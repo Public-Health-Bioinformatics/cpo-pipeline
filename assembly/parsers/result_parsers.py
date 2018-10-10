@@ -33,7 +33,7 @@ def parse_kraken_result(path_to_kraken_result):
     kraken_result = {}
     parsed_kraken_report_full = pandas.read_csv(path_to_kraken_result, delimiter='\t', header=None)
     #find all the rows with species level information and discard the rest
-    parsed_kraken_report_species_only = parsed_kraken_report.loc[
+    parsed_kraken_report_species_only = parsed_kraken_report_full.loc[
         (parsed_kraken_report_full[3] == "S")
     ]
     for i in range(len(parsed_kraken_report_species_only.index)):
