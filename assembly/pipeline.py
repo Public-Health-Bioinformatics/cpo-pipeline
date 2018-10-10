@@ -547,7 +547,7 @@ def main():
 
     output.append("\nKraken2 predicted species (>1%): ")
     for key in krakenGenomes:
-        output.append(krakenGenomes[key].name)
+        output.append(krakenGenomes[key]['name'])
     output.append("\nmash predicted genomes (within 300 of highest score): ")
     for key in mashHits:
         output.append(mashHits[key].species)
@@ -557,7 +557,7 @@ def main():
     
     output.append("\nDetailed kraken genome hits: ")
     for key in krakenGenomes:
-        output.append(krakenGenomes[key].row)
+        output.append(krakenGenomes[key]['row'])
     output.append("\nDetailed mash genome hits: ")
     for key in mashHits:
         output.append(mashHits[key].row)
@@ -577,7 +577,7 @@ def main():
         multiple = False
         
     for key in  krakenGenomes:
-        if (krakenGenomes[key].name == expectedSpecies):
+        if (krakenGenomes[key]['name'] == expectedSpecies):
             present = True
 
     if present:
