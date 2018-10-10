@@ -1,0 +1,28 @@
+#!/bin/bash -e
+
+#$ -V             # Pass environment variables to the job
+#$ -N cpo_pipeline
+#$ -cwd           # Use the current working dir
+#$ -pe smp 8      # Parallel Environment (how many cores)
+#$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
+#$ -e ./logs/$JOB_ID.err
+#$ -o ./logs/$JOB_ID.log
+
+#parameters:
+# <script-path>/pipeline.qsub
+# BC11-Kpn005
+# BC11-Kpn005.fa
+# -o output
+# -e "Klebsiella pneumoniae";
+
+pipeline_script="$1"
+sample_id="$2"
+assembly="$3"
+output_dir="$4"
+
+source activate pandas
+
+"${pipeline_script}" "${sample_id}" "${assembly}" "${output_dir}"
+
+source deactivate
+
