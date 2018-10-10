@@ -47,7 +47,7 @@ def parse_kraken_result(path_to_kraken_result):
             kraken_species_record['ncbi_taxon_id'] = parsed_kraken_report_species_only.iloc[i,4]
             kraken_species_record['name'] = parsed_kraken_report_species_only.iloc[i,5].strip()
             kraken_species_record['row'] = "\t".join(str(x) for x in parsed_kraken_report_species_only.iloc[i].tolist())
-            kraken_result[kraken_species_record.name] = kraken_species_record
+            kraken_result[kraken_species_record['name']] = kraken_species_record
     return kraken_result
 
 def parse_fastqc_result(pathToR1qc, pathToR2qc, ID, R1, R2):
