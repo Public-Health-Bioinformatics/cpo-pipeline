@@ -1,19 +1,30 @@
 #!/bin/bash -e
 
 #$ -V             # Pass environment variables to the job
-#$ -N CPO_pipeline    # Replace with a more specific job name
+#$ -N cpo_pipeline
 #$ -cwd           # Use the current working dir
 #$ -pe smp 8      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-#####################################################################################################################################################################################################
-#J-J-J-Jia @ pipeline_assembly.sh: assemble the reads.	then do QA on them	with busco and quast																									#
-#input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB																					#
-#Requires: shovill, bbmap, quast and busco (all conda-ble)																																			#
+######################################################################
+# J-J-J-Jia @ pipeline_assembly.sh: assemble the reads. Then do QA on them with busco and quast.
+# 
+# Positional input parameters:
+# 1 = id
+# 2 = forward
+# 3 = reverse
+# 4 = output
+# 5 = tmpdir for shovill
+# 6 = reference genome
+# 7 = buscoDB
+# 
+# Requires: shovill, bbmap, quast and busco
+# 
+# Example usage:
 # pipeline_assembly.sh BC11 BC11-Kpn005_S2_L001_R1_001.fastq.gz BC11-Kpn005_S2_L001_R2_001.fastq.gz output /home/dfornika/tmp/shovill /home/jjjjia/testCases/tests/references/refbc11 /data/ref_databases/busco/enterobacteriales_odb9
-#####################################################################################################################################################################################################
+######################################################################
 
 ID="$1"
 R1="$2"

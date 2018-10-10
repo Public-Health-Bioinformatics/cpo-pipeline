@@ -25,72 +25,7 @@ import collections
 import json
 import configparser
 
-debug = False
-
-if not debug:
-    config = configparser.ConfigParser()
-    config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
-    
-    #parses some parameters
-    parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
-    parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")    
-    parser.add_option("-f", "--forward", dest="R1", type="string", help="absolute file path forward read (R1)")
-    parser.add_option("-r", "--reverse", dest="R2", type="string", help="absolute file path to reverse read (R2)")
-    parser.add_option("-m", "--mash-genomedb", dest="mashGenomeRefDB", default = config['databases']['mash-genomedb'], type="string", help="absolute path to mash reference database")
-    parser.add_option("-n", "--mash-plasmiddb", dest="mashPlasmidRefDB", default = config['databases']['mash-plasmiddb'], type="string", help="absolute path to mash reference database")
-    parser.add_option("-z", "--kraken2-genomedb", dest="kraken2GenomeRefDB", default = config['databases']['kraken2-genomedb'], type="string", help="absolute path to kraken reference database")
-    parser.add_option("-v", "--kraken2-plasmiddb", dest="kraken2PlasmidRefDB", default = config['databases']['kraken2-plasmiddb'], type="string", help="absolute path to kraken reference database")
-    parser.add_option("-x", "--busco-db", dest="buscodb", default = config['databases']['busco-db'], type="string", help="absolute path to busco reference database")
-
-    parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")
-    parser.add_option("-k", "--script-path", dest="scriptDir", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
-
-    #used for parsing 
-    parser.add_option("-e", "--expected", dest="expectedSpecies", default="NA/NA/NA", type="string", help="expected species of the isolate")
-    
-    #parallelization, useless, these are hard coded to 8cores/64G RAM
-    #parser.add_option("-t", "--threads", dest="threads", default=8, type="int", help="number of cpu to use")
-    #parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
-
-    (options,args) = parser.parse_args()
-    #if len(args) != 8:
-        #parser.error("incorrect number of arguments, all 7 is required")
-
-    curDir = os.getcwd()
-    outputDir = options.output
-    mashdb = options.mashGenomeRefDB
-    mashplasmiddb=options.mashPlasmidRefDB
-    kraken2db = options.kraken2GenomeRefDB
-    kraken2plasmiddb=options.kraken2PlasmidRefDB
-    expectedSpecies = options.expectedSpecies
-    #threads = options.threads
-    #memory = options.memory
-    tempDir = outputDir + "/shovillTemp"
-    scriptDir = options.scriptDir
-    buscodb = options.buscodb
-    ID = options.id
-    R1 = options.R1
-    R2 = options.R2
-else:
-    curDir = os.getcwd()
-    outputDir = "pipelineTest"
-    mashdb = ""
-    mashplasmiddb=""
-    kraken2db = ""
-    kraken2plasmiddb=""
-    expectedSpecies = "Escherichia coli"
-    #threads = 8
-    #memory = 64
-    mlstScheme = outputDir + "/scheme_species_map.tab"
-    tempDir= outputDir + "/shovillTemp"    
-    scriptDir = "~/scripts"
-    updateAbName = "cpo"
-    updateAbPath = "~/database/bccdcCPO.seq"
-    updateMLST = True
-    buscodb = "~/database/bccdcCPO.seq"
-    ID = "BC16-Cfr035_S10"
-    R1 = "BC16-Cfr035_S10_L001_R1_001.fastq.gz"
-    R2 = "BC16-Cfr035_S10_L001_R2_001.fastq.gz"
+from parsers.parsers import *
 
 #region result objects
 #define some objects to store values from results
@@ -524,7 +459,53 @@ def ParseQuastResult(pathToQuastResult):
     return qr
 #endregion
 
-def Main(ID, R1, R2, expectedSpecies):
+def main():
+    
+    config = configparser.ConfigParser()
+    config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
+    
+    #parses some parameters
+    parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
+    parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")    
+    parser.add_option("-f", "--forward", dest="R1", type="string", help="absolute file path forward read (R1)")
+    parser.add_option("-r", "--reverse", dest="R2", type="string", help="absolute file path to reverse read (R2)")
+    parser.add_option("-m", "--mash-genomedb", dest="mashGenomeRefDB", default = config['databases']['mash-genomedb'], type="string", help="absolute path to mash reference database")
+    parser.add_option("-n", "--mash-plasmiddb", dest="mashPlasmidRefDB", default = config['databases']['mash-plasmiddb'], type="string", help="absolute path to mash reference database")
+    parser.add_option("-z", "--kraken2-genomedb", dest="kraken2GenomeRefDB", default = config['databases']['kraken2-genomedb'], type="string", help="absolute path to kraken reference database")
+    parser.add_option("-v", "--kraken2-plasmiddb", dest="kraken2PlasmidRefDB", default = config['databases']['kraken2-plasmiddb'], type="string", help="absolute path to kraken reference database")
+    parser.add_option("-x", "--busco-db", dest="buscodb", default = config['databases']['busco-db'], type="string", help="absolute path to busco reference database")
+
+    parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")
+    parser.add_option("-k", "--script-path", dest="scriptDir", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
+
+    #used for parsing 
+    parser.add_option("-e", "--expected", dest="expectedSpecies", default="NA/NA/NA", type="string", help="expected species of the isolate")
+    
+    #parallelization, useless, these are hard coded to 8cores/64G RAM
+    #parser.add_option("-t", "--threads", dest="threads", default=8, type="int", help="number of cpu to use")
+    #parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
+
+    (options,args) = parser.parse_args()
+    #if len(args) != 8:
+        #parser.error("incorrect number of arguments, all 7 is required")
+
+    curDir = os.getcwd()
+    outputDir = options.output
+    mashdb = options.mashGenomeRefDB
+    mashplasmiddb=options.mashPlasmidRefDB
+    kraken2db = options.kraken2GenomeRefDB
+    kraken2plasmiddb=options.kraken2PlasmidRefDB
+    expectedSpecies = options.expectedSpecies
+    #threads = options.threads
+    #memory = options.memory
+    tempDir = outputDir + "/shovillTemp"
+    scriptDir = options.scriptDir
+    buscodb = options.buscodb
+    ID = options.id
+    R1 = options.R1
+    R2 = options.R2
+
+    
     notes = []
     #init the output list
     output = []
@@ -774,11 +755,9 @@ def Main(ID, R1, R2, expectedSpecies):
     #endregion
 
 
-
-start = time.time()#time the analysis
-
-#analysis time
-Main(ID, R1, R2, expectedSpecies)
-
-end = time.time()
-print("Finished!\nThe analysis used: " + str(end-start) + " seconds")
+if __name__ = "__main__":
+    start = time.time()
+    print("Starting workflow...")
+    main()
+    end = time.time()
+    print("Finished!\nThe analysis used: " + str(end - start) + " seconds")
