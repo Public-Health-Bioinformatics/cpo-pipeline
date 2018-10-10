@@ -451,7 +451,7 @@ def main():
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
-    mashHits, PhiX = parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, size, depth)
+    mashHits, PhiX = result_parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, size, depth)
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
