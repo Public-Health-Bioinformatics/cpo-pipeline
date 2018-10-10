@@ -290,56 +290,6 @@ def ParseFastQCResult(pathToR1qc, pathToR2qc, ID, R1, R2):
 
     return _fastqcR1, _fastqcR2
 
-def ParseMashGenomeResult(pathToMashScreen, size, depth):
-    _mashHits = {}
-    _PhiX = False
-    
-    mashScreen = pandas.read_csv(pathToMashScreen, delimiter='\t', header=None) #read mash report
-    #0.998697        973/1000        71      0       GCF_000958965.1_matepair4_genomic.fna.gz        [59 seqs] NZ_LAFU01000001.1 Klebsiella pneumoniae strain CDPH5262 contig000001, whole genome shotgun sequence [...]
-    #parse mash result, using winner takes all
-    scores = mashScreen[1].values 
-    scoreCutoff = int(scores[0][:scores[0].index("/")]) - 300 #find the cut off value to use for filtering the report (300 below max)
-    index = 0
-    #find hits with score within top 300
-    for score in scores:
-        parsedScore = int(score[:score.index("/")])
-        if parsedScore >= scoreCutoff:
-            index+=1
-        else:
-            break
-
-    #parse what the species are.
-    for i in range(index):
-        mr = MashResult()
-        mr.size = size
-        mr.depth = depth
-        mr.identity = float(mashScreen.ix[i, 0])
-        mr.sharedHashes = mashScreen.ix[i, 1]
-        mr.medianMultiplicity = int(mashScreen.ix[i, 2])
-        mr.pvalue = float(mashScreen.ix[i, 3])
-        mr.queryID = mashScreen.ix[i, 4]
-        mr.queryComment = mashScreen.ix[i, 5]
-        mr.accession = mr.queryComment
-        mr.row = "\t".join(str(x) for x in mashScreen.ix[i].tolist())
-        qID = mr.queryID
-        #find gcf accession
-        gcf = (qID[:qID.find("_",5)]).replace("_","")
-        gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)]
-        mr.gcf = gcf 
-        #find assembly name
-        mr.assembly = qID[:qID.find("_genomic.fna.gz")]
-        #score = mashScreen.iloc[[i]][1]
-
-        if (mr.queryComment.find("phiX") > -1): #theres phix in top hits, just ignore
-            _PhiX=True
-            mr.species = "PhiX"
-        else: #add the non-phix hits to a list
-            start = int(mr.queryComment.index(".")) + 3
-            stop = int (mr.queryComment.index(","))
-            mr.species = str(mr.queryComment)[start: stop]
-            _mashHits[mr.species]=mr
-    return _mashHits, _PhiX
-
 def ParseMashPlasmidResult(pathToMashScreen, size, depth):
     mashScreen = pandas.read_csv(pathToMashScreen, delimiter='\t', header=None)
 
@@ -501,7 +451,7 @@ def main():
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
-    mashHits, PhiX = ParseMashGenomeResult(pathToMashGenomeScreenTSV, size, depth)
+    mashHits, PhiX = parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, size, depth)
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
@@ -550,7 +500,7 @@ def main():
         output.append(krakenGenomes[key]['name'])
     output.append("\nmash predicted genomes (within 300 of highest score): ")
     for key in mashHits:
-        output.append(mashHits[key].species)
+        output.append(mashHits[key]['species'])
     output.append("\nmash predicted plasmids (within 100 of highest score): ")
     for key in mashPlasmidHits:
         output.append(mashPlasmidHits[key].queryComment)
@@ -560,7 +510,7 @@ def main():
         output.append(krakenGenomes[key]['row'])
     output.append("\nDetailed mash genome hits: ")
     for key in mashHits:
-        output.append(mashHits[key].row)
+        output.append(mashHits[key]['row'])
     output.append("\nDetailed mash plasmid hits: ")
     for key in mashPlasmidHits:
         output.append(mashPlasmidHits[key].row)
@@ -603,7 +553,7 @@ def main():
                 
     present=False
     for key in mashHits:
-        spp = str(mashHits[key].species)
+        spp = str(mashHits[key]['species'])
         if (spp.find(expectedSpecies) > -1 ):
             present=True
     if present:
@@ -628,11 +578,11 @@ def main():
     #region identify and download a reference genome with mash
     referenceGenomes = []
     for key in mashHits:
-        qID = mashHits[key].queryID
-        gcf = mashHits[key].gcf
-        assembly = mashHits[key].assembly
+        qID = mashHits[key]['query_ID']
+        gcf = mashHits[key]['gcf']
+        assembly = mashHits[key]['assembly']
         url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + qID
-        referencePath = outputDir + "/qcResult/" + ID + "/" + mashHits[key].species.replace(" ","")
+        referencePath = outputDir + "/qcResult/" + ID + "/" + mashHits[key]['species'].replace(" ","")
         referenceGenomes.append(referencePath)
 
         httpGetFile(url, referencePath + ".gz")
