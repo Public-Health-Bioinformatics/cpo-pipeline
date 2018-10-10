@@ -517,11 +517,10 @@ def main():
     print("step 1: preassembly QC")
 
     #region call the qc script
-    if not debug:
-        print("running pipeline_qc.sh")
-        #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=mashgenomerefdb, $6=mashplasmidrefdb, $7=kraken2db, $8=kraken2plasmiddb
-        cmd = [scriptDir + "/pipeline_qc.sh", ID, R1, R2, outputDir, mashdb, mashplasmiddb, kraken2db, kraken2plasmiddb]
-        result = execute(cmd)
+    print("running pipeline_qc.sh")
+    #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=mashgenomerefdb, $6=mashplasmidrefdb, $7=kraken2db, $8=kraken2plasmiddb
+    cmd = [scriptDir + "/pipeline_qc.sh", ID, R1, R2, outputDir, mashdb, mashplasmiddb, kraken2db, kraken2plasmiddb]
+    result = execute(cmd)
     #endregion
 
     print("Parsing the QC results")
@@ -675,13 +674,12 @@ def main():
         referencePath = outputDir + "/qcResult/" + ID + "/" + mashHits[key].species.replace(" ","")
         referenceGenomes.append(referencePath)
 
-        if(not debug):
-            httpGetFile(url, referencePath + ".gz")
-            with gzip.open(referencePath + ".gz", 'rb') as f:
-                gzContent = f.read()
-            with open(referencePath, 'wb') as out:
-                out.write(gzContent)
-            os.remove(referencePath + ".gz")
+        httpGetFile(url, referencePath + ".gz")
+        with gzip.open(referencePath + ".gz", 'rb') as f:
+            gzContent = f.read()
+        with open(referencePath, 'wb') as out:
+            out.write(gzContent)
+        os.remove(referencePath + ".gz")
     
     #endregion
 
@@ -692,36 +690,36 @@ def main():
 
     #region call the script
     correctAssembly = ""
-    if not debug:
-        #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
-        #if (len(mashHits) == 1):
-        if (len(referenceGenomes) > 1):
-            for item in referenceGenomes:
-                if (item.find(expectedSpecies.replace(" ", "")) > -1): #found the right genome
-                    correctAssembly = os.path.basename(item)
-        else:
-            correctAssembly = os.path.basename(referenceGenomes[0])
-        if (correctAssembly == ""):
-            raise Exception("no reference genome...crashing")
 
-        if (not multiple and correctSpecies):
-            print("Noncontaminated Genome assembly...")            
-            cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
-            result = execute(cmd)
-        elif (multiple and correctSpecies):
-            #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome (csv, no spaces)	, 7=buscodb
-            print("Contaminated Genome assembly...")
-            cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
-            result = execute(cmd)
-        elif (multiple and not correctSpecies):
-            print("Contaminated Genome assembly...No Correct Species Either")
-            raise Exception("contamination and mislabeling...crashing")
-            #cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
-            #result = execute(cmd)
-        elif (not multiple and not correctSpecies):
-            print("Noncontaminated Genome assembly...No Correct species though")
-            cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
-            result = execute(cmd)
+    #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
+    #if (len(mashHits) == 1):
+    if (len(referenceGenomes) > 1):
+        for item in referenceGenomes:
+            if (item.find(expectedSpecies.replace(" ", "")) > -1): #found the right genome
+                correctAssembly = os.path.basename(item)
+    else:
+        correctAssembly = os.path.basename(referenceGenomes[0])
+    if (correctAssembly == ""):
+        raise Exception("no reference genome...crashing")
+
+    if (not multiple and correctSpecies):
+        print("Noncontaminated Genome assembly...")            
+        cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
+        result = execute(cmd)
+    elif (multiple and correctSpecies):
+        #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome (csv, no spaces)	, 7=buscodb
+        print("Contaminated Genome assembly...")
+        cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
+        result = execute(cmd)
+    elif (multiple and not correctSpecies):
+        print("Contaminated Genome assembly...No Correct Species Either")
+        raise Exception("contamination and mislabeling...crashing")
+        #cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
+        #result = execute(cmd)
+    elif (not multiple and not correctSpecies):
+        print("Noncontaminated Genome assembly...No Correct species though")
+        cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
+        result = execute(cmd)
     #endregion
 
     print("Parsing assembly results")
