@@ -755,7 +755,7 @@ def main():
     #endregion
 
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     start = time.time()
     print("Starting workflow...")
     main()
