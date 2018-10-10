@@ -21,7 +21,7 @@ def parse_kraken_result(path_to_kraken_result):
                                 "rank_code": "S",
                                 "ncbi_taxon_id": "562",
                                 "name": "Escherichia coli",
-                                "row": 12
+                                "row": " 84.08\t195563\t192561\tS\t562\tEscherichia coli"
                               }
           "Another species": { "fragment_percent": 12.1,
                                ...
@@ -109,7 +109,7 @@ def parse_mash_genome_result(path_to_mash_screen, size, depth):
                                 "query_ID": "GCF_001519515.1_ASM151951v1_genomic.fna.gz",
                                 "query_comment": "[219 seqs] NZ_LQSN01000001.1 Escherichia coli strain GN02215 GCID_ECOLID_00024_NODE_1.ctg_1, whole genome shotgun sequence [...]",
                                 "accession": "[219 seqs] NZ_LQSN01000001.1 Escherichia coli strain GN02215 GCID_ECOLID_00024_NODE_1.ctg_1, whole genome shotgun sequence [...]",
-                                "row": 1,
+                                "row": "0.998649\t972/1000\t16\t0\tGCF_001519515.1_ASM151951v1_genomic.fna.gz\t[219 seqs] NZ_LQSN01000001.1 Escherichia coli strain GN02215 GCID_ECOLID_00024_NODE_1.ctg_1, whole genome shotgun sequence [...]",
                                 "gcf": ["GCF", "001", "519", "515"],
                                 "assembly": "GCF_001519515.1_ASM151951v1",
                                 "species": "Escherichia coli"
@@ -153,7 +153,7 @@ def parse_mash_genome_result(path_to_mash_screen, size, depth):
         mash_record['p_value'] = float(mash_screen_report.ix[i, 3])
         mash_record['query_ID'] = mash_screen_report.ix[i, 4]
         mash_record['query_comment'] = mash_screen_report.ix[i, 5]
-        mash_record['accession'] = mash_result['query_comment']
+        mash_record['accession'] = mash_record['query_comment']
         mash_record['row'] = "\t".join(str(x) for x in mash_screen_report.ix[i].tolist())
         qID = mash_record['query_ID']
         # find gcf accession
