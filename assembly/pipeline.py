@@ -221,7 +221,7 @@ class RGIResult(object):
 def read(path):
     return [line.rstrip('\n') for line in open(path)]
 
-def execute(command):
+def execute(command, curDir):
     process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     # Poll process for new output until finished
@@ -520,7 +520,7 @@ def main():
     print("running pipeline_qc.sh")
     #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=mashgenomerefdb, $6=mashplasmidrefdb, $7=kraken2db, $8=kraken2plasmiddb
     cmd = [scriptDir + "/pipeline_qc.sh", ID, R1, R2, outputDir, mashdb, mashplasmiddb, kraken2db, kraken2plasmiddb]
-    result = execute(cmd)
+    result = execute(cmd, curDir)
     #endregion
 
     print("Parsing the QC results")
@@ -705,21 +705,21 @@ def main():
     if (not multiple and correctSpecies):
         print("Noncontaminated Genome assembly...")            
         cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
-        result = execute(cmd)
+        result = execute(cmd, curDir)
     elif (multiple and correctSpecies):
         #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome (csv, no spaces)	, 7=buscodb
         print("Contaminated Genome assembly...")
         cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
-        result = execute(cmd)
+        result = execute(cmd, curDir)
     elif (multiple and not correctSpecies):
         print("Contaminated Genome assembly...No Correct Species Either")
         raise Exception("contamination and mislabeling...crashing")
         #cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
-        #result = execute(cmd)
+        #result = execute(cmd, curDir)
     elif (not multiple and not correctSpecies):
         print("Noncontaminated Genome assembly...No Correct species though")
         cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
-        result = execute(cmd)
+        result = execute(cmd, curDir)
     #endregion
 
     print("Parsing assembly results")
