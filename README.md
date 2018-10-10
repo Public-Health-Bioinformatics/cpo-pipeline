@@ -54,4 +54,22 @@ The `assembly/pipeline_assembly_contaminant.sh` script requires the following co
  - `quast-4.6.3`
  - `busco-3.0.2`
 
+## Configuration
+
+A configuration file located at `assembly/config.ini` Use this file to configure the install location of these scripts and the locations of several reference databases used. The config file is a simple key-value [ini](https://en.wikipedia.org/wiki/INI_file) format. eg:
+
+```
+[scripts]
+script-path = /home/dfornika/code/cpo-pipeline/assembly
+
+[databases]
+mash-genomedb = /data/ref_databases/mash/refseq.genomes.k21s1000.msh
+mash-plasmiddb = /data/ref_databases/mash/refseq.plasmid.k21s1000.msh
+kraken2-genomedb = /data/ref_databases/kraken2/2018-09-20_standard
+kraken2-plasmiddb = /data/ref_databases/kraken2/2018-09-20_plasmid
+busco-db = /data/ref_databases/busco/enterobacteriales_odb9
+```
+
+Replace these paths with your system-specific paths.
+
 # Module 2: MLST Typing, Resistance Gene Identification, Plasmid Analysis and Dendrogram
