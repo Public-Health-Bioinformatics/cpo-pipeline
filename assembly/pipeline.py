@@ -25,7 +25,7 @@ import collections
 import json
 import configparser
 
-from parsers.parsers import *
+from parsers.result_parsers import *
 
 #region result objects
 #define some objects to store values from results
@@ -555,7 +555,7 @@ def main():
      
     # parse kraken2 result
     pathToKrakenResult = outputDir + "/qcResult/" + ID + "/kraken2.genome.report"
-    krakenGenomes = ParseKrakenResult(pathToKrakenResult)
+    krakenGenomes = parse_kraken_result(pathToKrakenResult)
     ToJson(krakenGenomes, "krakenGenomeHits.json")
     #pathToKrakenPlasmidResult = outputDir + "/qcResult/" + ID + "/kraken2.plasmid.report"
     

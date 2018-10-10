@@ -1,4 +1,4 @@
-def parse_kraken(pathToKrakenResult):
+def parse_kraken_result(pathToKrakenResult):
     _krakenGenomes = {}
     kraken = pandas.read_csv(pathToKrakenResult, delimiter='\t', header=None) #read  the kraken2report.tsv
     kraken = kraken.loc[(kraken[3] == "S")] #find all the rows with species level information and discard the rest
@@ -15,7 +15,7 @@ def parse_kraken(pathToKrakenResult):
             _krakenGenomes[kg.name]=(kg) #throw the kraken result object in to a list
     return _krakenGenomes
 
-def parse_fastqc(pathToR1qc, pathToR2qc, ID, R1, R2):
+def parse_fastqc_result(pathToR1qc, pathToR2qc, ID, R1, R2):
     fastqc = pandas.read_csv(pathToR1qc + "summary.txt", delimiter='\t', header=None)
     fastqc = fastqc[0].tolist()
 
@@ -54,7 +54,7 @@ def parse_fastqc(pathToR1qc, pathToR2qc, ID, R1, R2):
 
     return _fastqcR1, _fastqcR2
 
-def parse_mash_genome(pathToMashScreen, size, depth):
+def parse_mash_genome_result(pathToMashScreen, size, depth):
     _mashHits = {}
     _PhiX = False
     
@@ -104,7 +104,7 @@ def parse_mash_genome(pathToMashScreen, size, depth):
             _mashHits[mr.species]=mr
     return _mashHits, _PhiX
 
-def parse_mash_plasmid(pathToMashScreen, size, depth):
+def parse_mash_plasmid_result(pathToMashScreen, size, depth):
     mashScreen = pandas.read_csv(pathToMashScreen, delimiter='\t', header=None)
 
     #parse mash result, using winner takes all
@@ -149,7 +149,7 @@ def parse_read_stats(pathToMashLog, pathToTotalBp):
     _depth = float(format(_depth, '.2f'))
     return _size,_depth
 
-def parse_busco(pathToBuscoResult):
+def parse_busco_result(pathToBuscoResult):
     buscoOutput = read(pathToBuscoResult)
     if (len(buscoOutput) > 0):
         br = buscoResult()
@@ -164,7 +164,7 @@ def parse_busco(pathToBuscoResult):
         raise Exception("x011 this shouldnt happen...i think")
     return _buscoResults
 
-def parse_quast(pathToQuastResult):
+def parse_quast_result(pathToQuastResult):
     qResult = read(pathToQuastResult)
     qr = quastResult()
 
