@@ -41,3 +41,38 @@ busco-db = /data/ref_databases/busco/enterobacteriales_odb9
 ```
 
 Replace these paths with your system-specific paths.
+
+## Running the Pipeline
+
+### Setup
+
+Prepare an analysis directory with three sub-directories: `input`, `output`, and `logs`.
+
+The `input` directory should contain input `fastq[.gz]` files, along with a `sample_list.txt` file containing a simple list of sample IDs to include in the analysis.
+
+```
+Sample-001
+Sample-002
+Sample-003
+```
+
+```bash
+.
+├── input
+│   ├── Sample-001_R1.fastq.gz
+│   ├── Sample-001_R2.fastq.gz
+│   ├── Sample-002_R1.fastq.gz
+│   ├── Sample-002_R2.fastq.gz
+│   ├── Sample-003_R1.fastq.gz
+│   ├── Sample-003_R2.fastq.gz
+│   ├── ...
+│   └── sample_list.txt
+├── logs
+└── output
+```
+
+### Submit Analysis
+
+```
+assembly/pipeline_multisample.sh assembly/pipeline.qsub assembly/pipeline.py samples.txt input output "Expected species name"
+```
