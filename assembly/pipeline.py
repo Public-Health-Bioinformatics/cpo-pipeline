@@ -25,7 +25,7 @@ import collections
 import json
 import configparser
 
-from parsers.result_parsers import *
+from parsers import result_parsers
 
 #region result objects
 #define some objects to store values from results
@@ -126,16 +126,6 @@ class fastqcResult(object):
         for key in dict:
             s += key + "\t"
         return s
-
-class KrakenResult(object):
-    def __init__(self):
-        self.fragPercent = -1.00
-        self.fragCountRoot = 0
-        self.fragCountTaxon = 0
-        self.rankCode = ""
-        self.taxID = -1
-        self.name = ""
-        self.row = ""
 
 class buscoResult(object):
     def __init__(self):
@@ -259,31 +249,7 @@ def gunzip(inputpath="", outputpath=""):
             out.write(gzContent)
         return True
 
-def ToJson(dictObject, outputPath):
-    outDir = outputDir + '/summary/' + ID + ".json/"
-    #if not (os.path.exists(outDir)):
-        #os.makedirs(outDir)
-    #with open(outDir + outputPath, 'w') as f:
-        #json.dump([ob.__dict__ for ob in dictObject.values()], f, ensure_ascii=False)
 #endregion
-
-#region functions to parse result files
-def ParseKrakenResult(pathToKrakenResult):
-    _krakenGenomes = {}
-    kraken = pandas.read_csv(pathToKrakenResult, delimiter='\t', header=None) #read  the kraken2report.tsv
-    kraken = kraken.loc[(kraken[3] == "S")] #find all the rows with species level information and discard the rest
-    for i in range(len(kraken.index)):
-        if (float((str(kraken.iloc[i, 0])).strip("%")) > 1.00): #find all species above 1%
-            kg = KrakenResult() 
-            kg.fragPercent = float((str(kraken.iloc[i, 0])).strip("%"))
-            kg.fragCountRoot = int(kraken.iloc[i,1])
-            kg.fragCountTaxon = int (kraken.iloc[i,2])
-            kg.rankCode = kraken.iloc[i,3]
-            kg.taxID = kraken.iloc[i,4]
-            kg.name = kraken.iloc[i,5].strip()
-            kg.row = "\t".join(str(x) for x in kraken.iloc[i].tolist())
-            _krakenGenomes[kg.name]=(kg) #throw the kraken result object in to a list
-    return _krakenGenomes
 
 def ParseFastQCResult(pathToR1qc, pathToR2qc, ID, R1, R2):
     fastqc = pandas.read_csv(pathToR1qc + "summary.txt", delimiter='\t', header=None)
@@ -532,17 +498,14 @@ def main():
     stats = {}
     stats["size"] = size
     stats["depth"] = depth
-    ToJson(stats, "readStats.json")
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
     mashHits, PhiX = ParseMashGenomeResult(pathToMashGenomeScreenTSV, size, depth)
-    ToJson(mashHits, "mashGenomeHit.json")
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
     mashPlasmidHits = ParseMashPlasmidResult(pathToMashPlasmidScreenTSV, size, depth)
-    ToJson(mashPlasmidHits, "mashPlasmidHits.json")
 
     # parse fastqc
     pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/"
@@ -551,12 +514,10 @@ def main():
     fastqc = {}
     fastqc["R1"]=fastqcR1
     fastqc["R2"]=fastqcR1
-    ToJson(fastqc, "fastqc.json")
      
     # parse kraken2 result
     pathToKrakenResult = outputDir + "/qcResult/" + ID + "/kraken2.genome.report"
-    krakenGenomes = parse_kraken_result(pathToKrakenResult)
-    ToJson(krakenGenomes, "krakenGenomeHits.json")
+    krakenGenomes = result_parsers.parse_kraken_result(pathToKrakenResult)
     #pathToKrakenPlasmidResult = outputDir + "/qcResult/" + ID + "/kraken2.plasmid.report"
     
     #endregion
