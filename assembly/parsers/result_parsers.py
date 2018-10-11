@@ -50,44 +50,70 @@ def parse_kraken_result(path_to_kraken_result):
             kraken_result[kraken_species_record['name']] = kraken_species_record
     return kraken_result
 
-def parse_fastqc_result(pathToR1qc, pathToR2qc, ID, R1, R2):
-    fastqc = pandas.read_csv(pathToR1qc + "summary.txt", delimiter='\t', header=None)
-    fastqc = fastqc[0].tolist()
+def parse_fastqc_result(path_to_R1_qc, path_to_R2_qc):
+    """
+    Args:
+        path_to_R1_qc (str): Path to the fastqc R1 report directory.
+        path_to_R2_qc (str): Path to the fastqc R2 report directory.
 
-    _fastqcR1 = fastqcResult()
-    _fastqcR1.basic = fastqc[0]
-    _fastqcR1.perBaseSequenceQuality = fastqc[1]
-    _fastqcR1.perTileSequenceQuality = fastqc[2]
-    _fastqcR1.perSequenceQualityScores = fastqc[3]
-    _fastqcR1.perBaseSequenceContent = fastqc[4]
-    _fastqcR1.perSequenceGCContent = fastqc[5]
-    _fastqcR1.perBaseNContent = fastqc[6]
-    _fastqcR1.sequenceLengthDistribution = fastqc[7]
-    _fastqcR1.sequenceDuplicationLevels = fastqc[8]
-    _fastqcR1.overrepresentedSequences = fastqc[9]
-    _fastqcR1.adapterContent = fastqc[10]
-    with open(pathToR1qc + "fastqc_report.html", "r") as input:
-        _fastqcR1.fastqcHTMLblob = input.read()
+    Returns:
+        tuple(dict1, dict2) where:
+        dict1: Parsed fastqc R1 report.
+               All values except 'fastqc_html_blob' are either "PASS", "WARN", or "FAIL".
+        For example:
+        { "basic": "PASS",
+          "per_base_sequence_quality": "PASS",
+          "per_tile_sequence_quality": "PASS",
+          "per_sequence_quality_scores": "PASS",
+          "per_base_sequence_content": "WARN",
+          "per_sequence_gc_content": "FAIL",
+          "per_base_n_content": "PASS",
+          "sequence_length_distribution": "WARN",
+          "sequence_duplication_levels": "PASS",
+          "overrepresented_sequences": "WARN",
+          "adapter_content": "PASS",
+          "fastqc_html_blob": "<html><head><title>BC18-Eco016_R1.fastq.gz FastQC Report</title><style type="text/css">..."
+        }
+        dict2: Parsed fastqc R2 report.
+               Structure is identical to Parsed fastqc R1 report.
+    """
+    fastqc_R1_summary = pandas.read_csv(path_to_R1_qc + "summary.txt", delimiter='\t', header=None)
+    fastqc_R1_summary_labels = fastqc_R1_summary[0].tolist()
 
-    fastqc = pandas.read_csv(pathToR2qc+ "summary.txt", delimiter='\t', header=None)
-    fastqc = fastqc[0].tolist()
+    fastqc_R1 = {}
+    fastqc_R1['basic'] = fastqc_R1_summary_labels[0]
+    fastqc_R1['per_base_sequence_quality'] = fastqc_R1_summary_labels[1]
+    fastqc_R1['per_tile_sequence_quality'] = fastqc_R1_summary_labels[2]
+    fastqc_R1['per_sequence_quality_scores'] = fastqc_R1_summary_labels[3]
+    fastqc_R1['per_base_sequence_content'] = fastqc_R1_summary_labels[4]
+    fastqc_R1['per_sequence_gc_content'] = fastqc_R1_summary_labels[5]
+    fastqc_R1['per_base_n_content'] = fastqc_R1_summary_labels[6]
+    fastqc_R1['sequence_length_distribution'] = fastqc_R1_summary_labels[7]
+    fastqc_R1['sequence_duplication_levels'] = fastqc_R1_summary_labels[8]
+    fastqc_R1['overrepresented_sequences'] = fastqc_R1_summary_labels[9]
+    fastqc_R1['adapter_content'] = fastqc_R1_summary_labels[10]
+    with open(path_to_R1_qc + "fastqc_report.html", "r") as input:
+        fastqc_R1['fastqc_html_blob'] = input.read()
 
-    _fastqcR2 = fastqcResult()
-    _fastqcR2.basic = fastqc[0]
-    _fastqcR2.perBaseSequenceQuality = fastqc[1]
-    _fastqcR2.perTileSequenceQuality = fastqc[2]
-    _fastqcR2.perSequenceQualityScores = fastqc[3]
-    _fastqcR2.perBaseSequenceContent = fastqc[4]
-    _fastqcR2.perSequenceGCContent = fastqc[5]
-    _fastqcR2.perBaseNContent = fastqc[6]
-    _fastqcR2.sequenceLengthDistribution = fastqc[7]
-    _fastqcR2.sequenceDuplicationLevels = fastqc[8]
-    _fastqcR2.overrepresentedSequences = fastqc[9]
-    _fastqcR2.adapterContent = fastqc[10]
-    with open(pathToR2qc + "fastqc_report.html", "r") as input:
-        _fastqcR2.fastqcHTMLblob = input.read()
+    fastqc_R2_summary = pandas.read_csv(path_to_R2_qc + "summary.txt", delimiter='\t', header=None)
+    fastqc_R2_summary_labels = fastqc_R2_summary[0].tolist()
 
-    return _fastqcR1, _fastqcR2
+    fastqc_R2 = {}
+    fastqc_R2['basic'] = fastqc_R2_summary_labels[0]
+    fastqc_R2['per_base_sequence_quality'] = fastqc_R2_summary_labels[1]
+    fastqc_R2['per_tile_sequence_quality'] = fastqc_R2_summary_labels[2]
+    fastqc_R2['per_sequence_quality_scores'] = fastqc_R2_summary_labels[3]
+    fastqc_R2['per_base_sequence_content'] = fastqc_R2_summary_labels[4]
+    fastqc_R2['per_sequence_gc_content'] = fastqc_R2_summary_labels[5]
+    fastqc_R2['per_base_n_content'] = fastqc_R2_summary_labels[6]
+    fastqc_R2['sequence_length_distribution'] = fastqc_R2_summary_labels[7]
+    fastqc_R2['sequence_duplication_levels'] = fastqc_R2_summary_labels[8]
+    fastqc_R2['overrepresented_sequences'] = fastqc_R2_summary_labels[9]
+    fastqc_R2['adapter_content'] = fastqc_R2_summary_labels[10]
+    with open(path_to_R2_qc + "fastqc_report.html", "r") as input:
+        fastqc_R2['fastqc_html_blob'] = input.read()
+
+    return fastqc_R1, fastqc_R2
 
 def parse_mash_genome_result(path_to_mash_screen, size, depth):
     """
@@ -131,7 +157,7 @@ def parse_mash_genome_result(path_to_mash_screen, size, depth):
     # identity    shared-hashes    median-multiplicity    p-value    query-ID                                    query-comment]
     # 0.998697    973/1000         71                     0          GCF_000958965.1_matepair4_genomic.fna.gz    [59 seqs] NZ_LAFU01000001.1 Klebsiella pneumoniae strain CDPH5262 contig000001, whole genome shotgun sequence [...]
     # parse mash result, using winner takes all
-    scores = mash_screen_report[1].values 
+    scores = mash_screen_report[1].values
     score_cutoff = int(scores[0][:scores[0].index("/")]) - 300 #find the cut off value to use for filtering the report (300 below max)
     index = 0
     #find hits with score within top 300
@@ -173,41 +199,69 @@ def parse_mash_genome_result(path_to_mash_screen, size, depth):
             mash_hits[mash_record['species']] = mash_record
     return mash_hits, phiX
 
-def parse_mash_plasmid_result(pathToMashScreen, size, depth):
-    mashScreen = pandas.read_csv(pathToMashScreen, delimiter='\t', header=None)
+def parse_mash_plasmid_result(path_to_mash_screen, size, depth):
+    """
+    Args:
+        path_to_mash_screen (str): Path to the mash screen report file.
+        size (int):
+        depth (int):
+
+    Returns:
+        dict: Parsed mash screen report
+        For example:
+        { "NZ_CP010882.1": { "size": ,
+                             "depth": ,
+                             "identity": 0.992291,
+                             "shared_hashes": "850/1000",
+                             "median_multiplicity": 19,
+                             "p_value": 0.00,
+                             "query_ID": "ref|NZ_CP010882.1|",
+                             "query_comment": "Escherichia coli strain MNCRE44 plasmid pMNCRE44_6, complete sequence",
+                             "accession": "NZ_CP010882.1",
+                             "row": "0.992291\t850/1000\t19\t0\tref|NZ_CP010882.1|\tEscherichia coli strain MNCRE44 plasmid pMNCRE44_6, complete sequence",
+                             "species": ""
+                           }
+          "Another accession": { "size": ,
+                                 ...
+                               }
+        }
+
+        See mash docs for more info on mash screen report file:
+        https://mash.readthedocs.io/en/latest/tutorials.html#screening-a-read-set-for-containment-of-refseq-genomes
+    """
+    mash_screen_report = pandas.read_csv(path_to_mash_screen, delimiter='\t', header=None)
 
     #parse mash result, using winner takes all
-    scores = mashScreen[1].values 
-    scoreCutoff = int(scores[0][:scores[0].index("/")]) - 100
+    scores = mash_screen_report[1].values
+    score_cutoff = int(scores[0][:scores[0].index("/")]) - 100
     index = 0
 
-    #find hits with score >850
+    #find hits with score > (max_score - 100)
     for score in scores:
-        parsedScore = int(score[:score.index("/")])
-        if parsedScore >= scoreCutoff:
+        parsed_score = int(score[:score.index("/")])
+        if parsed_score >= score_cutoff:
             index+=1
         else:
             break
 
-    _mashPlasmidHits = {}
+    mash_plasmid_hits = {}
     #parse what the species are.
     for i in range(index):
-        mr = MashResult()
-        mr.size = size
-        mr.depth = depth
-        mr.identity = float(mashScreen.ix[i, 0])
-        mr.sharedHashes = mashScreen.ix[i, 1]
-        mr.medianMultiplicity = int(mashScreen.ix[i, 2])
-        mr.pvalue = float(mashScreen.ix[i, 3])
-        mr.queryID = mashScreen.ix[i, 4] #accession
-        mr.queryComment = mashScreen.ix[i, 5] #what is it
-        mr.accession = mr.queryID[4:len(mr.queryID)-1]
-        mr.row = "\t".join(str(x) for x in mashScreen.ix[i].tolist())
-        #score = mashScreen.iloc[[i]][1]
-        mr.species = ""
-        if (mr.identity >= 0.97):
-            _mashPlasmidHits[mr.accession] = mr
-    return _mashPlasmidHits
+        mash_record = {}
+        mash_record['size'] = size
+        mash_record['depth'] = depth
+        mash_record['identity'] = float(mash_screen_report.ix[i, 0])
+        mash_record['shared_hashes'] = mash_screen_report.ix[i, 1]
+        mash_record['median_multiplicity'] = int(mash_screen_report.ix[i, 2])
+        mash_record['p_value'] = float(mash_screen_report.ix[i, 3])
+        mash_record['query_ID'] = mash_screen_report.ix[i, 4] #accession
+        mash_record['query_comment'] = mash_screen_report.ix[i, 5]
+        mash_record['accession'] = mash_record['query_ID'][4:len(mash_record['query_ID'])-1]
+        mash_record['row'] = "\t".join(str(x) for x in mash_screen_report.ix[i].tolist())
+        mash_record['species'] = ""
+        if (mash_record['identity'] >= 0.97):
+            mash_plasmid_hits[mash_record['accession']] = mash_record
+    return mash_plasmid_hits
 
 def parse_read_stats(pathToMashLog, pathToTotalBp):
     for s in read(pathToMashLog):

@@ -27,7 +27,6 @@ import configparser
 
 from parsers import result_parsers
 
-#region result objects
 #define some objects to store values from results
 #//TODO this is not the proper way of get/set private object variables. every value has manually assigned defaults intead of specified in init(). Also, use property(def getVar, def setVar).
 class starFinders(object):
@@ -66,66 +65,6 @@ class MlstResult(object):
         self.scheme = ""
         self.species = ""
         self.row=""
-
-class MashResult(object):
-    def __init__(self):
-        self.size = 0.0
-        self.depth = 0.0
-        self.identity = 0.0
-        self.sharedHashes = ""
-        self.medianMultiplicity = 0
-        self.pvalue = 0.0
-        self.queryID= ""
-        self.queryComment = ""
-        self.species = ""
-        self.row = ""
-        self.accession = ""
-        self.gcf=""
-        self.assembly=""
-
-    def toDict(self): #doesnt actually work
-        return dict((name, getattr(self, name)) for name in dir(self) if not name.startswith('__')) 
-
-class fastqcResult(object):
-    def __init__(self):
-        self.basic = ""
-        self.perBaseSequenceQuality = ""
-        self.perTileSequenceQuality = ""
-        self.perSequenceQualityScores = ""
-        self.perBaseSequenceContent = ""
-        self.perSequenceGCContent = ""
-        self.perBaseNContent = ""
-        self.sequenceLengthDistribution = ""
-        self.sequenceDuplicationLevels = ""
-        self.overrepresentedSequences = ""
-        self.adapterContent = ""
-        self.fastqcHTMLblob = ""
-    def toDict(self):
-        dict = {}
-        dict["Basic Statistics"] = self.basic
-        dict["Per base sequence quality"] = self.perBaseSequenceQuality
-        dict["Per tile sequence quality"] = self.perTileSequenceQuality
-        dict["Per sequence quality scores"] = self.perSequenceQualityScores
-        dict["Per base sequence content"] = self.perBaseSequenceContent
-        dict["Per sequence GC content"] = self.perSequenceGCContent
-        dict["Per base N content"] = self.perBaseNContent
-        dict["Sequence Length Distribution"] = self.sequenceLengthDistribution
-        dict["Sequence Duplication Levels"] = self.sequenceDuplicationLevels
-        dict["Overrepresented sequences"] = self.overrepresentedSequences
-        dict["Adapter Content"] = self.adapterContent
-        return dict
-    def dataToTSV():
-        dict = toDict()
-        s = ""
-        for key in dict:
-            s += dict[key] + "\t"
-        return s
-    def headerToTSV():
-        dict = toDict()
-        s = ""
-        for key in dict:
-            s += key + "\t"
-        return s
 
 class buscoResult(object):
     def __init__(self):
@@ -207,7 +146,7 @@ class RGIResult(object):
 
 #endregion
 
-#region useful functions
+
 def read(path):
     return [line.rstrip('\n') for line in open(path)]
 
@@ -248,83 +187,6 @@ def gunzip(inputpath="", outputpath=""):
         with open(outputpath, 'wb') as out:
             out.write(gzContent)
         return True
-
-#endregion
-
-def ParseFastQCResult(pathToR1qc, pathToR2qc, ID, R1, R2):
-    fastqc = pandas.read_csv(pathToR1qc + "summary.txt", delimiter='\t', header=None)
-    fastqc = fastqc[0].tolist()
-
-    _fastqcR1 = fastqcResult()
-    _fastqcR1.basic = fastqc[0]
-    _fastqcR1.perBaseSequenceQuality = fastqc[1]
-    _fastqcR1.perTileSequenceQuality = fastqc[2]
-    _fastqcR1.perSequenceQualityScores = fastqc[3]
-    _fastqcR1.perBaseSequenceContent = fastqc[4]
-    _fastqcR1.perSequenceGCContent = fastqc[5]
-    _fastqcR1.perBaseNContent = fastqc[6]
-    _fastqcR1.sequenceLengthDistribution = fastqc[7]
-    _fastqcR1.sequenceDuplicationLevels = fastqc[8]
-    _fastqcR1.overrepresentedSequences = fastqc[9]
-    _fastqcR1.adapterContent = fastqc[10]
-    with open(pathToR1qc + "fastqc_report.html", "r") as input:
-        _fastqcR1.fastqcHTMLblob = input.read()
-
-    fastqc = pandas.read_csv(pathToR2qc+ "summary.txt", delimiter='\t', header=None)
-    fastqc = fastqc[0].tolist()
-
-    _fastqcR2 = fastqcResult()
-    _fastqcR2.basic = fastqc[0]
-    _fastqcR2.perBaseSequenceQuality = fastqc[1]
-    _fastqcR2.perTileSequenceQuality = fastqc[2]
-    _fastqcR2.perSequenceQualityScores = fastqc[3]
-    _fastqcR2.perBaseSequenceContent = fastqc[4]
-    _fastqcR2.perSequenceGCContent = fastqc[5]
-    _fastqcR2.perBaseNContent = fastqc[6]
-    _fastqcR2.sequenceLengthDistribution = fastqc[7]
-    _fastqcR2.sequenceDuplicationLevels = fastqc[8]
-    _fastqcR2.overrepresentedSequences = fastqc[9]
-    _fastqcR2.adapterContent = fastqc[10]
-    with open(pathToR2qc + "fastqc_report.html", "r") as input:
-        _fastqcR2.fastqcHTMLblob = input.read()
-
-    return _fastqcR1, _fastqcR2
-
-def ParseMashPlasmidResult(pathToMashScreen, size, depth):
-    mashScreen = pandas.read_csv(pathToMashScreen, delimiter='\t', header=None)
-
-    #parse mash result, using winner takes all
-    scores = mashScreen[1].values 
-    scoreCutoff = int(scores[0][:scores[0].index("/")]) - 100
-    index = 0
-
-    #find hits with score >850
-    for score in scores:
-        parsedScore = int(score[:score.index("/")])
-        if parsedScore >= scoreCutoff:
-            index+=1
-        else:
-            break
-
-    _mashPlasmidHits = {}
-    #parse what the species are.
-    for i in range(index):
-        mr = MashResult()
-        mr.size = size
-        mr.depth = depth
-        mr.identity = float(mashScreen.ix[i, 0])
-        mr.sharedHashes = mashScreen.ix[i, 1]
-        mr.medianMultiplicity = int(mashScreen.ix[i, 2])
-        mr.pvalue = float(mashScreen.ix[i, 3])
-        mr.queryID = mashScreen.ix[i, 4] #accession
-        mr.queryComment = mashScreen.ix[i, 5] #what is it
-        mr.accession = mr.queryID[4:len(mr.queryID)-1]
-        mr.row = "\t".join(str(x) for x in mashScreen.ix[i].tolist())
-        #score = mashScreen.iloc[[i]][1]
-        mr.species = ""
-        if (mr.identity >= 0.97):
-            _mashPlasmidHits[mr.accession] = mr
-    return _mashPlasmidHits
 
 def ParseReadStats(pathToMashLog, pathToTotalBp):
     for s in read(pathToMashLog):
@@ -429,18 +291,15 @@ def main():
     print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
     output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
 
-    #region step 1 pre assembly qc
     print("step 1: preassembly QC")
 
-    #region call the qc script
     print("running pipeline_qc.sh")
     #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=mashgenomerefdb, $6=mashplasmidrefdb, $7=kraken2db, $8=kraken2plasmiddb
     cmd = [scriptDir + "/pipeline_qc.sh", ID, R1, R2, outputDir, mashdb, mashplasmiddb, kraken2db, kraken2plasmiddb]
     result = execute(cmd, curDir)
-    #endregion
+
 
     print("Parsing the QC results")
-    #region parse results
     #parse read stats
     pathToMashLog = outputDir + "/qcResult/" + ID + "/" + "mash.log"
     pathToTotalBP = outputDir + "/qcResult/" + ID + "/" + "totalbp"
@@ -455,12 +314,12 @@ def main():
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
-    mashPlasmidHits = ParseMashPlasmidResult(pathToMashPlasmidScreenTSV, size, depth)
+    mashPlasmidHits = result_parsers.parse_mash_plasmid_result(pathToMashPlasmidScreenTSV, size, depth)
 
     # parse fastqc
     pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/"
     pathToFastQCR2 = outputDir + "/qcResult/" + ID + "/" + R2[R2.find(os.path.basename(R2)):R2.find(".")] + "_fastqc/"
-    fastqcR1,fastqcR2 = ParseFastQCResult(pathToFastQCR1, pathToFastQCR2, ID, R1, R2)
+    fastqcR1,fastqcR2 = result_parsers.parse_fastqc_result(pathToFastQCR1, pathToFastQCR2)
     fastqc = {}
     fastqc["R1"]=fastqcR1
     fastqc["R2"]=fastqcR1
@@ -468,12 +327,8 @@ def main():
     # parse kraken2 result
     pathToKrakenResult = outputDir + "/qcResult/" + ID + "/kraken2.genome.report"
     krakenGenomes = result_parsers.parse_kraken_result(pathToKrakenResult)
-    #pathToKrakenPlasmidResult = outputDir + "/qcResult/" + ID + "/kraken2.plasmid.report"
-    
-    #endregion
 
     print("Formatting the QC results")
-    #region output parsed results
     multiple = False
     correctSpecies = False
     correctReference = ""
@@ -485,15 +340,15 @@ def main():
 
     output.append("\nFastQC summary:")
     output.append("\nforward read qc:")
-    for key in fastqcR1.toDict():
-        output.append(key + ": " + fastqcR1.toDict()[key])
-        if (fastqcR1.toDict()[key] == "WARN" or fastqcR1.toDict()[key] == "FAIL"):
-            notes.append("FastQC: Forward read, " + key + " " + fastqcR1.toDict()[key])
+    for key, value in fastqcR1.items():
+        output.append(key + ": " + value)
+        if (value == "WARN" or value == "FAIL"):
+            notes.append("FastQC: Forward read, " + key + " " + value)
     output.append("\nreverse read qc:")
-    for key in fastqcR2.toDict():
-        output.append(key + ": " + fastqcR2.toDict()[key])
-        if (fastqcR2.toDict()[key] == "WARN" or fastqcR2.toDict()[key] == "FAIL"):
-            notes.append("FastQC: Reverse read, " + key + " " + fastqcR2.toDict()[key])
+    for key, value in fastqcR2.items():
+        output.append(key + ": " + value)
+        if (value == "WARN" or value == "FAIL"):
+            notes.append("FastQC: Reverse read, " + key + " " + value)
 
     output.append("\nKraken2 predicted species (>1%): ")
     for key in krakenGenomes:
@@ -503,7 +358,7 @@ def main():
         output.append(mashHits[key]['species'])
     output.append("\nmash predicted plasmids (within 100 of highest score): ")
     for key in mashPlasmidHits:
-        output.append(mashPlasmidHits[key].queryComment)
+        output.append(mashPlasmidHits[key]['query_comment'])
     
     output.append("\nDetailed kraken genome hits: ")
     for key in krakenGenomes:
@@ -513,7 +368,7 @@ def main():
         output.append(mashHits[key]['row'])
     output.append("\nDetailed mash plasmid hits: ")
     for key in mashPlasmidHits:
-        output.append(mashPlasmidHits[key].row)
+        output.append(mashPlasmidHits[key]['row'])
 
     #qcsummary
     output.append("\n\nQC Information:")
@@ -567,7 +422,6 @@ def main():
     if (len(mashPlasmidHits) == 0):
         output.append("!!!no plasmids predicted")
         notes.append("Mash: no plasmid predicted")
-    #endregion
 
     #hack: throw exception if this analysis should not proceed due to contamination and mislabelling
     if (multiple and not correctSpecies):
@@ -575,7 +429,7 @@ def main():
         out.write('GO RESEQUENCE THIS SAMPLE: It has contamination issues AND mislabelled')
         #raise Exception('GO RESEQUENCE THIS SAMPLE: It has contamination issues AND mislabelled')
     print("Downloading reference genomes")
-    #region identify and download a reference genome with mash
+
     referenceGenomes = []
     for key in mashHits:
         qID = mashHits[key]['query_ID']
@@ -590,16 +444,9 @@ def main():
             gzContent = f.read()
         with open(referencePath, 'wb') as out:
             out.write(gzContent)
-        os.remove(referencePath + ".gz")
-    
-    #endregion
+        os.remove(referencePath + ".gz"
 
-    #endregion
-
-    #region step2, assembly and qc
     print("step 2: genome assembly and QC")
-
-    #region call the script
     correctAssembly = ""
 
     #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
@@ -631,10 +478,8 @@ def main():
         print("Noncontaminated Genome assembly...No Correct species though")
         cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
         result = execute(cmd, curDir)
-    #endregion
 
     print("Parsing assembly results")
-    #region parse assembly_qc from quast and busco
     #get the correct busco and quast result file to parse
     correctAssembly = ""
     buscoPath = "" 
@@ -658,11 +503,6 @@ def main():
     #populate the busco and quast result object
     buscoResults = ParseBuscoResult(buscoPath)
     quastResults = ParseQuastResult(quastPath)
-
-    #endregion
-
-    #endregion
-
 
 if __name__ == "__main__":
     start = time.time()
