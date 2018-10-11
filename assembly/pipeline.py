@@ -66,15 +66,6 @@ class MlstResult(object):
         self.species = ""
         self.row=""
 
-class buscoResult(object):
-    def __init__(self):
-        self.completeSingle = 0
-        self.completeDuplicate = 0
-        self.fragmented = 0
-        self.mising = 0
-        self.total = 781
-        self.buscoResult = []
-
 class quastResult(object):
     def __init__(self):
         self.contigsCount = 0
@@ -187,21 +178,6 @@ def gunzip(inputpath="", outputpath=""):
         with open(outputpath, 'wb') as out:
             out.write(gzContent)
         return True
-
-def ParseBuscoResult(pathToBuscoResult):
-    buscoOutput = read(pathToBuscoResult)
-    if (len(buscoOutput) > 0):
-        br = buscoResult()
-        br.completeSingle = int(buscoOutput[10].split("\t")[1])
-        br.completeDuplicate = int(buscoOutput[11].split("\t")[1])
-        br.fragmented = int(buscoOutput[12].split("\t")[1])
-        br.mising = int(buscoOutput[13].split("\t")[1])
-        br.total = int(buscoOutput[14].split("\t")[1])
-        br.buscoResult = buscoOutput
-        _buscoResults = br
-    else: #it should never be <1.... i think
-        raise Exception("x011 this shouldnt happen...i think")
-    return _buscoResults
 
 def ParseQuastResult(pathToQuastResult):
     qResult = read(pathToQuastResult)
@@ -492,7 +468,7 @@ def main():
         raise Exception('theres no reference genome for this sample for whatever reason...')
 
     #populate the busco and quast result object
-    buscoResults = ParseBuscoResult(buscoPath)
+    buscoResults = result_parsers.parse_busco_result(buscoPath)
     quastResults = ParseQuastResult(quastPath)
 
 if __name__ == "__main__":
