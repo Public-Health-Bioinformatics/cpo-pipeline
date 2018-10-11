@@ -263,14 +263,25 @@ def parse_mash_plasmid_result(path_to_mash_screen, size, depth):
             mash_plasmid_hits[mash_record['accession']] = mash_record
     return mash_plasmid_hits
 
-def parse_read_stats(pathToMashLog, pathToTotalBp):
-    for s in read(pathToMashLog):
-        if (s.find("Estimated genome size:") > -1 ):
-            _size = float(s[s.index(": ")+2:])
-    _totalbp = float(read(pathToTotalBp)[0])
-    _depth = _totalbp / _size
-    _depth = float(format(_depth, '.2f'))
-    return _size,_depth
+def parse_read_stats(path_to_mash_log, path_to_total_bp):
+    """
+    Args:
+        path_to_mash_log (str): Path to the mash log file.
+        path_to_total_bp (str): Path to
+
+    Returns:
+        tuple(float1, float2) where:
+          float1: Estimated genome size
+          float2: Estimated depth (total bases / genome size)
+    """
+    total_bp = int([line.rstrip('\n') for line in open(path_to_total_bp)][0])
+    mash_log = [line.rstrip('\n') for line in open(path_to_mash_log)]
+    for line in mash_log:
+        if (line.find("Estimated genome size:") > -1 ):
+            size = float(line[line.index(": ") + 2:])
+    depth = total_bp / size
+    depth = float(format(depth, '.2f'))
+    return size, depth
 
 def parse_busco_result(pathToBuscoResult):
     buscoOutput = read(pathToBuscoResult)

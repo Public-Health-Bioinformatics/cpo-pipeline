@@ -188,15 +188,6 @@ def gunzip(inputpath="", outputpath=""):
             out.write(gzContent)
         return True
 
-def ParseReadStats(pathToMashLog, pathToTotalBp):
-    for s in read(pathToMashLog):
-        if (s.find("Estimated genome size:") > -1 ):
-            _size = float(s[s.index(": ")+2:])
-    _totalbp = float(read(pathToTotalBp)[0])
-    _depth = _totalbp / _size
-    _depth = float(format(_depth, '.2f'))
-    return _size,_depth
-
 def ParseBuscoResult(pathToBuscoResult):
     buscoOutput = read(pathToBuscoResult)
     if (len(buscoOutput) > 0):
@@ -303,7 +294,7 @@ def main():
     #parse read stats
     pathToMashLog = outputDir + "/qcResult/" + ID + "/" + "mash.log"
     pathToTotalBP = outputDir + "/qcResult/" + ID + "/" + "totalbp"
-    size, depth = ParseReadStats(pathToMashLog, pathToTotalBP)
+    size, depth = result_parsers.parse_read_stats(pathToMashLog, pathToTotalBP)
     stats = {}
     stats["size"] = size
     stats["depth"] = depth
@@ -444,7 +435,7 @@ def main():
             gzContent = f.read()
         with open(referencePath, 'wb') as out:
             out.write(gzContent)
-        os.remove(referencePath + ".gz"
+        os.remove(referencePath + ".gz")
 
     print("step 2: genome assembly and QC")
     correctAssembly = ""
