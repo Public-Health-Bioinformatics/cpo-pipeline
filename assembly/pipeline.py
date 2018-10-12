@@ -131,10 +131,7 @@ def main():
     #parse read stats
     pathToMashLog = outputDir + "/qcResult/" + ID + "/" + "mash.log"
     pathToTotalBP = outputDir + "/qcResult/" + ID + "/" + "totalbp"
-    size, depth = result_parsers.parse_read_stats(pathToMashLog, pathToTotalBP)
-    stats = {}
-    stats["size"] = size
-    stats["depth"] = depth
+    stats = result_parsers.parse_read_stats(pathToMashLog, pathToTotalBP)
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"

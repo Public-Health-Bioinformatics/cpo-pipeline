@@ -270,18 +270,23 @@ def parse_read_stats(path_to_mash_log, path_to_total_bp):
         path_to_total_bp (str): Path to
 
     Returns:
-        tuple(float1, float2) where:
-          float1: Estimated genome size
-          float2: Estimated depth (total bases / genome size)
+        dict: Read statistics
+        For example:
+          { "size": 5185840,
+            "depth": 22.28
+          }
     """
     total_bp = int([line.rstrip('\n') for line in open(path_to_total_bp)][0])
     mash_log = [line.rstrip('\n') for line in open(path_to_mash_log)]
+    read_stats = {}
     for line in mash_log:
         if (line.find("Estimated genome size:") > -1 ):
             size = float(line[line.index(": ") + 2:])
     depth = total_bp / size
     depth = float(format(depth, '.2f'))
-    return size, depth
+    read_stats['size'] = size
+    read_stats['depth'] = depth
+    return read_stats
 
 def parse_busco_result(path_to_busco_result):
     """
