@@ -142,7 +142,7 @@ class RGIResult(object):
 def read(path):
     return [line.rstrip('\n') for line in open(path)]
 
-def execute(command):
+def execute(command, curDir):
     process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     # Poll process for new output until finished
@@ -440,7 +440,9 @@ def main():
 
     parser.add_option("-s", "--mlst-scheme-map", dest="mlst_scheme_map", default=config['databases']['mlst-scheme-map'], type="string", help="absolute file path to mlst scheme")
     parser.add_option("-k", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
-    
+    parser.add_option("-c", "--card-path", dest="card_path", default=config['databases']['card'], type="string", help="absolute file path to card.json db")
+    parser.add_option("-d", "--abricate-datadir", dest="abricate_datadir", default=config['databases']['abricate-datadir'], type="string", help="absolute file path to directory where abricate dbs are stored")
+    parser.add_option("-p", "--abricate-cpo-plasmid-db", dest="abricate_cpo_plasmid_db", default=config['databases']['abricate-cpo-plasmid-db'], type="string", help="name of abricate cpo plasmid db to use")
     parser.add_option("-e", "--expected", dest="expected_species", default="NA/NA/NA", type="string", help="expected species of the isolate")
     
     # parallelization, useless, these are hard coded to 8cores/64G RAM
@@ -454,8 +456,12 @@ def main():
     ID = str(options.id).lstrip().rstrip()
     assembly = options.assembly
     expected_species = options.expected_species
+    script_path = options.script_path
+    cardPath = options.card_path
+    abricate_datadir = options.abricate_datadir
+    abricate_cpo_plasmid_db = options.abricate_cpo_plasmid_db
     mlst_scheme_map = options.mlst_scheme_map
-    plasmidfinder = str(options.plasmidfinder).lstrip().rstrip()
+    # plasmidfinder = str(options.plasmidfinder).lstrip().rstrip()
     outputDir = options.output
 
     notes = []
@@ -464,14 +470,13 @@ def main():
     jsonOutput = []
 
     print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
-    output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly
+    output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
 
     #region call the typing script
-    if not debug:
-        print("running pipeline_typing.sh")
-        #input parameters: 1 = id, 2 = assembly, 3 = output, 4 = cardPath
-        cmd = [script_path + "/pipeline_typing.sh", ID, assembly, outputDir, cardPath]
-        result = execute(cmd)
+    print("running pipeline_typing.sh")
+    #input parameters: 1=id, 2=assembly, 3=output, 4=cardPath, 5=abricate_datadir, 6=abricate_cpo_plasmid_db
+    cmd = [script_path + "/pipeline_typing.sh", ID, assembly, outputDir, cardPath, abricate_datadir, abricate_cpo_plasmid_db]
+    result = execute(cmd, curDir)
     #endregion
 
     #region parse the mlst results
@@ -509,8 +514,8 @@ def main():
             origins.append(mSuite[key].rep_type)
 
     #parse resfinder AMR results
-    pFinder = ParsePlasmidFinderResult(plasmidfinder)
-    ToJson(pFinder, "origins.json")
+    # pFinder = ParsePlasmidFinderResult(plasmidfinder)
+    # ToJson(pFinder, "origins.json")
 
     rFinder = ParseResFinderResult(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
     ToJson(rFinder, "resfinder.json") #*************
@@ -628,7 +633,7 @@ def main():
         out.write("%s\n" % item)
     #endregion
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     start = time.time()
     print("Starting workflow...")
     main()

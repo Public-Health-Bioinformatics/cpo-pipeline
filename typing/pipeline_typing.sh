@@ -1,19 +1,21 @@
 #!/bin/bash -e
 
 #$ -V             # Pass environment variables to the job
-#$ -N cpo_pipeline    # Replace with a more specific job name
+#$ -N cpo_pipeline
 #$ -cwd           # Use the current working dir
 #$ -pe smp 8      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-# input parameters: 1 = ID, 2 = assemblyPath, 3 = outputdir, 4 = card.json
+# input parameters: 1=ID, 2=assemblyPath, 3=outputdir, 4=card.json 5=abricate_datadir 6=abricate_cpo_plasmid_db
 
 ID="$1"
 assemblyPath="$2"
 outputDir="$3"
 cardPath="$4"
+abricate_datadir="$5"
+abricate_cpo_plasmid_db="$6"
 threads=8 #"$5"
 
 echo "parameters: "
@@ -46,7 +48,7 @@ echo "step4: plasmid+amr prediction"
 
 source activate abricate-0.8.7
 
-abricate --db cpo "${assemblyPath}" > "${resistanceDir}/${ID}.cp"
+abricate --datadir "${abricate_datadir}" --db "${abricate_cpo_plasmid_db}" "${assemblyPath}" > "${resistanceDir}/${ID}.cp"
 
 source deactivate
 
