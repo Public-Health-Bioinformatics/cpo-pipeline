@@ -26,54 +26,52 @@
 # pipeline_assembly.sh BC11 BC11-Kpn005_S2_L001_R1_001.fastq.gz BC11-Kpn005_S2_L001_R2_001.fastq.gz output /home/dfornika/tmp/shovill /home/jjjjia/testCases/tests/references/refbc11 /data/ref_databases/busco/enterobacteriales_odb9
 ######################################################################
 
-ID="$1"
-R1="$2"
-R2="$3"
-outputDir="$4"
-tmpDir="$5"
-refGenome="$6"
-buscoDB="$7"
+sample_id="$1"
+reads1_file="$2"
+reads2_file2="$3"
+output_dir="$4"
+tmp_dir="$5"
+reference_genome="$6"
+busco_db="$7"
 threads=8
 ram=80
 
 echo "parameters: "
-echo "ID: $ID"
-echo "R1: $R1"
-echo "R2: $R2"
-echo "outputDir: $outputDir"
-echo "tmpDir: $tmpDir"
-echo "refGenomePath: $refGenome"
-echo "buscoDB path: $buscoDB"
+echo "sample_id: ${sample_id}"
+echo "reads1_file: ${reads1_file}"
+echo "reads2_file: ${reads2_file}"
+echo "output_dir: ${output_dir}"
+echo "tmp_dir: ${tmp_dir}"
+echo "reference_genome: ${ref_genome}"
+echo "busco_db: ${busco_db}"
 echo "threads: $threads"
 echo "ram: $ram"
 
-assemblyDir="$outputDir"/assembly
-contigsDir="$outputDir"/contigs
-qcDir="$outputDir"/assembly_qc
-tempDir="$tmpDir"/"$ID"
+assembly_dir="${output_dir}"/assembly
+contigs_dir="${output_dir}"/contigs
+qc_dir="${output_dir}"/assembly_qc
+temp_dir="${tmp_dir}"/"$ID"
 
 #step2, shovill assembly
 
-mkdir -p "$assemblyDir"
-mkdir -p "$contigsDir"
-mkdir -p "$qcDir"
-mkdir -p "$tempDir"
+mkdir -p "${assembly_dir}"
+mkdir -p "${contigs_dir}"
+mkdir -p "${qc_dir}"
+mkdir -p "${temp_dir}"
 
 echo "step2: assembly"
-assemblyOutDir="$assemblyDir/$ID"
-#mkdir -p "$assemblyDir/$ID"
+assembly_output_dir="${assembly_dir}/$ID"
 
 source activate shovill-1.0.1
 
-shovill --mincov 3 --minlen 500 --force --R1 "$R1" --R2 "$R2" --cpus "$threads" --ram "$ram" --tmpdir "$tempDir" --outdir "$assemblyOutDir"
-#make the contigs dir in cwd
+shovill --mincov 3 --minlen 500 --force --R1 "${reads1_file}" --R2 "${reads2_file}" --cpus "${threads}" --ram "${ram}" --tmpdir "${temp_dir}" --outdir "${assembly_output_dir}"
 
 source deactivate
 
-#move all the assemblies to the new phone.
-if [ -f "$assemblyOutDir/contigs.fa" ]
+# Move assemblies to $assembly_output_dir
+if [ -f "${assembly_output_dir}/contigs.fa" ]
 then
-	cp "$assemblyOutDir/contigs.fa" "$contigsDir/$ID.fa"
+	cp "${assembly_output_dir}/contigs.fa" "${contigs_dir}/${sample_id}.fa"
 else
 	echo "!!!Error during assembly"
 	exit 818
@@ -82,24 +80,20 @@ fi
 source activate quast-4.6.3
 
 #run quast on assembled genome
-mkdir -p "$qcDir"/"$ID"
-quast "$contigsDir/$ID.fa" -R "$refGenome" -o "$qcDir/$ID/$ID.quast" --threads "$threads"
+mkdir -p "${qc_dir}"/"${sample_id}"
+quast "${contigs_dir}/${sample_id}.fa" -R "${reference_genome}" -o "${qc_dir}/${sample_id}/${sample_id}.quast" --threads "${threads}"
 
 source deactivate
-
-#contamination genomes
-#bbsplit.sh in1=BC16-Cfr035_S10_L001_R1_001.fastq.gz in2=BC16-Cfr035_S10_L001_R2_001.fastq.gz ref=ref1,ref2,ref3 basename=o%_#.fq outu1=unmap1.fq outu2=unmap2.fq
-#metaquast BC16-Cfr035_S10.fa -R ref1,ref2,ref3 --threads 8 -o result
 
 source activate busco-3.0.2
 
-cd "$qcDir"/"$ID"
-run_busco -i "../../../$contigsDir/$ID.fa" -o "$ID.busco" -l $buscoDB -m genome -c 1 -sp E_coli_K12 -f
-mv "run_$ID".busco "$ID".busco
+cd "${qc_dir}"/"${sample_id}"
+run_busco -i "../../../${contigs_dir}/${sample_id}.fa" -o "${sample_id}.busco" -l "${busco_db}" -m genome -c 1 -sp E_coli_K12 -f
+mv "run_${sample_id}".busco "${sample_id}".busco
 
 source deactivate
 
-rm -rf "$qcDir"/"$ID"/tmp
-rm -rf "$tempDir"
+rm -rf "${qc_dir}"/"${sample_id}"/tmp
+rm -rf "${temp_dir}"
 
 echo "done step 2"
