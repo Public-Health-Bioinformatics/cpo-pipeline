@@ -135,11 +135,11 @@ def main():
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
-    mashHits, PhiX = result_parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, size, depth)
+    mashHits, PhiX = result_parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, stats['size'], stats['depth'])
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
-    mashPlasmidHits = result_parsers.parse_mash_plasmid_result(pathToMashPlasmidScreenTSV, size, depth)
+    mashPlasmidHits = result_parsers.parse_mash_plasmid_result(pathToMashPlasmidScreenTSV, stats['size'], stats['depth'])
 
     # parse fastqc
     pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/"
@@ -159,8 +159,8 @@ def main():
     correctReference = ""
 
     output.append("\n\n~~~~~~~QC summary~~~~~~~")
-    output.append("Estimated genome size: " + str(size))
-    output.append("Estimated coverage: " + str(depth))
+    output.append("Estimated genome size: " + str(stats['size']))
+    output.append("Estimated coverage: " + str(stats['depth']))
     output.append("Expected isolate species: " + expectedSpecies)
 
     output.append("\nFastQC summary:")
@@ -217,8 +217,8 @@ def main():
         output.append("!!!The expected species is NOT predicted by kraken2, contamination? mislabeling?")
         notes.append("Kraken2: Not expected species. Possible contamination or mislabeling")
 
-    if (depth < 30):
-        output.append("!!!Coverage is lower than 30. Estimated depth: " + str(depth))
+    if (stats['depth'] < 30):
+        output.append("!!!Coverage is lower than 30. Estimated depth: " + str(stats['depth']))
 
     if(PhiX):
         output.append("!!!PhiX contamination, probably nothing to worry about")

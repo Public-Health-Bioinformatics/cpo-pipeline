@@ -28,7 +28,7 @@
 
 sample_id="$1"
 reads1_file="$2"
-reads2_file2="$3"
+reads2_file="$3"
 output_dir="$4"
 tmp_dir="$5"
 reference_genome="$6"

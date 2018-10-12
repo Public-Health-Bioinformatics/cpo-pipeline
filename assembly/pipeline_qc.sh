@@ -8,12 +8,14 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-#####################################################################################################################################################################################################
-#J-J-J-Jia @ pipeline_qc.sh: runs seqtk, mash, kraken2 and fastqc for pre-assembly quality checks																									#
-#input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=mashgenomerefdb, $6=mashplasmidrefdb, $7=kraken2db, $8=kraken2plasmiddb															#		
-#Requires: mash, kraken2, fastqc, seqtk	(all conda-ble)																																				#
-# pipeline_qc.sh BC16-Cfr035 BC16-Cfr035_S10_L001_R1_001.fastq.gz BC16-Cfr035_S10_L001_R2_001.fastq.gz output /data/ref_databases/mash/refseq.genomes.k21s1000.msh /data/ref_databases/mash/refseq.plasmid.k21s1000.msh /data/ref_databases/kraken2/2018-09-20_standard /data/ref_databases/kraken2/2018-09-20_plasmid	#
-#####################################################################################################################################################################################################
+################################################################################
+# J-J-J-Jia @ pipeline_qc.sh: runs seqtk, mash, kraken2 and fastqc for pre-assembly quality checks
+#
+# input parameters: 1=id, 2=forward, 3=reverse, 4=output, 5=mashgenomerefdb, 6=mashplasmidrefdb, 7=kraken2db, 8=kraken2plasmiddb
+# Requires: mash, kraken2, fastqc, seqtk (all conda-ble)
+#
+# pipeline_qc.sh BC16-Cfr035 BC16-Cfr035_S10_L001_R1_001.fastq.gz BC16-Cfr035_S10_L001_R2_001.fastq.gz output refseq.genomes.k21s1000.msh refseq.plasmid.k21s1000.msh 2018-09-20_standard 2018-09-20_plasmid
+################################################################################
 
 #step 1, mash QC
 
