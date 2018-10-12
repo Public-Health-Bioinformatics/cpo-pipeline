@@ -27,117 +27,6 @@ import configparser
 
 from parsers import result_parsers
 
-#define some objects to store values from results
-#//TODO this is not the proper way of get/set private object variables. every value has manually assigned defaults intead of specified in init(). Also, use property(def getVar, def setVar).
-class starFinders(object):
-    def __init__(self):
-        self.file = ""
-        self.sequence = ""
-        self.start = 0
-        self.end = 0
-        self.gene = ""
-        self.shortGene = ""
-        self.coverage = ""
-        self.coverage_map = ""
-        self.gaps = ""
-        self.pCoverage = 100.00
-        self.pIdentity = 100.00
-        self.database = ""
-        self.accession = ""
-        self.product = ""
-        self.source = "chromosome"
-        self.row = ""
-
-class PlasFlowResult(object):
-    def __init__(self):
-        self.sequence = ""
-        self.length = 0
-        self.label = ""
-        self.confidence = 0
-        self.usefulRow = ""
-        self.row = ""
-
-class MlstResult(object):
-    def __init__(self):
-        self.file = ""
-        self.speciesID = ""
-        self.seqType = 0
-        self.scheme = ""
-        self.species = ""
-        self.row=""
-
-class quastResult(object):
-    def __init__(self):
-        self.contigsCount = 0
-        self.largestContig = 0
-        self.N50 = 0
-        self.NG50 = 0
-        self.L50 = 0
-        self.LG50 = 0
-        self.N75 = 0
-        self.NG75 = 0
-        self.L75 = 0
-        self.LG75 = 0
-        self.totalLength = 0
-        self.referenceLength = 0
-        self.GC = 0.00
-        self.referenceGC = 0.00
-        self.genomeFraction = 0.00
-        self.duplicationRatio = 0.00
-        self.data = []
-
-class mobsuiteResult(object):
-    def __init__(self):
-        self.file_id = ""
-        self.cluster_id	= ""
-        self.contig_id	= ""
-        self.contig_num = 0
-        self.contig_length	= 0
-        self.circularity_status	= ""
-        self.rep_type	= ""
-        self.rep_type_accession = ""	
-        self.relaxase_type	= ""
-        self.relaxase_type_accession = ""	
-        self.mash_nearest_neighbor	 = ""
-        self.mash_neighbor_distance	= 0.00
-        self.repetitive_dna_id	= ""
-        self.match_type	= ""
-        self.score	= 0
-        self.contig_match_start	= 0
-        self.contig_match_end = 0
-        self.row = ""
-
-class RGIResult(object):
-    def __init__(self):
-        self.ORF_ID	= ""
-        self.Contig	= ""
-        self.Start	= -1
-        self.Stop	= -1
-        self.Orientation = ""	
-        self.Cut_Off	= ""
-        self.Pass_Bitscore	= 100000
-        self.Best_Hit_Bitscore	= 0.00
-        self.Best_Hit_ARO	= ""
-        self.Best_Identities	= 0.00
-        self.ARO = 0
-        self.Model_type	= ""
-        self.SNPs_in_Best_Hit_ARO	= ""
-        self.Other_SNPs	= ""
-        self.Drug_Class	= ""
-        self.Resistance_Mechanism	= ""
-        self.AMR_Gene_Family	= ""
-        self.Predicted_DNA	= ""
-        self.Predicted_Protein	= ""
-        self.CARD_Protein_Sequence	= ""
-        self.Percentage_Length_of_Reference_Sequence	= 0.00
-        self.ID	= ""
-        self.Model_ID = 0
-        self.source = ""
-        self.row = ""
-
-#endregion
-
-
 def read(path):
     return [line.rstrip('\n') for line in open(path)]
 
@@ -179,31 +68,6 @@ def gunzip(inputpath="", outputpath=""):
             out.write(gzContent)
         return True
 
-def ParseQuastResult(pathToQuastResult):
-    qResult = read(pathToQuastResult)
-    qr = quastResult()
-
-    qr.contigsCount = int(qResult[int([i for i,x in enumerate(qResult) if x.find("# contigs\t") > -1][-1])].split("\t")[1])
-    qr.largestContig = int(qResult[int([i for i,x in enumerate(qResult) if x.find("Largest contig\t") > -1][-1])].split("\t")[1])
-    qr.N50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("N50\t") > -1][-1])].split("\t")[1])
-    qr.NG50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("NG50\t") > -1][-1])].split("\t")[1])
-    qr.L50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("L50\t") > -1][-1])].split("\t")[1])
-    qr.LG50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("LG50\t") > -1][-1])].split("\t")[1])
-    qr.N75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("N75\t") > -1][-1])].split("\t")[1])
-    qr.NG75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("NG75\t") > -1][-1])].split("\t")[1])
-    qr.L75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("L75\t") > -1][-1])].split("\t")[1])
-    qr.LG75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("LG75\t") > -1][-1])].split("\t")[1])
-    qr.totalLength = int(qResult[int([i for i,x in enumerate(qResult) if x.find("Total length\t") > -1][-1])].split("\t")[1])
-    qr.referenceLength = int(qResult[int([i for i,x in enumerate(qResult) if x.find("Reference length\t") > -1][-1])].split("\t")[1])
-    qr.GC = float(qResult[int([i for i,x in enumerate(qResult) if x.find("GC (%)\t") > -1][-1])].split("\t")[1])
-    qr.referenceGC = float(qResult[int([i for i,x in enumerate(qResult) if x.find("Reference GC (%)\t") > -1][-1])].split("\t")[1])
-    qr.genomeFraction = float(qResult[int([i for i,x in enumerate(qResult) if x.find("Genome fraction (%)\t") > -1][-1])].split("\t")[1])
-    qr.duplicationRatio = float(qResult[int([i for i,x in enumerate(qResult) if x.find("Duplication ratio\t") > -1][-1])].split("\t")[1])
-    qr.data = qResult
-
-    return qr
-#endregion
-
 def main():
     
     config = configparser.ConfigParser()
@@ -231,8 +95,6 @@ def main():
     #parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
 
     (options,args) = parser.parse_args()
-    #if len(args) != 8:
-        #parser.error("incorrect number of arguments, all 7 is required")
 
     curDir = os.getcwd()
     outputDir = options.output
@@ -264,7 +126,6 @@ def main():
     #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=mashgenomerefdb, $6=mashplasmidrefdb, $7=kraken2db, $8=kraken2plasmiddb
     cmd = [scriptDir + "/pipeline_qc.sh", ID, R1, R2, outputDir, mashdb, mashplasmiddb, kraken2db, kraken2plasmiddb]
     result = execute(cmd, curDir)
-
 
     print("Parsing the QC results")
     #parse read stats
@@ -461,7 +322,7 @@ def main():
                 buscoPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + "." + os.path.basename(item) + ".busco" + "/short_summary_" + ID + "." + os.path.basename(item) + ".busco.txt")
                 quastPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + "." + os.path.basename(item) + ".quast/runs_per_reference/" + os.path.basename(item) + "/report.tsv")
                 correctAssembly = ID + "." + os.path.basename(item)
-    elif(multiple and not correctSpecies): #the most fked up case, dont even bother? just crash the damn program for now
+    elif(multiple and not correctSpecies):
         raise Exception('GO RESEQUENCE THIS SAMPLE: It has contamination issues AND mislabelled')
 
     if (buscoPath == "" or quastPath == ""):
@@ -469,7 +330,7 @@ def main():
 
     #populate the busco and quast result object
     buscoResults = result_parsers.parse_busco_result(buscoPath)
-    quastResults = ParseQuastResult(quastPath)
+    quastResults = result_parsers.parse_busco_result(quastPath)
 
 if __name__ == "__main__":
     start = time.time()

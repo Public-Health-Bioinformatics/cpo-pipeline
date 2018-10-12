@@ -310,27 +310,51 @@ def parse_busco_result(path_to_busco_result):
         raise Exception("BUSCO output file has no contents.")
     return busco_result
 
-def parse_quast_result(pathToQuastResult):
-    qResult = read(pathToQuastResult)
-    qr = quastResult()
+def parse_quast_result(path_to_quast_result):
+    """
+    Args:
+        path_to_quast_result (str): Path to the QUAST result file.
+    Returns:
+        dict: Parsed QUAST report
+        For example:
+        { "contigs_count": 163,
+          "largest_contig": 293450,
+          "N50": 111197,
+          "NG50": 112240,
+          "L50": 16,
+          "LG50": 15,
+          "N75": 57407,
+          "NG75": 65034,
+          "L75": 32,
+          "LG75": 29,
+          "total_length": 5432369,
+          "reference_length": 5169997,
+          "percent_GC": 50.55,
+          "reference_percent_GC": 50.65,
+          "genome_fraction_percent": 96.296,
+          "duplication_ratio": 1.01,
+          "data": ["Assembly	BC18-Eco016","# contigs (>= 0 bp)	163", ...]
+        }
+    """
+    quast_output = [line.rstrip('\n') for line in open(path_to_quast_result)]
+    quast_result = {}
+    quast_result['contigs_count'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("# contigs\t") > -1][-1])].split("\t")[1])
+    quast_result['largest_contig'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Largest contig\t") > -1][-1])].split("\t")[1])
+    quast_result['N50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("N50\t") > -1][-1])].split("\t")[1])
+    quast_result['NG50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("NG50\t") > -1][-1])].split("\t")[1])
+    quast_result['L50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("L50\t") > -1][-1])].split("\t")[1])
+    quast_result['LG50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("LG50\t") > -1][-1])].split("\t")[1])
+    quast_result['N75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("N75\t") > -1][-1])].split("\t")[1])
+    quast_result['NG75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("NG75\t") > -1][-1])].split("\t")[1])
+    quast_result['L75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("L75\t") > -1][-1])].split("\t")[1])
+    quast_result['LG75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("LG75\t") > -1][-1])].split("\t")[1])
+    quast_result['total_length'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Total length\t") > -1][-1])].split("\t")[1])
+    quast_result['reference_length'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Reference length\t") > -1][-1])].split("\t")[1])
+    quast_result['percent_GC'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("GC (%)\t") > -1][-1])].split("\t")[1])
+    quast_result['reference_percent_GC'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Reference GC (%)\t") > -1][-1])].split("\t")[1])
+    quast_result['genome_fraction_percent'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Genome fraction (%)\t") > -1][-1])].split("\t")[1])
+    quast_result['duplication_ratio'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Duplication ratio\t") > -1][-1])].split("\t")[1])
+    quast_result['data'] = quast_output
 
-    qr.contigsCount = int(qResult[int([i for i,x in enumerate(qResult) if x.find("# contigs\t") > -1][-1])].split("\t")[1])
-    qr.largestContig = int(qResult[int([i for i,x in enumerate(qResult) if x.find("Largest contig\t") > -1][-1])].split("\t")[1])
-    qr.N50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("N50\t") > -1][-1])].split("\t")[1])
-    qr.NG50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("NG50\t") > -1][-1])].split("\t")[1])
-    qr.L50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("L50\t") > -1][-1])].split("\t")[1])
-    qr.LG50 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("LG50\t") > -1][-1])].split("\t")[1])
-    qr.N75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("N75\t") > -1][-1])].split("\t")[1])
-    qr.NG75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("NG75\t") > -1][-1])].split("\t")[1])
-    qr.L75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("L75\t") > -1][-1])].split("\t")[1])
-    qr.LG75 = int(qResult[int([i for i,x in enumerate(qResult) if x.find("LG75\t") > -1][-1])].split("\t")[1])
-    qr.totalLength = int(qResult[int([i for i,x in enumerate(qResult) if x.find("Total length\t") > -1][-1])].split("\t")[1])
-    qr.referenceLength = int(qResult[int([i for i,x in enumerate(qResult) if x.find("Reference length\t") > -1][-1])].split("\t")[1])
-    qr.GC = float(qResult[int([i for i,x in enumerate(qResult) if x.find("GC (%)\t") > -1][-1])].split("\t")[1])
-    qr.referenceGC = float(qResult[int([i for i,x in enumerate(qResult) if x.find("Reference GC (%)\t") > -1][-1])].split("\t")[1])
-    qr.genomeFraction = float(qResult[int([i for i,x in enumerate(qResult) if x.find("Genome fraction (%)\t") > -1][-1])].split("\t")[1])
-    qr.duplicationRatio = float(qResult[int([i for i,x in enumerate(qResult) if x.find("Duplication ratio\t") > -1][-1])].split("\t")[1])
-    qr.data = qResult
-
-    return qr
+    return quast_result
 
