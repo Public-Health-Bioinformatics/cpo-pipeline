@@ -15,9 +15,9 @@ def parse_kraken_result(path_to_kraken_result):
     Returns:
         dict: Parsed kraken report with species-level results.
         For example:
-        { "Escherichia coli": { "fragment_percent": 80.2,
-                                "fragment_count_root": 120321,
-                                "fragment_count_taxon": 841210,
+        { "Escherichia coli": { "fragment_percent": 84.08,
+                                "fragment_count_root": 195536,
+                                "fragment_count_taxon": 192561,
                                 "rank_code": "S",
                                 "ncbi_taxon_id": "562",
                                 "name": "Escherichia coli",
