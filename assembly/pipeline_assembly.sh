@@ -50,7 +50,7 @@ echo "ram: $ram"
 assembly_dir="${output_dir}"/assembly
 contigs_dir="${output_dir}"/contigs
 qc_dir="${output_dir}"/assembly_qc
-temp_dir="${tmp_dir}"/"$ID"
+temp_dir="${tmp_dir}"/"${sample_id}"
 
 #step2, shovill assembly
 
@@ -60,7 +60,7 @@ mkdir -p "${qc_dir}"
 mkdir -p "${temp_dir}"
 
 echo "step2: assembly"
-assembly_output_dir="${assembly_dir}/$ID"
+assembly_output_dir="${assembly_dir}/${sample_id}"
 
 source activate shovill-1.0.1
 
