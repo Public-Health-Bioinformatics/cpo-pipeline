@@ -55,7 +55,7 @@ mkdir -p "${assembly_dir}"
 mkdir -p "${contigs_dir}"
 mkdir -p "${temp_dir}"
 mkdir -p "${split_output_dir}"
-mkdir -p "$qcDir"
+mkdir -p "${qc_dir}"
 
 
 echo "step2: assembly"

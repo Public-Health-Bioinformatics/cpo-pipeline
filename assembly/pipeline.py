@@ -27,9 +27,6 @@ import configparser
 
 from parsers import result_parsers
 
-def read(path):
-    return [line.rstrip('\n') for line in open(path)]
-
 def execute(command, curDir):
     process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
