@@ -2,7 +2,7 @@
 
 An analysis pipeline for the purpose of investigating [Carbapenemase-Producing Organisms](https://en.wikipedia.org/wiki/Carbapenem-resistant_enterobacteriaceae).
 
-This codebase is derived from the [https://github.com/imasianxd/CPO_Prediction](CPO_Prediction) workflow, written by [Justin Jia](https://github.com/imasianxd) in collaboration with [William Hsiao](https://github.com/wwhsiao) and [Matt Croxen](https://github.com/mcroxen). 
+This codebase is derived from the [CPO_Prediction](https://github.com/imasianxd/CPO_Prediction) workflow, written by [Justin Jia](https://github.com/imasianxd) in collaboration with [William Hsiao](https://github.com/wwhsiao) and [Matt Croxen](https://github.com/mcroxen).
 
 ## Requirements
 
