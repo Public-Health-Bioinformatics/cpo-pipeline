@@ -9,6 +9,7 @@ The output is a TSV summary of the results.
 Example usage:
 
   pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --output output --expected-species "Klebsiella"
+  cpo_galaxy_prediction.py --id BC11-Kpn005 BC11-Kpn005_S2.fa -m BC11-Kpn005_S2.mlst -c BC11-Kpn005_S2.recon/contig_report.txt -f BC11-Kpn005_S2.recon/mobtyper_aggregate_report.txt -a predictions/BC11-Kpn005_S2.cp -r predictions/BC11-Kpn005_S2.rgi.txt -e "Klebsiella"
 
 Requires the pipeline_prediction.sh script. the directory of where it's store can be specified using -k.
 '''
@@ -27,7 +28,7 @@ import json
 import numpy
 import configparser
 
-from parsers import result_parsers
+
 
 #region result objects
 #define some objects to store values from results
@@ -58,6 +59,36 @@ class PlasFlowResult(object):
         self.label = ""
         self.confidence = 0
         self.usefulRow = ""
+        self.row = ""
+
+class MlstResult(object):
+    def __init__(self):
+        self.file = ""
+        self.speciesID = ""
+        self.seqType = 0
+        self.scheme = ""
+        self.species = ""
+        self.row=""
+
+class mobsuiteResult(object):
+    def __init__(self):
+        self.file_id = ""
+        self.cluster_id	= ""
+        self.contig_id	= ""
+        self.contig_num = 0
+        self.contig_length	= 0
+        self.circularity_status	= ""
+        self.rep_type	= ""
+        self.rep_type_accession = ""	
+        self.relaxase_type	= ""
+        self.relaxase_type_accession = ""	
+        self.mash_nearest_neighbor	 = ""
+        self.mash_neighbor_distance	= 0.00
+        self.repetitive_dna_id	= ""
+        self.match_type	= ""
+        self.score	= 0
+        self.contig_match_start	= 0
+        self.contig_match_end = 0
         self.row = ""
 
 class mobsuitePlasmids(object):
@@ -108,13 +139,32 @@ class RGIResult(object):
         self.source = ""
         self.row = ""
 
+class MashResult(object):
+    def __init__(self):
+        self.size = 0.0
+        self.depth = 0.0
+        self.identity = 0.0
+        self.sharedHashes = ""
+        self.medianMultiplicity = 0
+        self.pvalue = 0.0
+        self.queryID= ""
+        self.queryComment = ""
+        self.species = ""
+        self.row = ""
+        self.accession = ""
+        self.gcf=""
+        self.assembly=""
+
+    def toDict(self): #doesnt actually work
+        return dict((name, getattr(self, name)) for name in dir(self) if not name.startswith('__')) 
+
+
 #endregion
 
 #region useful functions
 def read(path):
     return [line.rstrip('\n') for line in open(path)]
-
-def execute(command, curDir):
+def execute(command):
     process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     # Poll process for new output until finished
@@ -132,14 +182,12 @@ def execute(command, curDir):
         return output
     else:
         raise subprocess.CalledProcessError(exitCode, command)
-
 def httpGetFile(url, filepath=""):
     if (filepath == ""):
         return urllib.request.urlretrieve(url)
     else:
         urllib.request.urlretrieve(url, filepath)
         return True
-
 def gunzip(inputpath="", outputpath=""):
     if (outputpath == ""):
         with gzip.open(inputpath, 'rb') as f:
@@ -151,7 +199,6 @@ def gunzip(inputpath="", outputpath=""):
         with open(outputpath, 'wb') as out:
             out.write(gzContent)
         return True
-
 def ToJson(dictObject, outputPath):
     #outDir = outputDir + '/summary/' + ID + ".json/"
     #if not (os.path.exists(outDir)):
@@ -160,6 +207,41 @@ def ToJson(dictObject, outputPath):
       #json.dump([ob.__dict__ for ob in dictObject.values()], f, ensure_ascii=False)
     return ""
 #endregion
+
+#region functions to parse result files
+def ParseMLSTResult(pathToMLSTResult, scheme):
+    _mlstResult = {}
+    scheme = pandas.read_csv(scheme, delimiter='\t', header=0)
+    scheme = scheme.replace(numpy.nan, '', regex=True)
+
+    taxon = {}
+    #record the scheme as a dictionary
+    taxon["-"] = "No MLST Match"
+    for i in range(len(scheme.index)):
+        key = scheme.iloc[i,0]
+        if (str(scheme.iloc[i,2]) == "nan"):
+            value = str(scheme.iloc[i,1])
+        else:
+            value = str(scheme.iloc[i,1]) + " " + str(scheme.iloc[i,2])
+        
+        if (key in taxon.keys()):
+            taxon[key] = taxon.get(key) + ";" + value
+        else:
+            taxon[key] = value
+    #read in the mlst result
+    mlst = pandas.read_csv(pathToMLSTResult, delimiter='\t', header=None)
+    _mlstHit = MlstResult()
+
+    _mlstHit.file = mlst.iloc[0,0]
+    _mlstHit.speciesID = (mlst.iloc[0,1])
+    _mlstHit.seqType = str(mlst.iloc[0,2])
+    for i in range(3, len(mlst.columns)):
+        _mlstHit.scheme += mlst.iloc[0,i] + ";"
+    _mlstHit.species = taxon[_mlstHit.speciesID]
+    _mlstHit.row = "\t".join(str(x) for x in mlst.ix[0].tolist())
+    _mlstResult[_mlstHit.speciesID]=_mlstHit
+
+    return _mlstResult
 
 def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
     #pipelineTest/contigs/BC110-Kpn005.fa	contig00019	45455	45758	IncFIC(FII)_1	8-308/499	========/=.....	8/11	59.52	75.65	plasmidfinder	AP001918	IncFIC(FII)_1__AP001918
@@ -194,6 +276,41 @@ def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
         #plasmidFinderContigs.append(str(plasmidFinder.iloc[i,1]))
         #origins.append(str(plasmidFinder.iloc[i,4][:plasmidFinder.iloc[i,4].index("_")]))
     return _pFinder
+
+def ParseMobsuiteResult(pathToMobsuiteResult):
+    _mobsuite = {}
+    mResult = pandas.read_csv(pathToMobsuiteResult, delimiter='\t', header=0)
+    mResult = mResult.replace(numpy.nan, '', regex=True)
+
+    for i in range(len(mResult.index)):
+        mr = mobsuiteResult()
+        mr.file_id = str(mResult.iloc[i,0])
+        mr.cluster_id = str(mResult.iloc[i,1])
+        if (mr.cluster_id == "chromosome"):
+            break
+        mr.contig_id = str(mResult.iloc[i,2])
+        mr.contig_num = mr.contig_id[(mr.contig_id.find("contig")+6):mr.contig_id.find("_len=")]
+        mr.contig_length = int(mResult.iloc[i,3])
+        mr.circularity_status = str(mResult.iloc[i,4])
+        mr.rep_type = str(mResult.iloc[i,5])
+        mr.rep_type_accession = str(mResult.iloc[i,6])
+        mr.relaxase_type = str(mResult.iloc[i,7])
+        mr.relaxase_type_accession = str(mResult.iloc[i,8])
+        mr.mash_nearest_neighbor = str(mResult.iloc[i,9])
+        mr.mash_neighbor_distance = float(mResult.iloc[i,10])
+        mr.repetitive_dna_id = str(mResult.iloc[i,11])
+        mr.match_type = str(mResult.iloc[i,12])
+        if (mr.match_type == ""):
+            mr.score = -1
+            mr.contig_match_start = -1
+            mr.contig_match_end = -1
+        else:
+            mr.score = int(mResult.iloc[i,13])
+            mr.contig_match_start = int(mResult.iloc[i,14])
+            mr.contig_match_end = int(mResult.iloc[i,15])
+        mr.row = "\t".join(str(x) for x in mResult.ix[i].tolist())
+        _mobsuite[mr.contig_id]=(mr)
+    return _mobsuite
 
 def ParseMobsuitePlasmids(pathToMobsuiteResult):
     _mobsuite = {}
@@ -309,7 +426,10 @@ def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
         pf.start = int(plasmidFinder.iloc[i,2])
         pf.end = int(plasmidFinder.iloc[i,3])
         pf.gene = str(plasmidFinder.iloc[i,4])
-        pf.shortGene = pf.gene[:pf.gene.index("_")]
+        if (pf.gene.find("_") > -1):
+            pf.shortGene = pf.gene[:pf.gene.index("_")]
+        else:
+            pf.shortGene = pf.gene
         pf.coverage = str(plasmidFinder.iloc[i,5])
         pf.coverage_map = str(plasmidFinder.iloc[i,6])
         pf.gaps = str(plasmidFinder.iloc[i,7])
@@ -325,6 +445,22 @@ def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
         #plasmidFinderContigs.append(str(plasmidFinder.iloc[i,1]))
         #origins.append(str(plasmidFinder.iloc[i,4][:plasmidFinder.iloc[i,4].index("_")]))
     return _pFinder
+
+def ParseMashResult(pathToMashScreen):
+    mashScreen = pandas.read_csv(pathToMashScreen, delimiter='\t', header=None)
+
+    _mashPlasmidHits = {} #***********************
+    #parse what the species are.
+    for i in (range(len(mashScreen.index))):
+        mr = MashResult()
+        mr.identity = float(mashScreen.ix[i, 0])
+        mr.sharedHashes = mashScreen.ix[i, 1]
+        mr.medianMultiplicity = int(mashScreen.ix[i, 2])
+        mr.pvalue = float(mashScreen.ix[i, 3])
+        mr.name = mashScreen.ix[i, 4] #accession
+        mr.row = "\t".join(str(x) for x in mashScreen.ix[i].tolist())
+        _mashPlasmidHits[mr.name] = mr
+    return _mashPlasmidHits
 #endregion
 
 def main():
@@ -332,62 +468,59 @@ def main():
     config = configparser.ConfigParser()
     config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
 
+    debug = False #debug skips the shell scripts and also dump out a ton of debugging messages
+
     #parses some parameters
     parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
     #required
     #MLSTHIT, mobsuite, resfinder, rgi, mlstscheme
-    parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")
-    parser.add_option("-a", "--assembly", dest="assembly", type="string", help="Path to assembly file.")
-    parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")    
+    parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")    
+    parser.add_option("-m", "--mlst", dest="mlst", type="string", help="absolute file path to mlst result")
+    parser.add_option("-c", "--mobfinderContig", dest="mobfinderContig", type="string", help="absolute path to mobfinder aggregate result")
+    parser.add_option("-f", "--mobfinderAggregate", dest="mobfinderAggregate", type="string", help="absolute path to mobfinder plasmid results")
+    parser.add_option("-a", "--abricate", dest="abricate", type="string", help="absolute path to abricate results")
+    parser.add_option("-r", "--rgi", dest="rgi", type="string", help="absolute path to rgi results")
+    parser.add_option("-e", "--expected-species", dest="expectedSpecies", default="NA/NA/NA", type="string", help="expected species of the isolate")
+    parser.add_option("-s", "--mlst-scheme", dest="mlstScheme", default=config['databases']['mlst-scheme-map'], type="string", help="absolute file path to file that maps mlst scheme names to species names")
+    parser.add_option("-p", "--plasmidfinder", dest="plasmidfinder", type="string", help="absolute file path to plasmidfinder ")
+    parser.add_option("-d", "--mash", dest="mash", type="string", help="absolute file path to mash plasmiddb result")
 
-    parser.add_option("-s", "--mlst-scheme-map", dest="mlst_scheme_map", default=config['databases']['mlst-scheme-map'], type="string", help="absolute file path to mlst scheme")
-    parser.add_option("-k", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
-    parser.add_option("-c", "--card-path", dest="card_path", default=config['databases']['card'], type="string", help="absolute file path to card.json db")
-    parser.add_option("-d", "--abricate-datadir", dest="abricate_datadir", default=config['databases']['abricate-datadir'], type="string", help="absolute file path to directory where abricate dbs are stored")
-    parser.add_option("-p", "--abricate-cpo-plasmid-db", dest="abricate_cpo_plasmid_db", default=config['databases']['abricate-cpo-plasmid-db'], type="string", help="name of abricate cpo plasmid db to use")
-    parser.add_option("-e", "--expected-species", dest="expected_species", default="NA/NA/NA", type="string", help="expected species of the isolate")
-    
-    # parallelization, useless, these are hard coded to 8cores/64G RAM
-    # parser.add_option("-t", "--threads", dest="threads", default=8, type="int", help="number of cpu to use")
-    # parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
-    
-    (options, args) = parser.parse_args()
-    # if len(args) != 8:
-        # parser.error("incorrect number of arguments, all 7 is required")
+    #parallelization, useless, these are hard coded to 8cores/64G RAM
+    #parser.add_option("-t", "--threads", dest="threads", default=8, type="int", help="number of cpu to use")
+    #parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
+
+    (options,args) = parser.parse_args()
+    #if len(args) != 8:
+        #parser.error("incorrect number of arguments, all 7 is required")
     curDir = os.getcwd()
     ID = str(options.id).lstrip().rstrip()
-    assembly = options.assembly
-    expected_species = options.expected_species
-    script_path = options.script_path
-    cardPath = options.card_path
-    abricate_datadir = options.abricate_datadir
-    abricate_cpo_plasmid_db = options.abricate_cpo_plasmid_db
-    mlst_scheme_map = options.mlst_scheme_map
-    # plasmidfinder = str(options.plasmidfinder).lstrip().rstrip()
-    outputDir = options.output
+    mlst = str(options.mlst).lstrip().rstrip()
+    mobfindercontig = str(options.mobfinderContig).lstrip().rstrip()
+    mobfinderaggregate = str(options.mobfinderAggregate).lstrip().rstrip()
+    abricate = str(options.abricate).lstrip().rstrip()
+    rgi = str(options.rgi).lstrip().rstrip()
+    expectedSpecies = str(options.expectedSpecies).lstrip().rstrip()
+    mlstScheme = str(options.mlstScheme).lstrip().rstrip()
+    plasmidfinder = str(options.plasmidfinder).lstrip().rstrip()
+    mash = str(options.mash).lstrip().rstrip()
+    outputDir = "./"
+    print(mlst)
+    print(mobfindercontig)
+    print(mobfinderaggregate)
+    print(abricate)
+    print(rgi)
+    print(expectedSpecies)
+    print(mlstScheme)
+    print(mash)
 
-    notes = []
-    #init the output list
-    output = []
-    jsonOutput = []
-
-    print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
-    output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
-
-    #region call the typing script
-    print("running pipeline_typing.sh")
-    #input parameters: 1=id, 2=assembly, 3=output, 4=cardPath, 5=abricate_datadir, 6=abricate_cpo_plasmid_db
-    cmd = [script_path + "/pipeline_typing.sh", ID, assembly, outputDir, cardPath, abricate_datadir, abricate_cpo_plasmid_db]
-    result = execute(cmd, curDir)
-    #endregion
+    print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + ID)
+    output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + ID)
 
     #region parse the mlst results
-    
     print("step 3: parsing mlst, plasmid, and amr results")
     
-    print("identifying MLST")
-    mlst = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
-    mlstHit = result_parsers.parse_mlst_result(mlst, mlst_scheme_map)
+    print("identifying MLST")    
+    mlstHit = ParseMLSTResult(mlst, str(mlstScheme))#***********************
     ToJson(mlstHit, "mlst.json") #write it to a json output
     mlstHit = list(mlstHit.values())[0]
 
@@ -401,10 +534,8 @@ def main():
     origins = []
 
     #parse mobsuite results
-    mobfindercontig = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
-    mSuite = result_parsers.parse_mobsuite_result(mobfindercontig) #outputDir + "/predictions/" + ID + ".recon/contig_report.txt")#*************
+    mSuite = ParseMobsuiteResult(mobfindercontig) #outputDir + "/predictions/" + ID + ".recon/contig_report.txt")#*************
     ToJson(mSuite, "mobsuite.json") #*************
-    mobfinderaggregate = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
     mSuitePlasmids = ParseMobsuitePlasmids(mobfinderaggregate)#outputDir + "/predictions/" + ID + ".recon/mobtyper_aggregate_report.txt")#*************
     ToJson(mSuitePlasmids, "mobsuitePlasmids.json") #*************
 
@@ -419,38 +550,42 @@ def main():
             origins.append(mSuite[key].rep_type)
 
     #parse resfinder AMR results
-    # pFinder = ParsePlasmidFinderResult(plasmidfinder)
-    # ToJson(pFinder, "origins.json")
-    abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
+    pFinder = ParsePlasmidFinderResult(plasmidfinder)
+    ToJson(pFinder, "origins.json")
+
     rFinder = ParseResFinderResult(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
     ToJson(rFinder, "resfinder.json") #*************
 
-    rgi = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
     rgiAMR = ParseRGIResult(rgi, plasmidContigs, likelyPlasmidContigs) # outputDir + "/predictions/" + ID + ".rgi.txt", plasmidContigs, likelyPlasmidContigs)#***********************
     ToJson(rgiAMR, "rgi.json") #*************
 
-    carbapenamases = []
+    plasmidFamily = ParseMashResult(mash)
+    ToJson(plasmidFamily, "mash.json")
+
+    carbapenamases = [] 
+    resfinderCarbas = [] #list of rfinder objects for lindaout list
     amrGenes = []
     for keys in rFinder:
         carbapenamases.append(rFinder[keys].shortGene + "(" + rFinder[keys].source + ")")
+        resfinderCarbas.append(rFinder[keys])
     for keys in rgiAMR:
-        if (rgiAMR[keys].Drug_Class.find("carbapenem") > -1):
-            if (rgiAMR[keys].Best_Hit_ARO not in carbapenamases):
+        if (rgiAMR[keys].Drug_Class.find("carbapenem") > -1 and rgiAMR[keys].AMR_Gene_Family.find("beta-lactamase") > -1):
+            if ((rgiAMR[keys].Best_Hit_ARO+ "(" + rgiAMR[keys].source + ")") not in carbapenamases):
                 carbapenamases.append(rgiAMR[keys].Best_Hit_ARO+ "(" + rgiAMR[keys].source + ")")
         else:
-            if (rgiAMR[keys].Best_Hit_ARO not in amrGenes):
+            if ((rgiAMR[keys].Best_Hit_ARO+ "(" + rgiAMR[keys].source + ")") not in amrGenes):
                 amrGenes.append(rgiAMR[keys].Best_Hit_ARO+ "(" + rgiAMR[keys].source + ")")
     #endregion
 
     #region output parsed mlst information
     print("formatting mlst outputs")
     output.append("\n\n\n~~~~~~~MLST summary~~~~~~~")
-    output.append("MLST determined species: " + mlstHit['species'])
+    output.append("MLST determined species: " + mlstHit.species)
     output.append("\nMLST Details: ")
-    output.append(mlstHit['row'])
+    output.append(mlstHit.row)
 
     output.append("\nMLST information: ")
-    if (mlstHit['species'] == expected_species):
+    if (mlstHit.species == expectedSpecies):
         output.append("MLST determined species is the same as expected species")
         #notes.append("MLST determined species is the same as expected species")
     else:
@@ -491,30 +626,63 @@ def main():
 
     #write summary to a file
     summaryDir = outputDir + "/summary/" + ID
-    os.makedirs(summaryDir, exists_ok=True)
-    out = open(summaryDir + "/summary.txt", 'w')
+    out = open("summary.txt", 'w')
     for item in output:
         out.write("%s\n" % item)
 
 
     #TSV output
+    lindaOut = []
     tsvOut = []
-    tsvOut.append("ID\tExpected Species\tMLST Species\tSequence Type\tMLST Scheme\tCarbapenem Resistance Genes\tOther AMR Genes\tTotal Plasmids\tPlasmids ID\tNum_Contigs\tPlasmid Length\tPlasmid RepType\tPlasmid Mobility\tNearest Reference\tDefinitely Plasmid Contigs\tLikely Plasmid Contigs")
+    lindaOut.append("ID\tQUALITY\tExpected Species\tMLST Scheme\tSequence Type\tMLST_ALLELE_1\tMLST_ALLELE_2\tMLST_ALLELE_3\tMLST_ALLELE_4\tMLST_ALLELE_5\tMLST_ALLELE_6\tMLST_ALLELE_7\tSEROTYPE\tK_CAPSULE\tPLASMID_2_RFLP\tPLASMID_1_FAMILY\tPLASMID_1_BEST_MATCH\tPLASMID_1_COVERAGE\tPLASMID_1_SNVS_TO_BEST_MATCH\tPLASMID_1_CARBAPENEMASE\tPLASMID_1_INC_GROUP\tPLASMID_2_RFLP\tPLASMID_2_FAMILY\tPLASMID_2_BEST_MATCH\tPLASMID_2_COVERAGE\tPLASMID_2_SNVS_TO_BEST_MATCH\tPLASMID_2_CARBAPENEMASE\tPLASMID_2_INC_GROUP")
+    lindaTemp = ID + "\t" #id
+    lindaTemp += "\t" #quality
+    lindaTemp += expectedSpecies + "\t" #expected
+    lindaTemp += mlstHit.species + "\t" #mlstscheme
+    lindaTemp += str(mlstHit.seqType)  + "\t" #seq type
+    lindaTemp += "\t".join(mlstHit.scheme.split(";")) + "\t"#mlst alleles x 7
+    lindaTemp += "\t\t" #sero and kcap
+    
+    #resfinderCarbas
+    index = 0
+    for carbs in resfinderCarbas:
+        if (carbs.source == "plasmid"): #
+            lindaTemp += "\t"
+            plasmid = plasmidFamily[list(plasmidFamily.keys())[index]]
+            lindaTemp += plasmid.name + "\t"
+            lindaTemp += str(plasmid.identity) + "\t"
+            lindaTemp += plasmid.sharedHashes + "\t"
+            lindaTemp += carbs.shortGene + "\t" #found an carbapenase
+            contig = carbs.sequence[6:] #this is the contig number
+            for i in mSuite.keys():
+                if (str(mSuite[i].contig_num) == str(contig)): #found the right plasmid
+                    clusterid = mSuite[i].cluster_id
+                    rep_types = mSuitePlasmids["plasmid_" + str(clusterid) + ".fasta"].rep_types
+                    lindaTemp += rep_types
+    lindaOut.append(lindaTemp)
+    out = open("summary.linda.tsv", 'w')
+    for item in lindaOut:
+        out.write("%s\n" % item)
+
+    tsvOut.append("new\tID\tExpected Species\tMLST Species\tSequence Type\tMLST Scheme\tCarbapenem Resistance Genes\tOther AMR Genes\tPlasmid Best Match\tPlasmid Identity\tPlasmid Shared Hash\tTotal Plasmids\tPlasmids ID\tNum_Contigs\tPlasmid Length\tPlasmid RepType\tPlasmid Mobility\tNearest Reference\tDefinitely Plasmid Contigs\tLikely Plasmid Contigs")
     #start with ID
-    temp = ""
+    temp = "\t"
     temp += (ID + "\t")
-    temp += expected_species + "\t"
+    temp += expectedSpecies + "\t"
 
     #move into MLST
-    temp += mlstHit['species'] + "\t"
-    temp += str(mlstHit['sequence_type']) + "\t"
-    temp += mlstHit['scheme'] + "\t"
+    temp += mlstHit.species + "\t"
+    temp += str(mlstHit.seqType) + "\t"
+    temp += mlstHit.scheme + "\t"
     
     #now onto AMR genes
     temp += ";".join(carbapenamases) + "\t"
     temp += ";".join(amrGenes) + "\t"
 
     #lastly plasmids
+    temp += str(plasmidFamily[list(plasmidFamily.keys())[0]].name) + "\t"
+    temp += str(plasmidFamily[list(plasmidFamily.keys())[0]].identity) + "\t"
+    temp += str(plasmidFamily[list(plasmidFamily.keys())[0]].sharedHashes) + "\t"
     temp+= str(len(mSuitePlasmids)) + "\t"
     plasmidID = ""
     contigs = ""
@@ -535,7 +703,7 @@ def main():
     tsvOut.append(temp)
 
     summaryDir = outputDir + "/summary/" + ID
-    out = open(summaryDir + "/summary.tsv", 'w')
+    out = open("summary.tsv", 'w')
     for item in tsvOut:
         out.write("%s\n" % item)
     #endregion
@@ -545,4 +713,4 @@ if __name__ == "__main__":
     print("Starting workflow...")
     main()
     end = time.time()
-    print("Finished!\nThe analysis used: " + str(end - start) + " seconds")
+    print("Finished!\nThe analysis used: " + str(end-start) + " seconds")
