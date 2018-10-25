@@ -1,4 +1,4 @@
-# Module 2: MLST Typing, Resistance Gene Identification, Plasmid Analysis and Dendrogram
+# CPO Pipeline Phase 2: MLST Typing, Resistance Gene Identification, Plasmid Analysis
 
 ## Requirements
 

@@ -1,4 +1,4 @@
-# Module 1: Quality Control & Assembly
+# CPO Pipeline Phase 1: Quality Control & Assembly
 
 ## Requirements
 
