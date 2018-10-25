@@ -27,8 +27,6 @@ import json
 import numpy
 import configparser
 
-from parsers import result_parsers
-
 #region result objects
 #define some objects to store values from results
 #//TODO this is not the proper way of get/set private object variables. every value has manually assigned defaults intead of specified in init(). Also, use property(def getVar, def setVar).
@@ -58,6 +56,36 @@ class PlasFlowResult(object):
         self.label = ""
         self.confidence = 0
         self.usefulRow = ""
+        self.row = ""
+
+class MlstResult(object):
+    def __init__(self):
+        self.file = ""
+        self.speciesID = ""
+        self.seqType = 0
+        self.scheme = ""
+        self.species = ""
+        self.row=""
+
+class mobsuiteResult(object):
+    def __init__(self):
+        self.file_id = ""
+        self.cluster_id	= ""
+        self.contig_id	= ""
+        self.contig_num = 0
+        self.contig_length	= 0
+        self.circularity_status	= ""
+        self.rep_type	= ""
+        self.rep_type_accession = ""	
+        self.relaxase_type	= ""
+        self.relaxase_type_accession = ""	
+        self.mash_nearest_neighbor	 = ""
+        self.mash_neighbor_distance	= 0.00
+        self.repetitive_dna_id	= ""
+        self.match_type	= ""
+        self.score	= 0
+        self.contig_match_start	= 0
+        self.contig_match_end = 0
         self.row = ""
 
 class mobsuitePlasmids(object):
@@ -161,6 +189,41 @@ def ToJson(dictObject, outputPath):
     return ""
 #endregion
 
+#region functions to parse result files
+def ParseMLSTResult(pathToMLSTResult, scheme):
+    _mlstResult = {}
+    scheme = pandas.read_csv(scheme, delimiter='\t', header=0)
+    scheme = scheme.replace(numpy.nan, '', regex=True)
+
+    taxon = {}
+    #record the scheme as a dictionary
+    taxon["-"] = "No MLST Match"
+    for i in range(len(scheme.index)):
+        key = scheme.iloc[i,0]
+        if (str(scheme.iloc[i,2]) == "nan"):
+            value = str(scheme.iloc[i,1])
+        else:
+            value = str(scheme.iloc[i,1]) + " " + str(scheme.iloc[i,2])
+        
+        if (key in taxon.keys()):
+            taxon[key] = taxon.get(key) + ";" + value
+        else:
+            taxon[key] = value
+    #read in the mlst result
+    mlst = pandas.read_csv(pathToMLSTResult, delimiter='\t', header=None)
+    _mlstHit = MlstResult()
+
+    _mlstHit.file = mlst.iloc[0,0]
+    _mlstHit.speciesID = (mlst.iloc[0,1])
+    _mlstHit.seqType = str(mlst.iloc[0,2])
+    for i in range(3, len(mlst.columns)):
+        _mlstHit.scheme += mlst.iloc[0,i] + ";"
+    _mlstHit.species = taxon[_mlstHit.speciesID]
+    _mlstHit.row = "\t".join(str(x) for x in mlst.ix[0].tolist())
+    _mlstResult[_mlstHit.speciesID]=_mlstHit
+
+    return _mlstResult
+
 def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
     #pipelineTest/contigs/BC110-Kpn005.fa	contig00019	45455	45758	IncFIC(FII)_1	8-308/499	========/=.....	8/11	59.52	75.65	plasmidfinder	AP001918	IncFIC(FII)_1__AP001918
     #example resfinder:
@@ -194,6 +257,41 @@ def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
         #plasmidFinderContigs.append(str(plasmidFinder.iloc[i,1]))
         #origins.append(str(plasmidFinder.iloc[i,4][:plasmidFinder.iloc[i,4].index("_")]))
     return _pFinder
+
+def ParseMobsuiteResult(pathToMobsuiteResult):
+    _mobsuite = {}
+    mResult = pandas.read_csv(pathToMobsuiteResult, delimiter='\t', header=0)
+    mResult = mResult.replace(numpy.nan, '', regex=True)
+
+    for i in range(len(mResult.index)):
+        mr = mobsuiteResult()
+        mr.file_id = str(mResult.iloc[i,0])
+        mr.cluster_id = str(mResult.iloc[i,1])
+        if (mr.cluster_id == "chromosome"):
+            break
+        mr.contig_id = str(mResult.iloc[i,2])
+        mr.contig_num = mr.contig_id[(mr.contig_id.find("contig")+6):mr.contig_id.find("_len=")]
+        mr.contig_length = int(mResult.iloc[i,3])
+        mr.circularity_status = str(mResult.iloc[i,4])
+        mr.rep_type = str(mResult.iloc[i,5])
+        mr.rep_type_accession = str(mResult.iloc[i,6])
+        mr.relaxase_type = str(mResult.iloc[i,7])
+        mr.relaxase_type_accession = str(mResult.iloc[i,8])
+        mr.mash_nearest_neighbor = str(mResult.iloc[i,9])
+        mr.mash_neighbor_distance = float(mResult.iloc[i,10])
+        mr.repetitive_dna_id = str(mResult.iloc[i,11])
+        mr.match_type = str(mResult.iloc[i,12])
+        if (mr.match_type == ""):
+            mr.score = -1
+            mr.contig_match_start = -1
+            mr.contig_match_end = -1
+        else:
+            mr.score = int(mResult.iloc[i,13])
+            mr.contig_match_start = int(mResult.iloc[i,14])
+            mr.contig_match_end = int(mResult.iloc[i,15])
+        mr.row = "\t".join(str(x) for x in mResult.ix[i].tolist())
+        _mobsuite[mr.contig_id]=(mr)
+    return _mobsuite
 
 def ParseMobsuitePlasmids(pathToMobsuiteResult):
     _mobsuite = {}
@@ -387,7 +485,7 @@ def main():
     
     print("identifying MLST")
     mlst = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
-    mlstHit = result_parsers.parse_mlst_result(mlst, mlst_scheme_map)
+    mlstHit = ParseMLSTResult(mlst, mlst_scheme_map)#***********************
     ToJson(mlstHit, "mlst.json") #write it to a json output
     mlstHit = list(mlstHit.values())[0]
 
@@ -402,7 +500,7 @@ def main():
 
     #parse mobsuite results
     mobfindercontig = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
-    mSuite = result_parsers.parse_mobsuite_result(mobfindercontig) #outputDir + "/predictions/" + ID + ".recon/contig_report.txt")#*************
+    mSuite = ParseMobsuiteResult(mobfindercontig) #outputDir + "/predictions/" + ID + ".recon/contig_report.txt")#*************
     ToJson(mSuite, "mobsuite.json") #*************
     mobfinderaggregate = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
     mSuitePlasmids = ParseMobsuitePlasmids(mobfinderaggregate)#outputDir + "/predictions/" + ID + ".recon/mobtyper_aggregate_report.txt")#*************
@@ -445,12 +543,12 @@ def main():
     #region output parsed mlst information
     print("formatting mlst outputs")
     output.append("\n\n\n~~~~~~~MLST summary~~~~~~~")
-    output.append("MLST determined species: " + mlstHit['species'])
+    output.append("MLST determined species: " + mlstHit.species)
     output.append("\nMLST Details: ")
-    output.append(mlstHit['row'])
+    output.append(mlstHit.row)
 
     output.append("\nMLST information: ")
-    if (mlstHit['species'] == expected_species):
+    if (mlstHit.species == expected_species):
         output.append("MLST determined species is the same as expected species")
         #notes.append("MLST determined species is the same as expected species")
     else:
@@ -491,7 +589,6 @@ def main():
 
     #write summary to a file
     summaryDir = outputDir + "/summary/" + ID
-    os.makedirs(summaryDir, exists_ok=True)
     out = open(summaryDir + "/summary.txt", 'w')
     for item in output:
         out.write("%s\n" % item)
@@ -506,9 +603,9 @@ def main():
     temp += expected_species + "\t"
 
     #move into MLST
-    temp += mlstHit['species'] + "\t"
-    temp += str(mlstHit['sequence_type']) + "\t"
-    temp += mlstHit['scheme'] + "\t"
+    temp += mlstHit.species + "\t"
+    temp += str(mlstHit.seqType) + "\t"
+    temp += mlstHit.scheme + "\t"
     
     #now onto AMR genes
     temp += ";".join(carbapenamases) + "\t"

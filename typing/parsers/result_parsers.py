@@ -8,7 +8,6 @@ during the Typing phase of the cpo-pipeline.
 import csv
 import pandas
 import numpy
-import pprint
 
 def parse_mlst_result(path_to_mlst_result, mlst_scheme_map):
     """
@@ -19,7 +18,7 @@ def parse_mlst_result(path_to_mlst_result, mlst_scheme_map):
     Returns:
         dict: Parsed mlst report.
         For example:
-        { 'ecoli': { 'contig_file': '/path/to/contig.fa',
+        { 'ecoli': { 'file': '/path/to/contig.fa',
                      'species_id': 'ecoli',
                      'sequence_type': '405',
                      'species':, 'Escherichia  ;Shigella ',
@@ -56,19 +55,20 @@ def parse_mlst_result(path_to_mlst_result, mlst_scheme_map):
         else:
             taxon[key] = value
     #read in the mlst result
+    pprint.pprint(taxon)
     mlst = pandas.read_csv(path_to_mlst_result, delimiter='\t', header=None)
     mlst_hit = {}
     mlst_hit['scheme'] = ""
     """
     structure of mlst_hit dict:
-    { "contig_file": "/path/to/contig.fa",
+    { "file": "/path/to/contig.fa",
       "species_id": "ecoli",
       "sequence_type": "405",
-      "scheme":, "Escherichia  ;Shigella ",
+      "species":, "Escherichia  ;Shigella ",
       "row": "/path/to/contig.fa\tecoli\t405\tadk(35)\tfumC(37)\tgyrB(29)\ticd(25)\tmdh(4)\tpurA(5)\trecA(73)"
     } 
     """
-    mlst_hit['contig_file'] = mlst.iloc[0,0]
+    mlst_hit['file'] = mlst.iloc[0,0]
     mlst_hit['species_id'] = (mlst.iloc[0,1])
     mlst_hit['sequence_type'] = str(mlst.iloc[0,2])
     for i in range(3, len(mlst.columns)):
@@ -77,53 +77,3 @@ def parse_mlst_result(path_to_mlst_result, mlst_scheme_map):
     mlst_hit['row'] = "\t".join(str(x) for x in mlst.ix[0].tolist())
     mlst_result[mlst_hit['species_id']] = mlst_hit
     return mlst_result
-
-def parse_mobsuite_result(path_to_mobsuite_result):
-    """
-    Args:
-        path_to_mobsuite_result (str): Path to the kraken report file.
-
-    Returns:
-        dict: Parsed mobsuite report.
-        For example:
-        { 'ecoli': { 'contig_file': '/path/to/contig.fa',
-                     'species_id': 'ecoli',
-                     'sequence_type': '405',
-                     'species':, 'Escherichia  ;Shigella ',
-                     'row': '/path/to/contig.fa\tecoli\t405\tadk(35)\tfumC(37)\tgyrB(29)\ticd(25)\tmdh(4)\tpurA(5)\trecA(73)'
-                   }
-        }
-    """
-    mobsuite = {}
-    mResult = pandas.read_csv(path_to_mobsuite_result, delimiter='\t', header=0)
-    mResult = mResult.replace(numpy.nan, '', regex=True)
-
-    for i in range(len(mResult.index)):
-        mr = {}
-        mr['file_id'] = str(mResult.iloc[i,0])
-        mr['cluster_id'] = str(mResult.iloc[i,1])
-        if (mr['cluster_id'] == "chromosome"):
-            break
-        mr['contig_id'] = str(mResult.iloc[i,2])
-        mr['contig_num'] = mr['contig_id'][(mr['contig_id'].find("contig")+6):mr['contig_id'].find("_len=")]
-        mr['contig_length'] = int(mResult.iloc[i,3])
-        mr['circularity_status'] = str(mResult.iloc[i,4])
-        mr['rep_type'] = str(mResult.iloc[i,5])
-        mr['rep_type_accession'] = str(mResult.iloc[i,6])
-        mr['relaxase_type'] = str(mResult.iloc[i,7])
-        mr['relaxase_type_accession'] = str(mResult.iloc[i,8])
-        mr['mash_nearest_neighbor'] = str(mResult.iloc[i,9])
-        mr['mash_neighbor_distance'] = float(mResult.iloc[i,10])
-        mr['repetitive_dna_id'] = str(mResult.iloc[i,11])
-        mr['match_type'] = str(mResult.iloc[i,12])
-        if (mr['match_type'] == ""):
-            mr['score'] = -1
-            mr['contig_match_start'] = -1
-            mr['contig_match_end'] = -1
-        else:
-            mr['score'] = int(mResult.iloc[i,13])
-            mr['contig_match_start'] = int(mResult.iloc[i,14])
-            mr['contig_match_end'] = int(mResult.iloc[i,15])
-        mr['row'] = "\t".join(str(x) for x in mResult.ix[i].tolist())
-        mobsuite[mr['contig_id']]=(mr)
-    return mobsuite
