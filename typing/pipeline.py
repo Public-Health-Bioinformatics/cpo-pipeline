@@ -589,7 +589,7 @@ def main():
 
     #write summary to a file
     summaryDir = outputDir + "/summary/" + ID
-    out = open("summary.txt", 'w')
+    out = open(summaryDir + "/summary.txt", 'w')
     for item in output:
         out.write("%s\n" % item)
 
@@ -632,7 +632,7 @@ def main():
     tsvOut.append(temp)
 
     summaryDir = outputDir + "/summary/" + ID
-    out = open("summary.tsv", 'w')
+    out = open(summaryDir + "/summary.tsv", 'w')
     for item in tsvOut:
         out.write("%s\n" % item)
     #endregion
