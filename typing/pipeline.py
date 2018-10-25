@@ -51,15 +51,6 @@ class starFinders(object):
         self.source = "chromosome"
         self.row = ""
 
-class PlasFlowResult(object):
-    def __init__(self):
-        self.sequence = ""
-        self.length = 0
-        self.label = ""
-        self.confidence = 0
-        self.usefulRow = ""
-        self.row = ""
-
 class mobsuitePlasmids(object):
     def __init__(self):
         self.file_id = ""
@@ -222,37 +213,6 @@ def ParseMobsuitePlasmids(pathToMobsuiteResult):
         _mobsuite[mr.file_id] = mr
     return _mobsuite
 
-def ParseResFinderResult(pathToResFinderResults, plasmidContigs, likelyPlasmidContigs):
-    _rFinder = {}
-    resFinder = pandas.read_csv(pathToResFinderResults, delimiter='\t', header=0)
-    resFinder = resFinder.replace(numpy.nan, '', regex=True)
-
-    for i in range(len(resFinder.index)):
-        rf = starFinders()
-        rf.file = str(resFinder.iloc[i,0])
-        rf.sequence = str(resFinder.iloc[i,1])
-        rf.start = int(resFinder.iloc[i,2])
-        rf.end = int(resFinder.iloc[i,3])
-        rf.gene = str(resFinder.iloc[i,4])
-        rf.shortGene = rf.gene
-        rf.coverage = str(resFinder.iloc[i,5])
-        rf.coverage_map = str(resFinder.iloc[i,6])
-        rf.gaps = str(resFinder.iloc[i,7])
-        rf.pCoverage = float(resFinder.iloc[i,8])
-        rf.pIdentity = float(resFinder.iloc[i,9])
-        rf.database = str(resFinder.iloc[i,10])
-        rf.accession = str(resFinder.iloc[i,11])
-        rf.product = str(resFinder.iloc[i,12])
-        rf.row = "\t".join(str(x) for x in resFinder.ix[i].tolist())
-        if (rf.sequence[6:] in plasmidContigs):
-            rf.source = "plasmid"
-        elif (rf.sequence[6:] in likelyPlasmidContigs):
-            rf.source = "likely plasmid"
-        else:
-            rf.source = "likely chromosome"
-        _rFinder[rf.gene]=rf
-    return _rFinder
-
 def ParseRGIResult(pathToRGIResults, plasmidContigs, likelyPlasmidContigs):
     _rgiR = {}
     RGI = pandas.read_csv(pathToRGIResults, delimiter='\t', header=0)
@@ -409,20 +369,20 @@ def main():
     ToJson(mSuitePlasmids, "mobsuitePlasmids.json") #*************
 
     for key in mSuite:
-        if mSuite[key].contig_num not in plasmidContigs and mSuite[key].contig_num not in likelyPlasmidContigs:
-            if not (mSuite[key].rep_type == ''):
-                plasmidContigs.append(mSuite[key].contig_num)
+        if mSuite[key]['contig_num'] not in plasmidContigs and mSuite[key]['contig_num'] not in likelyPlasmidContigs:
+            if not (mSuite[key]['rep_type'] == ''):
+                plasmidContigs.append(mSuite[key]['contig_num'])
             else:
-                likelyPlasmidContigs.append(mSuite[key].contig_num)
+                likelyPlasmidContigs.append(mSuite[key]['contig_num'])
     for key in mSuite:
-        if mSuite[key].rep_type not in origins:
-            origins.append(mSuite[key].rep_type)
+        if mSuite[key]['rep_type'] not in origins:
+            origins.append(mSuite[key]['rep_type'])
 
     #parse resfinder AMR results
     # pFinder = ParsePlasmidFinderResult(plasmidfinder)
     # ToJson(pFinder, "origins.json")
     abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
-    rFinder = ParseResFinderResult(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
+    rFinder = result_parsers.parse_resfinder_result(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
     ToJson(rFinder, "resfinder.json") #*************
 
     rgi = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
@@ -432,7 +392,7 @@ def main():
     carbapenamases = []
     amrGenes = []
     for keys in rFinder:
-        carbapenamases.append(rFinder[keys].shortGene + "(" + rFinder[keys].source + ")")
+        carbapenamases.append(rFinder[keys]['short_gene'] + "(" + rFinder[keys]['source'] + ")")
     for keys in rgiAMR:
         if (rgiAMR[keys].Drug_Class.find("carbapenem") > -1):
             if (rgiAMR[keys].Best_Hit_ARO not in carbapenamases):
@@ -473,7 +433,7 @@ def main():
 
     output.append("\nmob-suite prediction details: ")
     for key in mSuite:
-        output.append(mSuite[key].row)
+        output.append(mSuite[key]['row'])
 
     output.append("\n\n\n~~~~~~~~AMR Genes~~~~~~~~\n")
     output.append("predicted carbapenamase Genes: ")
@@ -484,14 +444,14 @@ def main():
 
     output.append("\nDetails about the carbapenamase Genes: ")
     for key in rFinder:
-        output.append(rFinder[key].row)
+        output.append(rFinder[key]['row'])
     output.append("\nDetails about the RGI AMR Genes: ")
     for key in rgiAMR:
         output.append(rgiAMR[key].row)
 
     #write summary to a file
     summaryDir = outputDir + "/summary/" + ID
-    os.makedirs(summaryDir, exists_ok=True)
+    os.makedirs(summaryDir, exist_ok=True)
     out = open(summaryDir + "/summary.txt", 'w')
     for item in output:
         out.write("%s\n" % item)

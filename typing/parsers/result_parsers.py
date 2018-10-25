@@ -127,3 +127,90 @@ def parse_mobsuite_result(path_to_mobsuite_result):
         mr['row'] = "\t".join(str(x) for x in mResult.ix[i].tolist())
         mobsuite[mr['contig_id']]=(mr)
     return mobsuite
+
+def parse_mobsuite_plasmids(path_to_mobsuite_result):
+    """
+    Args:
+        path_to_mobsuite_result (str): Path to the mobsuite result file.
+
+    Returns:
+        dict: Parsed mobsuite result.
+        For example:
+        { '': { '': '',
+                '': '',
+              }
+        }
+    """
+    mobsuite = {}
+    mResults = pandas.read_csv(pathToMobsuiteResult, delimiter='\t', header=0)
+    mResults = mResults.replace(numpy.nan, '', regex=True)
+
+    for i in range(len(mResults.index)):
+        mr = {}
+        mr['file_id'] = str(mResults.iloc[i,0])
+        mr['num_contigs'] = int(mResults.iloc[i,1])
+        mr['total_length'] = int(mResults.iloc[i,2])
+        mr['gc'] = int(mResults.iloc[i,3])
+        mr['rep_types'] = str(mResults.iloc[i,4])
+        mr['rep_typeAccession'] = str(mResults.iloc[i,5])
+        mr['relaxase_type'] = str(mResults.iloc[i,6])
+        mr['relaxase_type_accession'] = str(mResults.iloc[i,7])
+        mr['mpf_type'] = str(mResults.iloc[i,8])
+        mr['mpf_type_accession'] = str(mResults.iloc[i,9])
+        mr['orit_type'] = str(mResults.iloc[i,10])
+        mr['orit_accession'] = str(mResults.iloc[i,11])
+        mr['PredictedMobility'] = str(mResults.iloc[i,12])
+        mr['mash_nearest_neighbor'] = str(mResults.iloc[i,13])
+        mr['mash_neighbor_distance'] = float(mResults.iloc[i,14])
+        mr['mash_neighbor_cluster'] = int(mResults.iloc[i,15])
+        mr['row'] = "\t".join(str(x) for x in mResults.ix[i].tolist())
+        mobsuite[mr['file_id']] = mr
+    return mobsuite
+
+def parse_resfinder_result(path_to_resfinder_results, plasmid_contigs, likely_plasmid_contigs):
+    """
+    Args:
+        path_to_resfinder_result (str): Path to the resfinder report file.
+        plasmid_contings (str):
+        likely_plasmid_contigs ():
+
+    Returns:
+        dict: Parsed resfinder report.
+        For example:
+        { '': { '': '',
+                '': '',
+              }
+        }
+    """
+    rFinder = {}
+    resFinder = pandas.read_csv(path_to_resfinder_results, delimiter='\t', header=0)
+    resFinder = resFinder.replace(numpy.nan, '', regex=True)
+
+    for i in range(len(resFinder.index)):
+        rf = {}
+        rf['file'] = str(resFinder.iloc[i,0])
+        rf['sequence'] = str(resFinder.iloc[i,1])
+        rf['start'] = int(resFinder.iloc[i,2])
+        rf['end'] = int(resFinder.iloc[i,3])
+        rf['gene'] = str(resFinder.iloc[i,4])
+        rf['short_gene'] = rf['gene']
+        rf['coverage'] = str(resFinder.iloc[i,5])
+        rf['coverage_map'] = str(resFinder.iloc[i,6])
+        rf['gaps'] = str(resFinder.iloc[i,7])
+        rf['pCoverage'] = float(resFinder.iloc[i,8])
+        rf['pIdentity'] = float(resFinder.iloc[i,9])
+        rf['database'] = str(resFinder.iloc[i,10])
+        rf['accession'] = str(resFinder.iloc[i,11])
+        rf['product'] = str(resFinder.iloc[i,12])
+        rf['row'] = "\t".join(str(x) for x in resFinder.ix[i].tolist())
+        if (rf['sequence'][6:] in plasmid_contigs):
+            rf['source'] = "plasmid"
+        elif (rf['sequence'][6:] in likely_plasmid_contigs):
+            rf['source'] = "likely plasmid"
+        else:
+            rf['source'] = "likely chromosome"
+        rFinder[rf['gene']]=rf
+        print("**** BEGIN PRINT parse_resfinder_results() OUTPUT ****")
+        pprint.pprint(rFinder)
+        print("**** END PRINT parse_resfinder_results() OUTPUT ****")
+    return rFinder
