@@ -9,9 +9,10 @@
 # species_name ("Escherichia coli")
 
 pipeline_qsub_script=$1
-samples_list=$2
-module_1_output_dir=$3
-module_2_output_dir=$4
+pipeline_script=$2
+samples_list=$3
+module_1_output_dir=$4
+module_2_output_dir=$5
 
 #submitting multiple jobs
 for sample_id in `cat "${samples_list}"`; do
@@ -20,11 +21,8 @@ for sample_id in `cat "${samples_list}"`; do
     echo "${sample_id}"
     
     qsub  "${pipeline_qsub_script}" \
+	  "${pipeline_script}" \
 	  "${sample_id}" \
 	  "${assembly}" \
-	  "${module_2_output_dir}" \
-	  "/data/ref_databases/card/card-2.0.3.json" \
-	  "/projects/carbapenemase_producing_organisms_surveillance/databases/abricate" \
-	  "carbapenemases"
-	  
+	  "${module_2_output_dir}"
 done;

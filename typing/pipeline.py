@@ -443,7 +443,7 @@ def main():
     parser.add_option("-c", "--card-path", dest="card_path", default=config['databases']['card'], type="string", help="absolute file path to card.json db")
     parser.add_option("-d", "--abricate-datadir", dest="abricate_datadir", default=config['databases']['abricate-datadir'], type="string", help="absolute file path to directory where abricate dbs are stored")
     parser.add_option("-p", "--abricate-cpo-plasmid-db", dest="abricate_cpo_plasmid_db", default=config['databases']['abricate-cpo-plasmid-db'], type="string", help="name of abricate cpo plasmid db to use")
-    parser.add_option("-e", "--expected", dest="expected_species", default="NA/NA/NA", type="string", help="expected species of the isolate")
+    parser.add_option("-e", "--expected-species", dest="expected_species", default="NA/NA/NA", type="string", help="expected species of the isolate")
     
     # parallelization, useless, these are hard coded to 8cores/64G RAM
     # parser.add_option("-t", "--threads", dest="threads", default=8, type="int", help="number of cpu to use")
@@ -483,7 +483,8 @@ def main():
     
     print("step 3: parsing mlst, plasmid, and amr results")
     
-    print("identifying MLST")    
+    print("identifying MLST")
+    mlst = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
     mlstHit = ParseMLSTResult(mlst, mlst_scheme_map)#***********************
     ToJson(mlstHit, "mlst.json") #write it to a json output
     mlstHit = list(mlstHit.values())[0]
@@ -498,8 +499,10 @@ def main():
     origins = []
 
     #parse mobsuite results
+    mobfindercontig = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
     mSuite = ParseMobsuiteResult(mobfindercontig) #outputDir + "/predictions/" + ID + ".recon/contig_report.txt")#*************
     ToJson(mSuite, "mobsuite.json") #*************
+    mobfinderaggregate = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
     mSuitePlasmids = ParseMobsuitePlasmids(mobfinderaggregate)#outputDir + "/predictions/" + ID + ".recon/mobtyper_aggregate_report.txt")#*************
     ToJson(mSuitePlasmids, "mobsuitePlasmids.json") #*************
 
@@ -516,10 +519,11 @@ def main():
     #parse resfinder AMR results
     # pFinder = ParsePlasmidFinderResult(plasmidfinder)
     # ToJson(pFinder, "origins.json")
-
+    abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
     rFinder = ParseResFinderResult(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
     ToJson(rFinder, "resfinder.json") #*************
 
+    rgi = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
     rgiAMR = ParseRGIResult(rgi, plasmidContigs, likelyPlasmidContigs) # outputDir + "/predictions/" + ID + ".rgi.txt", plasmidContigs, likelyPlasmidContigs)#***********************
     ToJson(rgiAMR, "rgi.json") #*************
 

@@ -27,7 +27,7 @@ echo "threads: $threads"
 typingDir="${outputDir}"/typing
 resistanceDir="${outputDir}"/resistance
 
-mkdir -p "${typingDir}"/"${ID}"
+mkdir -p "${typingDir}"/"${ID}"/{"${ID}".mlst,"${ID}".recon}
 mkdir -p "${resistanceDir}"/"${ID}"
 mkdir -p "${outputDir}"/summary
 
@@ -37,7 +37,7 @@ echo "step3: mlst"
 
 source activate mlst-2.15.1
 
-mlst "${assemblyPath}" > "${typingDir}/${ID}/${ID}.mlst"
+mlst "${assemblyPath}" > "${typingDir}/${ID}/${ID}.mlst/${ID}.mlst"
 
 source deactivate
 
@@ -68,7 +68,7 @@ cd -
 source activate mob_suite-1.4.5
 
 #run mob typer
-mob_recon --infile "${assemblyPath}" --outdir "${typingDir}/${ID}.recon" --run_typer
+mob_recon --infile "${assemblyPath}" --outdir "${typingDir}/${ID}/${ID}.recon" --run_typer
 
 source deactivate
 
