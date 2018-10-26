@@ -1,15 +1,15 @@
-#!/home/jjjjia/.conda/envs/py36/bin/python
+#!/usr/bin/env python
 
-#$ -S /home/jjjjia/.conda/envs/py36/bin/python
+#$ -S /usr/bin/env python
 #$ -V             # Pass environment variables to the job
-#$ -N CPO_pipeline    # Replace with a more specific job name
-#$ -wd /home/jjjjia/testCases           # Use the current working dir
+#$ -N cpo_pipeline
+#$ -cwd           # Use the current working dir
 #$ -pe smp 1      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 #$ -m ea
-#$ -M bja20@sfu.ca
+
 
 # This script is a wrapper for module two, part 2: tree rendering of the cpo_workflow to render dendrograms.
 # It uses snippy for core genome SNV calling and alignment, clustalw to generate a NJ tree and ete3 to render the dendrogram
@@ -39,6 +39,7 @@ import json
 import numpy #conda numpy
 import ete3 as e #conda ete3 3.1.1**** >requires pyqt5
 
+from parsers import result_parsers
 
 #parses some parameters
 parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
@@ -89,38 +90,11 @@ class SensitiveMetadata(object):
             row_idx = bcids.index( bcid )                        # lookup the row for this BCID
         return self.sensitive_data.loc[ row_idx, column_name ]  # return the one value based on the column (col_idx) and this row
 
-class workflowResult(object):
-    def __init__(self):
-        self.new = False
-        self.ID	= "?" 
-        self.ExpectedSpecies = "?"
-        self.MLSTSpecies = "?"
-        self.SequenceType = "?"
-        self.MLSTScheme = "?"
-        self.CarbapenemResistanceGenes ="?"
-        self.plasmidBestMatch ="?"
-        self.plasmididentity =-1
-        self.plasmidsharedhashes ="?"
-        self.OtherAMRGenes="?"
-        self.TotalPlasmids = -1
-        self.plasmids = []
-        self.DefinitelyPlasmidContigs ="?"
-        self.LikelyPlasmidContigs="?"
-        self.row = ""
-class plasmidObj(object):
-    def __init__(self):
-        self.PlasmidsID = 0
-        self.Num_Contigs = 0
-        self.PlasmidLength	= 0
-        self.PlasmidRepType	= ""
-        self.PlasmidMobility = ""
-        self.NearestReference = ""
 
-#endregion
 
-#region useful functions
 def read(path): #read in a text file to a list
     return [line.rstrip('\n') for line in open(path)]
+
 def execute(command): #subprocess.popen call bash command
     process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
@@ -139,12 +113,14 @@ def execute(command): #subprocess.popen call bash command
         return output
     else:
         raise subprocess.CalledProcessError(exitCode, command)
+
 def httpGetFile(url, filepath=""): #download a file from the web
     if (filepath == ""):
         return urllib.request.urlretrieve(url)
     else:
         urllib.request.urlretrieve(url, filepath)
         return True
+    
 def gunzip(inputpath="", outputpath=""): #gunzip
     if (outputpath == ""):
         with gzip.open(inputpath, 'rb') as f:
@@ -156,6 +132,7 @@ def gunzip(inputpath="", outputpath=""): #gunzip
         with open(outputpath, 'wb') as out:
             out.write(gzContent)
         return True
+    
 def addFace(name): #function to add a facet to a tree
     #if its the reference branch, populate the faces with column headers
     face = e.faces.TextFace(name,fsize=10,tight_text=True)
@@ -163,54 +140,13 @@ def addFace(name): #function to add a facet to a tree
     face.margin_right = 5
     face.margin_left = 5
     return face
-#endregion
 
-#region functions to parse result files
-def ParseWorkflowResults(pathToResult):
-    _worflowResult = {}
-    r = pandas.read_csv(pathToResult, delimiter='\t', header=0) 
-    r = r.replace(numpy.nan, '', regex=True)
-    _naResult = workflowResult()
-    _worflowResult["na"] = _naResult
-    for i in range(len(r.index)):  
-        _results = workflowResult()
-        if(str(r.loc[r.index[i], 'new']).lower() == "new"):
-            _results.new = True
-        else:
-            _results.new = False        
-        _results.ID = str(r.loc[r.index[i], 'ID']).replace(".fa","")
-        _results.ExpectedSpecies = str(r.loc[r.index[i], 'Expected Species'])
-        _results.MLSTSpecies = str(r.loc[r.index[i], 'MLST Species'])
-        _results.SequenceType = str(r.loc[r.index[i], 'Sequence Type'])
-        _results.MLSTScheme = (str(r.loc[r.index[i], 'MLST Scheme']))
-        _results.CarbapenemResistanceGenes = (str(r.loc[r.index[i], 'Carbapenem Resistance Genes']))
-        _results.OtherAMRGenes = (str(r.loc[r.index[i], 'Other AMR Genes']))
-        _results.TotalPlasmids = int(r.loc[r.index[i], 'Total Plasmids'])
-        _results.plasmidBestMatch = str(r.loc[r.index[i], 'Plasmid Best Match'])
-        _results.plasmididentity = str(r.loc[r.index[i], 'Plasmid Identity'])
-        _results.plasmidsharedhashes = str(r.loc[r.index[i], 'Plasmid Shared Hash'])
-        for j in range(0,_results.TotalPlasmids):
-            _plasmid = plasmidObj()
-            _plasmid.PlasmidsID =(((str(r.loc[r.index[i], 'Plasmids ID'])).split(";"))[j])
-            _plasmid.Num_Contigs = (((str(r.loc[r.index[i], 'Num_Contigs'])).split(";"))[j])
-            _plasmid.PlasmidLength	= (((str(r.loc[r.index[i], 'Plasmid Length'])).split(";"))[j])
-            _plasmid.PlasmidRepType	= (((str(r.loc[r.index[i], 'Plasmid RepType'])).split(";"))[j])
-            _plasmid.PlasmidMobility = ((str(r.loc[r.index[i], 'Plasmid Mobility'])).split(";"))[j]
-            _plasmid.NearestReference = ((str(r.loc[r.index[i], 'Nearest Reference'])).split(";"))[j]
-            _results.plasmids.append(_plasmid)
-        _results.DefinitelyPlasmidContigs = (str(r.loc[r.index[i], 'Definitely Plasmid Contigs']))
-        _results.LikelyPlasmidContigs = (str(r.loc[r.index[i], 'Likely Plasmid Contigs']))
-        _results.row = "\t".join(str(x) for x in r.ix[i].tolist())
-        _worflowResult[_results.ID] = _results
-    return _worflowResult
 
-#endregion
-
-def Main():
+def main():
     if len(sensitivePath)>0:
         sensitive_meta_data = SensitiveMetadata()
 
-    metadata = ParseWorkflowResults(metadataPath)
+    metadata = result_parsers.parse_workflow_results(metadataPath)
     distance = read(distancePath)
     treeFile = "".join(read(treePath))
 
@@ -347,10 +283,8 @@ def Main():
 #endregion
 
 
-start = time.time()#time the analysis
-
-#analysis time
-Main()
-
-end = time.time()
-print("Finished!\nThe analysis used: " + str(end-start) + " seconds")
+if __name__ == '__main__':
+    start = time.time()#time the analysis
+    main()
+    end = time.time()
+    print("Finished!\nThe analysis used: " + str(end-start) + " seconds")
