@@ -136,13 +136,37 @@ def parse_mobsuite_plasmids(path_to_mobsuite_result):
     Returns:
         dict: Parsed mobsuite result.
         For example:
-        { '': { '': '',
-                '': '',
-              }
+
+        {'plasmid_133.fasta': {'predicted_mobility': 'Mobilizable',
+                               'file_id': 'plasmid_133.fasta',
+                               'gc': 56,
+                               'mash_nearest_neighbor': 'CP016867',
+                               'mash_neighbor_cluster': 133,
+                               'mash_neighbor_distance': 0.000264084,
+                               'mpf_type': '-',
+                               'mpf_type_accession': '-',
+                               'num_contigs': 16,
+                               'orit_accession': 'CP018941',
+                               'orit_type': 'MOBP',
+                               'relaxase_type': 'MOBP',
+                               'relaxase_type_accession': 'NC_013090_00004',
+                               'rep_typeAccession': '000019__CP000651_00005',
+                               'rep_types': 'ColRNAI_rep_cluster_1987',
+                               'row': [ 'plasmid_133.fasta\t16\t53600\t56.1791044776\t',
+                                        'ColRNAI_rep_cluster_1987\t',
+                                        '000019__CP000651_00005\tMOBP\tNC_013090_00004\t',
+                                        '-\t-\tMOBP\tCP018941\tMobilizable\tCP016867\t',
+                                        '0.000264084\t133'
+                                      ],
+                               'total_length': 53600
+                               },
+         'plasmid_182.fasta': {...
+                              },
+         ...
         }
     """
     mobsuite = {}
-    mResults = pandas.read_csv(pathToMobsuiteResult, delimiter='\t', header=0)
+    mResults = pandas.read_csv(path_to_mobsuite_result, delimiter='\t', header=0)
     mResults = mResults.replace(numpy.nan, '', regex=True)
 
     for i in range(len(mResults.index)):
@@ -159,7 +183,7 @@ def parse_mobsuite_plasmids(path_to_mobsuite_result):
         mr['mpf_type_accession'] = str(mResults.iloc[i,9])
         mr['orit_type'] = str(mResults.iloc[i,10])
         mr['orit_accession'] = str(mResults.iloc[i,11])
-        mr['PredictedMobility'] = str(mResults.iloc[i,12])
+        mr['predicted_mobility'] = str(mResults.iloc[i,12])
         mr['mash_nearest_neighbor'] = str(mResults.iloc[i,13])
         mr['mash_neighbor_distance'] = float(mResults.iloc[i,14])
         mr['mash_neighbor_cluster'] = int(mResults.iloc[i,15])
@@ -177,9 +201,28 @@ def parse_resfinder_result(path_to_resfinder_results, plasmid_contigs, likely_pl
     Returns:
         dict: Parsed resfinder report.
         For example:
-        { '': { '': '',
-                '': '',
-              }
+
+        {'NDM-1': {'accession': 'CAZ39946.1',
+                   'coverage': '1-813/813',
+                   'coverage_map': '===============',
+                   'database': 'bccdc',
+                   'end': 3995,
+                   'file': '/projects/cpo/analyses/2018-10-01_validation/Cfr-ST22/cpo_pipeline_module_1_assembly/2018-10-24_7d537af_output/contigs/BC11-Cfr001.fa',
+                   'gaps': '0/0',
+                   'gene': 'NDM-1',
+                   'percent_coverage': 100.0,
+                   'percent_identity': 100.0,
+                   'product': '  subclass B1 metallo-beta-lactamase NDM-1 ',
+                   'row': [ '/projects/cpo/analyses/2018-10-01_validation/Cfr-ST22/cpo_pipeline_module_1_assembly/2018-10-24_7d537af_output/contigs/BC11-Cfr001.fa\t',
+                            'contig00044\t3183\t3995\tNDM-1\t1-813/813\t===============\t',
+                            '0/0\t100.0\t100.0\tbccdc\tCAZ39946.1\t  subclass B1 ',
+                            'metallo-beta-lactamase NDM-1 ',
+                          ],
+                   'sequence': 'contig00044',
+                   'short_gene': 'NDM-1',
+                   'source': 'likely plasmid',
+                   'start': 3183
+                  }
         }
     """
     rFinder = {}
@@ -197,8 +240,8 @@ def parse_resfinder_result(path_to_resfinder_results, plasmid_contigs, likely_pl
         rf['coverage'] = str(resFinder.iloc[i,5])
         rf['coverage_map'] = str(resFinder.iloc[i,6])
         rf['gaps'] = str(resFinder.iloc[i,7])
-        rf['pCoverage'] = float(resFinder.iloc[i,8])
-        rf['pIdentity'] = float(resFinder.iloc[i,9])
+        rf['percent_coverage'] = float(resFinder.iloc[i,8])
+        rf['percent_identity'] = float(resFinder.iloc[i,9])
         rf['database'] = str(resFinder.iloc[i,10])
         rf['accession'] = str(resFinder.iloc[i,11])
         rf['product'] = str(resFinder.iloc[i,12])
@@ -210,7 +253,99 @@ def parse_resfinder_result(path_to_resfinder_results, plasmid_contigs, likely_pl
         else:
             rf['source'] = "likely chromosome"
         rFinder[rf['gene']]=rf
-        print("**** BEGIN PRINT parse_resfinder_results() OUTPUT ****")
-        pprint.pprint(rFinder)
-        print("**** END PRINT parse_resfinder_results() OUTPUT ****")
     return rFinder
+
+def parse_rgi_result(path_to_rgi_results, plasmid_contigs, likely_plasmid_contigs):
+    """
+    Args:
+        path_to_rgi_result (str): Path to the rgi report file.
+        plasmid_contings (str):
+        likely_plasmid_contigs ():
+
+    Returns:
+        dict: Parsed rgi report.
+        For example:
+
+    {2886: {'AMR_Gene_Family': 'Penicillin-binding protein mutations conferring resistance to beta-lactam antibiotics',
+            'ARO': 3004446,
+            'Best_Hit_ARO': 'Haemophilus influenzae PBP3 conferring resistance to beta-lactam antibiotics',
+            'Best_Hit_Bitscore': 592.038,
+            'Best_Identities': 52.75,
+            'CARD_Protein_Sequence': 'MVKFNSSRKSGKSKKTI...',
+            'Contig': 'contig00006_112 ',
+            'Contig_Num': '00006',
+            'Cut_Off': 'Strict',
+            'Drug_Class': 'carbapenem; cephalosporin; monobactam; penam; cephamycin',
+            'ID': 'gnl|BL_ORD_ID|849|hsp_num:1',
+            'Model_ID': 2886,
+            'Model_type': 'protein variant model',
+            'ORF_ID': 'contig00006_112 # 126897 # 128663 # -1 # ID=6_112;partial=00;start_type=ATG;rbs_motif=AGGA/GGAG/GAGG;rbs_spacer=11-12bp;gc_cont=0.546',
+            'Orientation': '-',
+            'Other_SNPs': '',
+            'Pass_Bitscore': 500,
+            'Percentage_Length_of_Reference_Sequence': 0.0,
+            'Predicted_DNA': 'ATGAAAGCAGCGGCAAAAACGCACAA...',
+            'Predicted_Protein': 'MKAAAKTHKPKRQEE...',
+            'Resistance_Mechanism': 'antibiotic target alteration',
+            'SNPs_in_Best_Hit_ARO': 'S357N, D350N',
+            'Start': 126897,
+            'Stop': 128663,
+            'row': 'contig00006_112 # 126897 # 128663 # -1 # '
+               'ID=6_112;partial=00;start_type=ATG;rbs_motif=AGGA/GGAG/GAGG;rbs_spacer=11-12bp;gc_cont=0.546\t'
+               'contig00006_112 \t126897\t128663\t-\tStrict\t500\t592.038\t'
+               'Haemophilus influenzae PBP3 conferring resistance to '
+               'beta-lactam antibiotics\t52.75\t3004446\tprotein variant '
+               'model\tS357N, D350N\t\tcarbapenem; cephalosporin; monobactam; '
+               'penam; cephamycin\tantibiotic target alteration\t'
+               'Penicillin-binding protein mutations conferring resistance to '
+               'beta-lactam antibiotics\t'
+               'ATGAAAGCAGCGGCAAAAACGCACAAACCAAAACGCCAGGAAGAACAAGCCAACTTTATCAGTTGGCGTTTTGCGTTACTGTGCGGCTGTATTTTGCTGGCACTGGGTTTTCTGCTGGGTCGCGTTGCCTGGCTGCAAATCATCGCGCCGGACATGCTGGTGCGTCAGGGTGATATGCGCTCTCTACGCGTCCAGGAAGTGTCTACATCGCGCGGAATGATTACCGACCGCTCTGGTCGTCCGCTGGCGGTGAGTGTTCCGGTTAAAGCTATATGGGCCGACCCGAAAGAAGTACATGATGCCGGCGGAGTGAGCGTTGGCGAACGCTGGAGAGCGCTGTCAACCGCGCTGAATCTCCCGCTCGATCAACTGGCTTCCCGCATTAACGCGAATCCGAAAGGGCGCTTTATCTATCTGGCGCGTCAGGTAAACCCTGACATGGCTGATTACATCAAAAAACTGAAGCTGCCAGGTATCCATCTGCGCGAAGAATCCCGCCGTTACTACCCTTCCGGGGAAGTGACTGCTCACCTCATCGGATTTACGAACGTCGACAGCCAGGGCATTGAAGGCGTTGAGAAGAGCTTCGACAAGTGGCTCACCGGACAACCGGGCGAGCGTATTGTACGTAAAGACCGGTATGGCCGCGTCATTGAAGATATCTCCTCTACCGACAGCCAGGCGGCGCATAACCTCGCGTTGAGCATTGATGAGCGTTTACAGGCACTGGTCTACCGTGAACTGAATAACGCCGTGGCGTTCAACAAGGCGGAGTCAGGCAGTGCGGTACTGGTGGATGTGAACACCGGTGAAGTGCTGGCAATGGCCAACAGTCCGTCCTACAACCCGAACAATCTCACCGGTACGCCAAAAGACGCGATGCGTAACCGCACCATTACCGACGTGTTTGAACCGGGTTCTACCGTTAAACCGATGGTGGTGATGACCGCGCTGCAGCGCGGTGTGGTACGCGAAAATACGGTCCTCAACACTATCCCTTACCGAATTAATGGTCACGAAATCAAAGACGTGGCACGTTATAGCGAATTAACCCTCACCGGGGTTTTGCAGAAGTCGAGTAACGTCGGTGTTTCCAAGCTGGCGTTAGCGATGCCGTCCTCAGCGTTAGTAGATACTTACTCACGTTTTGGGCTGGGAAAAGCGACCAATTTGGGGTTGGTCGGAGAACGCAGTGGCTTATATCCTCAAAAACAACGGTGGTCTGACATAGAGAGGGCCACCTTCTCTTTCGGCTACGGGCTAATGGTAACGCCGTTACAGTTAGCGCGAGTCTATGCAACGATCGGCAGTTACGGCGTTTATCGTCCACTGTCGATTACTAAAGTTGACCCTCCAGTTCCGGGCGAGCGTATCTTCCCGGAAGCGACCGTACGTACCGTGGTGCACATGATGGAAAGCGTGGCGCTGCCCGGCGGCGGCGGCGTGAAGGCGGCGATTAAAGGTTATCGTATCGCCATTAAAACCGGTACAGCGAAAAAAGTAGGGCCGGATGGCCGCTACATCAACAAATACATTGCTTATACCGCAGGTGTTGCGCCTGCGAGTCAGCCGCGCTTCGCGCTGGTTGTTGTTATCAACGATCCGCAGGCGGGTAAATACTACGGTGGCGCCGTTTCCGCGCCGGTCTTTGGTGCCATCATGGGCGGCGTACTGCGTACCATGAACATCGAGCCGGATGCGCTGACAACGGGCGATAAAAATGAATTTGTGAATAATCAAGGCGAGGCAACAGGTGGCAGATCGTAA\t'
+               'MKAAAKTHKPKRQEEQANFISWRFALLCGCILLALGFLLGRVAWLQIIAPDMLVRQGDMRSLRVQEVSTSRGMITDRSGRPLAVSVPVKAIWADPKEVHDAGGVSVGERWRALSTALNLPLDQLASRINANPKGRFIYLARQVNPDMADYIKKLKLPGIHLREESRRYYPSGEVTAHLIGFTNVDSQGIEGVEKSFDKWLTGQPGERIVRKDRYGRVIEDISSTDSQAAHNLALSIDERLQALVYRELNNAVAFNKAESGSAVLVDVNTGEVLAMANSPSYNPNNLTGTPKDAMRNRTITDVFEPGSTVKPMVVMTALQRGVVRENTVLNTIPYRINGHEIKDVARYSELTLTGVLQKSSNVGVSKLALAMPSSALVDTYSRFGLGKATNLGLVGERSGLYPQKQRWSDIERATFSFGYGLMVTPLQLARVYATIGSYGVYRPLSITKVDPPVPGERIFPEATVRTVVHMMESVALPGGGGVKAAIKGYRIAIKTGTAKKVGPDGRYINKYIAYTAGVAPASQPRFALVVVINDPQAGKYYGGAVSAPVFGAIMGGVLRTMNIEPDALTTGDKNEFVNNQGEATGGRS\t'
+               'MVKFNSSRKSGKSKKTIRKLTAPETVKQNKPQKVFEKCFMRGRYMLSTVLILLGLCALVARAAYVQSINADTLSNEADKRSLRKDEVLSVRGSILDRNGQLLSVSVPMSAIVADPKTMLKENSLADKERIAALAEELGMTENDLVKKIEKNSKSGYLYLARQVELSKANYIRRLKIKGIILETEHRRFYPRVEEAAHVVGYTDIDGNGIEGIEKSFNSLLVGKDGSRTVRKDKRGNIVAHISDEKKYDAQDVTLSIDEKLQSMVYREIKKAVSENNAESGTAVLVDVRTGEVLAMATAPSYNPNNRVGVKSELMRNRAITDTFEPGSTVKPFVVLTALQRGVVKRDEIIDTTSFKLSGKEIVDVAPRAQQTLDEILMNSSNRGVSRLALRMPPSALMETYQNAGLSKPTDLGLIGEQVGILNANRKRWADIERATVAYGYGITATPLQIARAYATLGSFGVYRPLSITKVDPPVIGKRVFSEKITKDIVGILEKVAIKNKRAMVEGYRVGVKTGTARKIENGHYVNKYVAFTAGIAPISDPRYALVVLINDPKAGEYYGGAVSAPVFSNIMGYALRANAIPQDAEAAENTTTKSAKRIVYIGEHKNQKVN\t'
+               '0.0\tgnl|BL_ORD_ID|849|hsp_num:1\t2886',
+            'source': 'likely chromosome'
+        }
+    2661: {...
+          }
+    ...
+    }
+    """
+    rgiR = {}
+    RGI = pandas.read_csv(path_to_rgi_results, delimiter='\t', header=0)
+    RGI = RGI.replace(numpy.nan, '', regex=True)
+
+    for i in range(len(RGI.index)):
+        r = {}
+        r['orf_id'] = str(RGI.iloc[i,0])
+        r['contig'] = str(RGI.iloc[i,1])
+        r['contig_num'] = r['contig'][6:r['contig'].find("_")]
+        r['start'] = int(RGI.iloc[i,2])
+        r['stop'] = int(RGI.iloc[i,3])
+        r['orientation'] = str(RGI.iloc[i,4])
+        r['cut_off'] = str(RGI.iloc[i,5])
+        r['pass_bitscore'] = int(RGI.iloc[i,6])
+        r['best_hit_bitscore'] = float(RGI.iloc[i,7])
+        r['best_hit_aro'] = str(RGI.iloc[i,8])
+        r['best_identities'] = float(RGI.iloc[i,9])
+        r['aro'] = int(RGI.iloc[i,10])
+        r['model_type'] = str(RGI.iloc[i,11])
+        r['snps_in_best_hit_aro'] = str(RGI.iloc[i,12])
+        r['other_snps'] = str(RGI.iloc[i,13])
+        r['drug_class'] = str(RGI.iloc[i,14])
+        r['resistance_mechanism'] = str(RGI.iloc[i,15])
+        r['amr_gene_family'] = str(RGI.iloc[i,16])
+        r['predicted_dna'] = str(RGI.iloc[i,17])
+        r['predicted_protein'] = str(RGI.iloc[i,18])
+        r['card_protein_sequence'] = str(RGI.iloc[i,19])
+        r['percentage_length_of_reference_sequence'] = float(RGI.iloc[i,20])
+        r['id'] = str(RGI.iloc[i,21])
+        r['model_id'] = int(RGI.iloc[i,22])
+        r['row'] = "\t".join(str(x) for x in RGI.ix[i].tolist())
+        if (r['contig_num'] in plasmid_contigs):
+            r['source'] = "plasmid"
+        elif (r['contig_num'] in likely_plasmid_contigs):
+            r['source'] = "likely plasmid"
+        else:
+            r['source'] = "likely chromosome"
+        rgiR[r['model_id']] = r
+    return rgiR

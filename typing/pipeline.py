@@ -29,79 +29,6 @@ import configparser
 
 from parsers import result_parsers
 
-#region result objects
-#define some objects to store values from results
-#//TODO this is not the proper way of get/set private object variables. every value has manually assigned defaults intead of specified in init(). Also, use property(def getVar, def setVar).
-class starFinders(object):
-    def __init__(self):
-        self.file = ""
-        self.sequence = ""
-        self.start = 0
-        self.end = 0
-        self.gene = ""
-        self.shortGene = ""
-        self.coverage = ""
-        self.coverage_map = ""
-        self.gaps = ""
-        self.pCoverage = 100.00
-        self.pIdentity = 100.00
-        self.database = ""
-        self.accession = ""
-        self.product = ""
-        self.source = "chromosome"
-        self.row = ""
-
-class mobsuitePlasmids(object):
-    def __init__(self):
-        self.file_id = ""
-        self.num_contigs = 0
-        self.total_length = 0
-        self.gc = ""
-        self.rep_types = ""
-        self.rep_typeAccession = ""
-        self.relaxase_type= ""
-        self.relaxase_type_accession	= ""
-        self.mpf_type	= ""
-        self.mpf_type_accession= ""	
-        self.orit_type	= ""
-        self.orit_accession	= ""
-        self.PredictedMobility	= ""
-        self.mash_nearest_neighbor	= ""
-        self.mash_neighbor_distance	= 0.00
-        self.mash_neighbor_cluster= 0
-        self.row = ""
-
-class RGIResult(object):
-    def __init__(self):
-        self.ORF_ID	= ""
-        self.Contig	= ""
-        self.Start	= -1
-        self.Stop	= -1
-        self.Orientation = ""	
-        self.Cut_Off	= ""
-        self.Pass_Bitscore	= 100000
-        self.Best_Hit_Bitscore	= 0.00
-        self.Best_Hit_ARO	= ""
-        self.Best_Identities	= 0.00
-        self.ARO = 0
-        self.Model_type	= ""
-        self.SNPs_in_Best_Hit_ARO	= ""
-        self.Other_SNPs	= ""
-        self.Drug_Class	= ""
-        self.Resistance_Mechanism	= ""
-        self.AMR_Gene_Family	= ""
-        self.Predicted_DNA	= ""
-        self.Predicted_Protein	= ""
-        self.CARD_Protein_Sequence	= ""
-        self.Percentage_Length_of_Reference_Sequence	= 0.00
-        self.ID	= ""
-        self.Model_ID = 0
-        self.source = ""
-        self.row = ""
-
-#endregion
-
-#region useful functions
 def read(path):
     return [line.rstrip('\n') for line in open(path)]
 
@@ -150,142 +77,6 @@ def ToJson(dictObject, outputPath):
     #with open(outputPath, 'w') as f:
       #json.dump([ob.__dict__ for ob in dictObject.values()], f, ensure_ascii=False)
     return ""
-#endregion
-
-def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
-    #pipelineTest/contigs/BC110-Kpn005.fa	contig00019	45455	45758	IncFIC(FII)_1	8-308/499	========/=.....	8/11	59.52	75.65	plasmidfinder	AP001918	IncFIC(FII)_1__AP001918
-    #example resfinder:
-    #pipelineTest/contigs/BC110-Kpn005.fa	contig00038	256	1053	OXA-181	1-798/798	===============	0/0	100.00	100.00	bccdc	AEP16366.1	  OXA-48 family carbapenem-hydrolyzing class D beta-lactamase OXA-181 
-
-    _pFinder = {} #***********************
-    plasmidFinder = pandas.read_csv(pathToPlasmidFinderResult, delimiter='\t', header=0)
-    plasmidFinder = plasmidFinder.replace(numpy.nan, '', regex=True)
-
-
-    for i in range(len(plasmidFinder.index)):
-        pf = starFinders()
-        pf.file = str(plasmidFinder.iloc[i,0])
-        pf.sequence = str(plasmidFinder.iloc[i,1])
-        pf.start = int(plasmidFinder.iloc[i,2])
-        pf.end = int(plasmidFinder.iloc[i,3])
-        pf.gene = str(plasmidFinder.iloc[i,4])
-        pf.shortGene = pf.gene[:pf.gene.index("_")]
-        pf.coverage = str(plasmidFinder.iloc[i,5])
-        pf.coverage_map = str(plasmidFinder.iloc[i,6])
-        pf.gaps = str(plasmidFinder.iloc[i,7])
-        pf.pCoverage = float(plasmidFinder.iloc[i,8])
-        pf.pIdentity = float(plasmidFinder.iloc[i,9])
-        pf.database = str(plasmidFinder.iloc[i,10])
-        pf.accession = str(plasmidFinder.iloc[i,11])
-        pf.product = str(plasmidFinder.iloc[i,12])
-        pf.source = "plasmid"
-        pf.row = "\t".join(str(x) for x in plasmidFinder.ix[i].tolist())
-        _pFinder[pf.gene]=pf
-        #row = "\t".join(str(x) for x in plasmidFinder.ix[i].tolist())
-        #plasmidFinderContigs.append(str(plasmidFinder.iloc[i,1]))
-        #origins.append(str(plasmidFinder.iloc[i,4][:plasmidFinder.iloc[i,4].index("_")]))
-    return _pFinder
-
-def ParseMobsuitePlasmids(pathToMobsuiteResult):
-    _mobsuite = {}
-    mResults = pandas.read_csv(pathToMobsuiteResult, delimiter='\t', header=0)
-    mResults = mResults.replace(numpy.nan, '', regex=True)
-
-    for i in range(len(mResults.index)):
-        mr = mobsuitePlasmids()
-        mr.file_id = str(mResults.iloc[i,0])
-        mr.num_contigs = int(mResults.iloc[i,1])
-        mr.total_length = int(mResults.iloc[i,2])
-        mr.gc = int(mResults.iloc[i,3])
-        mr.rep_types = str(mResults.iloc[i,4])
-        mr.rep_typeAccession = str(mResults.iloc[i,5])
-        mr.relaxase_type = str(mResults.iloc[i,6])
-        mr.relaxase_type_accession = str(mResults.iloc[i,7])
-        mr.mpf_type = str(mResults.iloc[i,8])
-        mr.mpf_type_accession = str(mResults.iloc[i,9])
-        mr.orit_type = str(mResults.iloc[i,10])
-        mr.orit_accession = str(mResults.iloc[i,11])
-        mr.PredictedMobility = str(mResults.iloc[i,12])
-        mr.mash_nearest_neighbor = str(mResults.iloc[i,13])
-        mr.mash_neighbor_distance = float(mResults.iloc[i,14])
-        mr.mash_neighbor_cluster = int(mResults.iloc[i,15])
-        mr.row = "\t".join(str(x) for x in mResults.ix[i].tolist())
-        _mobsuite[mr.file_id] = mr
-    return _mobsuite
-
-def ParseRGIResult(pathToRGIResults, plasmidContigs, likelyPlasmidContigs):
-    _rgiR = {}
-    RGI = pandas.read_csv(pathToRGIResults, delimiter='\t', header=0)
-    RGI = RGI.replace(numpy.nan, '', regex=True)
-
-    for i in range(len(RGI.index)):
-        r = RGIResult()
-        r.ORF_ID = str(RGI.iloc[i,0])
-        r.Contig = str(RGI.iloc[i,1])
-        r.Contig_Num = r.Contig[6:r.Contig.find("_")]
-        r.Start = int(RGI.iloc[i,2])
-        r.Stop = int(RGI.iloc[i,3])
-        r.Orientation = str(RGI.iloc[i,4])
-        r.Cut_Off = str(RGI.iloc[i,5])
-        r.Pass_Bitscore = int(RGI.iloc[i,6])
-        r.Best_Hit_Bitscore = float(RGI.iloc[i,7])
-        r.Best_Hit_ARO = str(RGI.iloc[i,8])
-        r.Best_Identities = float(RGI.iloc[i,9])
-        r.ARO = int(RGI.iloc[i,10])
-        r.Model_type = str(RGI.iloc[i,11])
-        r.SNPs_in_Best_Hit_ARO = str(RGI.iloc[i,12])
-        r.Other_SNPs = str(RGI.iloc[i,13])
-        r.Drug_Class = str(RGI.iloc[i,14])
-        r.Resistance_Mechanism = str(RGI.iloc[i,15])
-        r.AMR_Gene_Family = str(RGI.iloc[i,16])
-        r.Predicted_DNA = str(RGI.iloc[i,17])
-        r.Predicted_Protein = str(RGI.iloc[i,18])
-        r.CARD_Protein_Sequence = str(RGI.iloc[i,19])
-        r.Percentage_Length_of_Reference_Sequence = float(RGI.iloc[i,20])
-        r.ID = str(RGI.iloc[i,21])
-        r.Model_ID = int(RGI.iloc[i,22])
-        r.row = "\t".join(str(x) for x in RGI.ix[i].tolist())
-        if (r.Contig_Num in plasmidContigs):
-            r.source = "plasmid"
-        elif (r.Contig_Num in likelyPlasmidContigs):
-            r.source = "likely plasmid"
-        else:
-            r.source = "likely chromosome"
-        _rgiR[r.Model_ID]=r
-    return _rgiR
-
-def ParsePlasmidFinderResult(pathToPlasmidFinderResult):
-    #pipelineTest/contigs/BC110-Kpn005.fa	contig00019	45455	45758	IncFIC(FII)_1	8-308/499	========/=.....	8/11	59.52	75.65	plasmidfinder	AP001918	IncFIC(FII)_1__AP001918
-    #example resfinder:
-    #pipelineTest/contigs/BC110-Kpn005.fa	contig00038	256	1053	OXA-181	1-798/798	===============	0/0	100.00	100.00	bccdc	AEP16366.1	  OXA-48 family carbapenem-hydrolyzing class D beta-lactamase OXA-181 
-
-    _pFinder = {} #***********************
-    plasmidFinder = pandas.read_csv(pathToPlasmidFinderResult, delimiter='\t', header=0)
-
-    for i in range(len(plasmidFinder.index)):
-        pf = starFinders()
-        pf.file = str(plasmidFinder.iloc[i,0])
-        pf.sequence = str(plasmidFinder.iloc[i,1])
-        pf.start = int(plasmidFinder.iloc[i,2])
-        pf.end = int(plasmidFinder.iloc[i,3])
-        pf.gene = str(plasmidFinder.iloc[i,4])
-        pf.shortGene = pf.gene[:pf.gene.index("_")]
-        pf.coverage = str(plasmidFinder.iloc[i,5])
-        pf.coverage_map = str(plasmidFinder.iloc[i,6])
-        pf.gaps = str(plasmidFinder.iloc[i,7])
-        pf.pCoverage = float(plasmidFinder.iloc[i,8])
-        pf.pIdentity = float(plasmidFinder.iloc[i,9])
-        pf.database = str(plasmidFinder.iloc[i,10])
-        pf.accession = str(plasmidFinder.iloc[i,11])
-        pf.product = str(plasmidFinder.iloc[i,12])
-        pf.source = "plasmid"
-        pf.row = "\t".join(str(x) for x in plasmidFinder.ix[i].tolist())
-        _pFinder[pf.gene]=pf
-        #row = "\t".join(str(x) for x in plasmidFinder.ix[i].tolist())
-        #plasmidFinderContigs.append(str(plasmidFinder.iloc[i,1]))
-        #origins.append(str(plasmidFinder.iloc[i,4][:plasmidFinder.iloc[i,4].index("_")]))
-    return _pFinder
-#endregion
 
 def main():
 
@@ -348,7 +139,7 @@ def main():
     print("identifying MLST")
     mlst = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
     mlstHit = result_parsers.parse_mlst_result(mlst, mlst_scheme_map)
-    ToJson(mlstHit, "mlst.json") #write it to a json output
+    ToJson(mlstHit, "mlst.json")
     mlstHit = list(mlstHit.values())[0]
 
     #endregion
@@ -362,11 +153,11 @@ def main():
 
     #parse mobsuite results
     mobfindercontig = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
-    mSuite = result_parsers.parse_mobsuite_result(mobfindercontig) #outputDir + "/predictions/" + ID + ".recon/contig_report.txt")#*************
-    ToJson(mSuite, "mobsuite.json") #*************
+    mSuite = result_parsers.parse_mobsuite_result(mobfindercontig)
+    ToJson(mSuite, "mobsuite.json")
     mobfinderaggregate = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
-    mSuitePlasmids = ParseMobsuitePlasmids(mobfinderaggregate)#outputDir + "/predictions/" + ID + ".recon/mobtyper_aggregate_report.txt")#*************
-    ToJson(mSuitePlasmids, "mobsuitePlasmids.json") #*************
+    mSuitePlasmids = result_parsers.parse_mobsuite_plasmids(mobfinderaggregate)
+    ToJson(mSuitePlasmids, "mobsuitePlasmids.json")
 
     for key in mSuite:
         if mSuite[key]['contig_num'] not in plasmidContigs and mSuite[key]['contig_num'] not in likelyPlasmidContigs:
@@ -379,27 +170,25 @@ def main():
             origins.append(mSuite[key]['rep_type'])
 
     #parse resfinder AMR results
-    # pFinder = ParsePlasmidFinderResult(plasmidfinder)
-    # ToJson(pFinder, "origins.json")
     abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
     rFinder = result_parsers.parse_resfinder_result(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
-    ToJson(rFinder, "resfinder.json") #*************
+    ToJson(rFinder, "resfinder.json")
 
     rgi = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
-    rgiAMR = ParseRGIResult(rgi, plasmidContigs, likelyPlasmidContigs) # outputDir + "/predictions/" + ID + ".rgi.txt", plasmidContigs, likelyPlasmidContigs)#***********************
-    ToJson(rgiAMR, "rgi.json") #*************
+    rgiAMR = result_parsers.parse_rgi_result(rgi, plasmidContigs, likelyPlasmidContigs) # outputDir + "/predictions/" + ID + ".rgi.txt", plasmidContigs, likelyPlasmidContigs)#***********************
+    ToJson(rgiAMR, "rgi.json")
 
     carbapenamases = []
     amrGenes = []
     for keys in rFinder:
         carbapenamases.append(rFinder[keys]['short_gene'] + "(" + rFinder[keys]['source'] + ")")
     for keys in rgiAMR:
-        if (rgiAMR[keys].Drug_Class.find("carbapenem") > -1):
-            if (rgiAMR[keys].Best_Hit_ARO not in carbapenamases):
-                carbapenamases.append(rgiAMR[keys].Best_Hit_ARO+ "(" + rgiAMR[keys].source + ")")
+        if (rgiAMR[keys]['drug_class'].find("carbapenem") > -1):
+            if (rgiAMR[keys]['best_hit_aro'] not in carbapenamases):
+                carbapenamases.append(rgiAMR[keys]['best_hit_aro'] + "(" + rgiAMR[keys]['source'] + ")")
         else:
-            if (rgiAMR[keys].Best_Hit_ARO not in amrGenes):
-                amrGenes.append(rgiAMR[keys].Best_Hit_ARO+ "(" + rgiAMR[keys].source + ")")
+            if (rgiAMR[keys]['best_hit_aro'] not in amrGenes):
+                amrGenes.append(rgiAMR[keys]['best_hit_aro'] + "(" + rgiAMR[keys]['source'] + ")")
     #endregion
 
     #region output parsed mlst information
@@ -440,14 +229,14 @@ def main():
     output.append(",".join(carbapenamases))
     output.append("other RGI AMR Genes: ")
     for key in rgiAMR:
-        output.append(rgiAMR[key].Best_Hit_ARO + "(" + rgiAMR[key].source + ")")
+        output.append(rgiAMR[key]['best_hit_aro'] + "(" + rgiAMR[key]['source'] + ")")
 
     output.append("\nDetails about the carbapenamase Genes: ")
     for key in rFinder:
         output.append(rFinder[key]['row'])
     output.append("\nDetails about the RGI AMR Genes: ")
     for key in rgiAMR:
-        output.append(rgiAMR[key].row)
+        output.append(rgiAMR[key]['row'])
 
     #write summary to a file
     summaryDir = outputDir + "/summary/" + ID
@@ -483,12 +272,12 @@ def main():
     mobility = ""
     neighbour = ""
     for keys in mSuitePlasmids:
-        plasmidID += str(mSuitePlasmids[keys].mash_neighbor_cluster) + ";"
-        contigs += str(mSuitePlasmids[keys].num_contigs) + ";"
-        lengths += str(mSuitePlasmids[keys].total_length) + ";"
-        rep_type += str(mSuitePlasmids[keys].rep_types) + ";"
-        mobility += str(mSuitePlasmids[keys].PredictedMobility) + ";"
-        neighbour += str(mSuitePlasmids[keys].mash_nearest_neighbor) + ";"
+        plasmidID += str(mSuitePlasmids[keys]['mash_neighbor_cluster']) + ";"
+        contigs += str(mSuitePlasmids[keys]['num_contigs']) + ";"
+        lengths += str(mSuitePlasmids[keys]['total_length']) + ";"
+        rep_type += str(mSuitePlasmids[keys]['rep_types']) + ";"
+        mobility += str(mSuitePlasmids[keys]['predicted_mobility']) + ";"
+        neighbour += str(mSuitePlasmids[keys]['mash_nearest_neighbor']) + ";"
     temp += plasmidID + "\t" + contigs + "\t" + lengths + "\t" + rep_type + "\t" + mobility + "\t" + neighbour + "\t"
     temp += ";".join(plasmidContigs) + "\t"
     temp += ";".join(likelyPlasmidContigs)
