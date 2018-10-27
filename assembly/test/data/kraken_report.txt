@@ -1,20 +1,20 @@
-  1.60  8826    8826    U       0       unclassified
- 98.40  541907  63      R       1       root
- 98.38  541834  4       R1      131567    cellular organisms
- 98.37  541739  1110    D       2           Bacteria
- 98.15  540551  1628    P       1224          Proteobacteria
- 97.84  538814  15078   C       1236            Gammaproteobacteria
- 94.59  520925  31639   O       91347             Enterobacterales
- 87.53  482075  44382   F       543                 Enterobacteriaceae
- 72.28  398096  16647   G       544                   Citrobacter
- 69.16  380907  72570   G1      1344959                 Citrobacter freundii complex
- 55.40  305117  304596  S       546                       Citrobacter freundii
-  0.09  521     521     S1      1333848                     Citrobacter freundii CFNIH1
-  0.26  1425    1425    S       67827                     Citrobacter werkmanii
-  0.14  795     795     S       2077148                   Citrobacter freundii complex sp. CFNIH4
-  0.05  281     281     S       57706                     Citrobacter braakii
-  0.04  235     235     S       133448                    Citrobacter youngae
-  0.04  232     232     S       2077149                   Citrobacter freundii complex sp. CFNIH9
-  0.04  219     219     S       2077147                   Citrobacter freundii complex sp. CFNIH3
-  0.01  33      33      S       2066049                   Citrobacter freundii complex sp. CFNIH2
-  0.04  218     41      S       35703                   Citrobacter amalonaticus
+  1.60	8826	8826	U	0	unclassified
+ 98.40	541907	63	R	1	root
+ 98.38	541834	4	R1	131567	  cellular organisms
+ 98.37	541739	1110	D	2	    Bacteria
+ 98.15	540551	1628	P	1224	      Proteobacteria
+ 97.84	538814	15078	C	1236	        Gammaproteobacteria
+ 94.59	520925	31639	O	91347	          Enterobacterales
+ 87.53	482075	44382	F	543	            Enterobacteriaceae
+ 72.28	398096	16647	G	544	              Citrobacter
+ 69.16	380907	72570	G1	1344959	                Citrobacter freundii complex
+ 55.40	305117	304596	S	546	                  Citrobacter freundii
+  0.09	521	521	S1	1333848	                    Citrobacter freundii CFNIH1
+  0.26	1425	1425	S	67827	                  Citrobacter werkmanii
+  0.14	795	795	S	2077148	                  Citrobacter freundii complex sp. CFNIH4
+  0.05	281	281	S	57706	                  Citrobacter braakii
+  0.04	235	235	S	133448	                  Citrobacter youngae
+  0.04	232	232	S	2077149	                  Citrobacter freundii complex sp. CFNIH9
+  0.04	219	219	S	2077147	                  Citrobacter freundii complex sp. CFNIH3
+  0.01	33	33	S	2066049	                  Citrobacter freundii complex sp. CFNIH2
+  0.04	218	41	S	35703	                Citrobacter amalonaticus
