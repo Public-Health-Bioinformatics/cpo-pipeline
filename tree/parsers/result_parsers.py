@@ -14,22 +14,11 @@ def parse_workflow_results(path_to_result):
         path_to_result (str): Path to the result file.
 
     Returns:
-        dict: Parsed kraken report with species-level results.
+        dict: Parsed results.
         For example:
-        { "Escherichia coli": { "fragment_percent": 84.08,
-                                "fragment_count_root": 195536,
-                                "fragment_count_taxon": 192561,
-                                "rank_code": "S",
-                                "ncbi_taxon_id": "562",
-                                "name": "Escherichia coli",
-                                "row": " 84.08\t195563\t192561\tS\t562\tEscherichia coli"
-                              }
-          "Another species": { "fragment_percent": 12.1,
-                               ...
-                             }
+        { "": { "": "",
+              }
         }
-        See kraken manual for more detail on report fields:
-        http://ccb.jhu.edu/software/kraken/MANUAL.html#sample-report-output-format
     """
     worflowResult = {}
     r = pandas.read_csv(pathToResult, delimiter='\t', header=0) 

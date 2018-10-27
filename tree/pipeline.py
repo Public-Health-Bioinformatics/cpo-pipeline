@@ -8,10 +8,9 @@
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
-#$ -m ea
 
 
-# This script is a wrapper for module two, part 2: tree rendering of the cpo_workflow to render dendrograms.
+# This script is a wrapper for CPO Pipeline Phase 3: tree rendering.
 # It uses snippy for core genome SNV calling and alignment, clustalw to generate a NJ tree and ete3 to render the dendrogram
 
 #   >python cpo_galaxy_tree.py -t /path/to/tree.ph -d /path/to/distance/matrix -m /path/to/metadata
@@ -25,10 +24,9 @@
 #  </requirements>
 
 import subprocess
-import pandas #conda pandas
+import pandas
 import optparse
 import os
-os.environ['QT_QPA_PLATFORM']='offscreen'
 import datetime
 import sys
 import time
@@ -36,60 +34,10 @@ import urllib.request
 import gzip
 import collections
 import json
-import numpy #conda numpy
-import ete3 as e #conda ete3 3.1.1**** >requires pyqt5
+import numpy
+import ete3 as e
 
 from parsers import result_parsers
-
-#parses some parameters
-parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
-parser.add_option("-t", "--tree", dest="treePath", type="string", default="./pipelineTest/tree.txt", help="absolute file path to phylip tree")    
-parser.add_option("-d", "--distance", dest="distancePath", type="string", default="./pipelineTest/dist.tabular", help="absolute file path to distance matrix")
-parser.add_option("-m", "--metadata", dest="metadataPath", type="string", default="./pipelineTest/metadata.tabular",help="absolute file path to metadata file")
-parser.add_option("-o", "--output_file", dest="outputFile", type="string", default="tree.png", help="Output graphics file. Use ending 'png', 'pdf' or 'svg' to specify file format.")
-
-# sensitive data adder
-parser.add_option("-p", "--sensitive_data", dest="sensitivePath", type="string", default="", help="Spreadsheet (CSV) with sensitive metadata")
-parser.add_option("-c", "--sensitive_cols", dest="sensitiveCols", type="string", default="", help="CSV list of column names from sensitive metadata spreadsheet to use as labels on dendrogram")
-parser.add_option("-b", "--bcid_column", dest="bcidCol", type="string", default="BCID", help="Column name of BCID in sensitive metadata file")
-parser.add_option("-n", "--missing_value", dest="naValue", type="string", default="NA", help="Value to write for missing data.")
-
-(options,args) = parser.parse_args()
-treePath = str(options.treePath).lstrip().rstrip()
-distancePath = str(options.distancePath).lstrip().rstrip()
-metadataPath = str(options.metadataPath).lstrip().rstrip()
-
-sensitivePath = str(options.sensitivePath).lstrip().rstrip()
-sensitiveCols = str(options.sensitiveCols).lstrip().rstrip()
-outputFile = str(options.outputFile).lstrip().rstrip()
-bcidCol = str( str(options.bcidCol).lstrip().rstrip() ) 
-naValue = str( str(options.naValue).lstrip().rstrip() ) 
-
-
-#region result objects
-#define some objects to store values from results
-#//TODO this is not the proper way of get/set private object variables. every value has manually assigned defaults intead of specified in init(). Also, use property(def getVar, def setVar).
-
-class SensitiveMetadata(object):
-    def __init__(self):
-        x = pandas.read_csv( sensitivePath )
-        col_names = [ s for s in sensitiveCols.split(',')] # convert to 0 offset
-        if not bcidCol in col_names:
-            col_names.append( bcidCol )
-        all_cols = [ str(col) for col in x.columns ]
-        col_idxs = [ all_cols.index(col) for col in col_names ]
-        self.sensitive_data = x.iloc[:, col_idxs]
-    def get_columns(self):
-        cols = [ str(x) for x in self.sensitive_data.columns ]
-        return cols
-    def get_value( self, bcid, column_name ): # might be nice to get them all in single call via an input list of bcids ... for later
-        bcids= list( self.sensitive_data.loc[:, bcidCol ] ) # get the list of all BCIDs  in sensitive metadata
-        if not bcid in bcids:
-            return naValue
-        else:
-            row_idx = bcids.index( bcid )                        # lookup the row for this BCID
-        return self.sensitive_data.loc[ row_idx, column_name ]  # return the one value based on the column (col_idx) and this row
-
 
 
 def read(path): #read in a text file to a list
@@ -143,14 +91,39 @@ def addFace(name): #function to add a facet to a tree
 
 
 def main():
-    if len(sensitivePath)>0:
-        sensitive_meta_data = SensitiveMetadata()
-
+    
+    #parses some parameters
+    parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
+    parser.add_option("-m", "--metadata", dest="metadataPath", type="string", default="./pipelineTest/metadata.tabular", help="absolute file path to metadata file")
+    parser.add_option("-o", "--output_file", dest="outputFile", type="string", default="tree.png", help="Output graphics file. Use ending 'png', 'pdf' or 'svg' to specify file format.")
+    
+    (options,args) = parser.parse_args()
+    curDir = os.getcwd()
+    treePath = str(options.treePath).lstrip().rstrip()
+    distancePath = str(options.distancePath).lstrip().rstrip()
+    metadataPath = str(options.metadataPath).lstrip().rstrip()
+    
+    sensitivePath = str(options.sensitivePath).lstrip().rstrip()
+    sensitiveCols = str(options.sensitiveCols).lstrip().rstrip()
+    outputFile = str(options.outputFile).lstrip().rstrip()
+    bcidCol = str( str(options.bcidCol).lstrip().rstrip() ) 
+    naValue = str( str(options.naValue).lstrip().rstrip() ) 
+    
     metadata = result_parsers.parse_workflow_results(metadataPath)
     distance = read(distancePath)
     treeFile = "".join(read(treePath))
 
+    os.environ['QT_QPA_PLATFORM']='offscreen'
+
+    #region call the typing script
+    print("running pipeline_tree.sh")
+    #input parameters: 1=outputDir, 2=reference, 3=contigs
+    cmd = [script_path + "/pipeline_tree.sh", outputDir, reference, contigs]
+    result = execute(cmd, curDir)
+    #endregion
+    
     distanceDict = {} #store the distance matrix as rowname:list<string>
+    
     for i in range(len(distance)):
         temp = distance[i].split("\t")
         distanceDict[temp[0]] = temp[1:]
@@ -182,14 +155,14 @@ def main():
     #find the plasmid origins
     plasmidIncs = {}
     for key in metadata:
-        for plasmid in metadata[key].plasmids:
-            for inc in plasmid.PlasmidRepType.split(","):
+        for plasmid in metadata[key]['plasmids']:
+            for inc in plasmid['PlasmidRepType'].split(","):
                 if (inc.lower().find("inc") > -1):
                     if not (inc in plasmidIncs):
-                        plasmidIncs[inc] = [metadata[key].ID]
+                        plasmidIncs[inc] = [metadata[key]['ID']]
                     else:
-                        if metadata[key].ID not in plasmidIncs[inc]:
-                            plasmidIncs[inc].append(metadata[key].ID)
+                        if metadata[key]['ID'] not in plasmidIncs[inc]:
+                            plasmidIncs[inc].append(metadata[key]['ID'])
     #plasmidIncs = sorted(plasmidIncs)
     for n in t.traverse(): #loop through the nodes of a tree
         if (n.is_leaf() and n.name == "Reference"):
@@ -225,26 +198,13 @@ def main():
             #not reference branches, populate with metadata
             index = 0
 
-            if len(sensitivePath)>0: #sensitive metadata @ chris
-                # pushing in sensitive data
-                for sensitive_data_column in sensitive_meta_data.get_columns():
-                    # tree uses bcids like BC18A021A_S12
-                    # while sens meta-data uses BC18A021A
-                    # trim the "_S.*" if present
-                    bcid = str(mData.ID)
-                    if bcid.find( "_S" ) != -1:
-                        bcid = bcid[ 0:bcid.find( "_S" ) ]
-                    sens_col_val = sensitive_meta_data.get_value(bcid=bcid, column_name=sensitive_data_column )
-                    n.add_face(addFace(sens_col_val), index, "aligned")
-                    index = index + 1
-
             if (n.name.replace(".fa","") in metadata.keys()):
                 mData = metadata[n.name.replace(".fa","")]
             else:
                 mData = metadata["na"]
             n.add_face(addFace(mData.ID), index, "aligned")
             index = index + 1
-            if (mData.new == True): #new column
+            if (mData['new']): #new column
                 face = e.RectFace(30,30,"green","green") # TextFace("Y",fsize=10,tight_text=True)
                 face.border.margin = 5
                 face.margin_right = 5
@@ -263,15 +223,15 @@ def main():
                     face.ht_align = 1
                     n.add_face(face, list(plasmidIncs.keys()).index(incs) + index, "aligned")
             index = index + len(plasmidIncs)
-            n.add_face(addFace(mData.MLSTSpecies), index, "aligned")
+            n.add_face(addFace(mData['MLSTSpecies']), index, "aligned")
             index = index + 1
-            n.add_face(addFace(mData.SequenceType), index, "aligned")
+            n.add_face(addFace(mData['SequenceType']), index, "aligned")
             index = index + 1
-            n.add_face(addFace(mData.CarbapenemResistanceGenes), index, "aligned")
+            n.add_face(addFace(mData['CarbapenemResistanceGenes']), index, "aligned")
             index = index + 1
-            n.add_face(addFace(mData.plasmidBestMatch), index, "aligned")
+            n.add_face(addFace(mData['plasmidBestMatch']), index, "aligned")
             index = index + 1
-            n.add_face(addFace(mData.plasmididentity), index, "aligned")
+            n.add_face(addFace(mData['plasmididentity']), index, "aligned")
             index = index + 1			
             for i in range(len(distanceDict[list(distanceDict.keys())[0]])): #this loop adds distance matrix
                 if (n.name in distanceDict): #make sure the column is in the distance matrice
@@ -279,12 +239,9 @@ def main():
                 
     t.render(outputFile, w=5000,units="mm", tree_style=ts) #save it as a png, pdf, svg or an phyloxml
 
-    #endregion
-#endregion
-
 
 if __name__ == '__main__':
-    start = time.time()#time the analysis
+    start = time.time()
     main()
     end = time.time()
-    print("Finished!\nThe analysis used: " + str(end-start) + " seconds")
+    print("Finished!\nThe analysis used: " + str(end - start) + " seconds")

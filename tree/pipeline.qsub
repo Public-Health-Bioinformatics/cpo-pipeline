@@ -1,0 +1,33 @@
+#!/bin/bash
+
+#$ -V                # Pass environment variables to the job
+#$ -N cpo_pipeline
+#$ -cwd              # Use the current working dir
+#$ -pe smp 8         # Parallel Environment (how many cores)
+#$ -l h_vmem=11G     # Memory (RAM) allocation *per core*
+#$ -e ./logs/$JOB_ID.err
+#$ -o ./logs/$JOB_ID.log
+
+#parameters:
+# <script-path>/pipeline.py
+# BC11-Eco005
+# contigs.fa
+# output
+# "Escherichia coli"
+
+pipeline_script=$1
+sample_id=$2
+assembly=$3
+output_dir=$4
+species_name=$5
+
+source activate ete3-3.1.1
+
+"${pipeline_script}" \
+    --id "${sample_id}" \
+    --assembly "${assembly}" \
+    --output "${output_dir}" \
+    --expected-species "${species_name}";
+
+source deactivate
+
