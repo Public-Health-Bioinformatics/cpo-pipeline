@@ -42,14 +42,4 @@ Sample-003
 
 ### Submit Analysis
 
-1. Run `mlst` typing, `abricate` carbapenemase gene identification, `rgi` resistance gene identification and `mob_suite` mobile element (plasmid analysis):
-
-```
-typing/pipeline_multisample.sh typing/pipeline_typing.qsub sample_list.txt module_1_output_dir module_2_output_dir
-```
-
-2. 
-
-```
-typing/pipeline.py
-```
+TBD
