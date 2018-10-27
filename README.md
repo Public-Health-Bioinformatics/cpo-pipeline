@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Public-Health-Bioinformatics/cpo-pipeline.svg?branch=master)](https://travis-ci.org/Public-Health-Bioinformatics/cpo-pipeline)
+
 # cpo-pipeline
 
 An analysis pipeline for the purpose of investigating [Carbapenemase-Producing Organisms](https://en.wikipedia.org/wiki/Carbapenem-resistant_enterobacteriaceae).
