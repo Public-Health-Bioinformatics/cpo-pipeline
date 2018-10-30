@@ -4,14 +4,16 @@ import unittest
 import json
 
 # add the '../../assembly' directory to the 'sys.path'
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+TEST_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(TEST_DIR_PATH))
 
 from parsers import result_parsers
 
 class KrakenResultParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/kraken_report.txt')
-        with open('data/parsed_kraken_report.json') as kraken_report_json:
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/kraken_report.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_kraken_report.json')) as kraken_report_json:
             self.parsed_kraken_json = json.load(kraken_report_json)
             kraken_report_json.close()
         
