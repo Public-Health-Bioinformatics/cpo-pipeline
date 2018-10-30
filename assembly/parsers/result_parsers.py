@@ -92,7 +92,7 @@ def parse_mash_genome_result(path_to_mash_screen):
     Returns:
         dict: Parsed mash screen report
         For example:
-        { "Escherichia coli": { "identity": 0.996805,
+        { "Citrobacter freundii strain CAV1321": { "identity": 0.996805,
                                 "shared_hashes": "935/1000",
                                 "median_multiplicity": 38,
                                 "p_value": 0.00,
