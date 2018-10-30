@@ -57,7 +57,7 @@ def parse_kraken_result(path_to_kraken_result):
 def parse_fastqc_result(path_to_qc_summary):
     """
     Args:
-        path_to_R1_qc (str): Path to the fastqc report summary file.
+        path_to_qc_summary (str): Path to the fastqc report summary file.
 
     Returns:
         dict: Parsed fastqc R1 report.
