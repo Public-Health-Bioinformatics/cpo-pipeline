@@ -84,32 +84,22 @@ def parse_fastqc_result(path_to_qc_summary):
             fastqc_summary[field_name] = row[0]
     return fastqc_summary
 
-def parse_mash_genome_result(path_to_mash_screen, size, depth):
+def parse_mash_genome_result(path_to_mash_screen):
     """
     Args:
         path_to_mash_screen (str): Path to the mash screen report file.
-        size (int):
-        depth (int):
 
     Returns:
-        tuple(dict, boolean) where:
         dict: Parsed mash screen report
         For example:
-        { "Escherichia coli": { "size": ,
-                                "depth": ,
-                                "identity": 0.998694,
-                                "shared_hashes": "972/1000",
-                                "median_multiplicity": 16,
+        { "Escherichia coli": { "identity": 0.996805,
+                                "shared_hashes": "935/1000",
+                                "median_multiplicity": 38,
                                 "p_value": 0.00,
-                                "query_ID": "GCF_001519515.1_ASM151951v1_genomic.fna.gz",
-                                "query_comment": "[219 seqs] NZ_LQSN01000001.1 Escherichia coli strain GN02215 GCID_ECOLID_00024_NODE_1.ctg_1, whole genome shotgun sequence [...]",
-                                "accession": "[219 seqs] NZ_LQSN01000001.1 Escherichia coli strain GN02215 GCID_ECOLID_00024_NODE_1.ctg_1, whole genome shotgun sequence [...]",
-                                "row": "0.998649\t972/1000\t16\t0\tGCF_001519515.1_ASM151951v1_genomic.fna.gz\t[219 seqs] NZ_LQSN01000001.1 Escherichia coli strain GN02215 GCID_ECOLID_00024_NODE_1.ctg_1, whole genome shotgun sequence [...]",
-                                "gcf": ["GCF", "001", "519", "515"],
-                                "assembly": "GCF_001519515.1_ASM151951v1",
-                                "species": "Escherichia coli"
-                              }
-          "Another species": { "size": ,
+                                "query_ID": "GCF_001022155.1_ASM102215v1_genomic.fna.gz",
+                                "query_comment": "[10 seqs] NZ_CP011612.1 Citrobacter freundii strain CAV1321, complete genome [...]"
+                              },
+          "Another species": { "identity": 0.914483,
                                ...
                              }
         }
@@ -118,55 +108,32 @@ def parse_mash_genome_result(path_to_mash_screen, size, depth):
         boolean: true if phiX is present in top hits, false if absent
     
     """
-    mash_hits = {}
-    phiX = False
+    mash_result = {}
+
+    mash_screen_report_fields = {
+        'identity': lambda x: float(x),
+        'shared_hashes': lambda x: x,
+        'median_multiplicity': lambda x: int(x),
+        'p_value': lambda x: float(x),
+        'query_ID': lambda x: x,
+        'query_comment': lambda x: x
+    }
     
-    mash_screen_report = pandas.read_csv(path_to_mash_screen, delimiter='\t', header=None)
     # Example mash screen report record (actual report has no header and is tab-delimited):
-    # identity    shared-hashes    median-multiplicity    p-value    query-ID                                    query-comment]
+    # identity    shared-hashes    median-multiplicity    p-value    query-ID                                    query-comment
     # 0.998697    973/1000         71                     0          GCF_000958965.1_matepair4_genomic.fna.gz    [59 seqs] NZ_LAFU01000001.1 Klebsiella pneumoniae strain CDPH5262 contig000001, whole genome shotgun sequence [...]
-    # parse mash result, using winner takes all
-    scores = mash_screen_report[1].values
-    score_cutoff = int(scores[0][:scores[0].index("/")]) - 300 #find the cut off value to use for filtering the report (300 below max)
-    index = 0
-    #find hits with score within top 300
-    for score in scores:
-        parsed_score = int(score[:score.index("/")])
-        if parsed_score >= score_cutoff:
-            index+=1
-        else:
-            break
 
-    #parse what the species are.
-    for i in range(index):
+    with open(path_to_mash_screen) as mashfile:
+        reader = csv.DictReader(mashfile, delimiter='\t', fieldnames=list(mash_screen_report_fields))
         mash_record = {}
-        mash_record['size'] = size
-        mash_record['depth'] = depth
-        mash_record['identity'] = float(mash_screen_report.ix[i, 0])
-        mash_record['shared_hashes'] = mash_screen_report.ix[i, 1]
-        mash_record['median_multiplicity'] = int(mash_screen_report.ix[i, 2])
-        mash_record['p_value'] = float(mash_screen_report.ix[i, 3])
-        mash_record['query_ID'] = mash_screen_report.ix[i, 4]
-        mash_record['query_comment'] = mash_screen_report.ix[i, 5]
-        mash_record['accession'] = mash_record['query_comment']
-        mash_record['row'] = "\t".join(str(x) for x in mash_screen_report.ix[i].tolist())
-        qID = mash_record['query_ID']
-        # find gcf accession
-        gcf = (qID[:qID.find("_",5)]).replace("_","")
-        gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)]
-        mash_record['gcf'] = gcf 
-        # find assembly name
-        mash_record['assembly'] = qID[:qID.find("_genomic.fna.gz")]
-
-        if (mash_record['query_comment'].find("phiX") > -1): #theres phix in top hits, just ignore
-            phiX = True
-            mash_record['species'] = "PhiX"
-        else: #add the non-phix hits to a list
+        for row in reader:
+            for field_name, parse in mash_screen_report_fields.items():
+                mash_record[field_name] = parse(row[field_name])
             species_name_start = int(mash_record['query_comment'].index(".")) + 3
-            species_name_stop = int (mash_record['query_comment'].index(","))
-            mash_record['species'] = str(mash_record['query_comment'])[species_name_start: species_name_stop]
-            mash_hits[mash_record['species']] = mash_record
-    return mash_hits, phiX
+            species_name_stop = int(mash_record['query_comment'].index(","))
+            species = str(mash_record['query_comment'])[species_name_start: species_name_stop]    
+            mash_result[species] = mash_record
+    return mash_result
 
 def parse_mash_plasmid_result(path_to_mash_screen, size, depth):
     """

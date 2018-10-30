@@ -132,7 +132,7 @@ def main():
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
-    mashHits, PhiX = result_parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, stats['size'], stats['depth'])
+    mashHits = result_parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, stats['size'], stats['depth'])
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
@@ -218,10 +218,6 @@ def main():
     if (stats['depth'] < 30):
         output.append("!!!Coverage is lower than 30. Estimated depth: " + str(stats['depth']))
 
-    if(PhiX):
-        output.append("!!!PhiX contamination, probably nothing to worry about")
-        notes.append("PhiX contamination")
-
     if (len(mashHits) > 1):
         output.append("!!!MASH predicted multiple species, possible contamination?")
         multiple=True
@@ -256,10 +252,15 @@ def main():
     referenceGenomes = []
     for key in mashHits:
         qID = mashHits[key]['query_ID']
-        gcf = mashHits[key]['gcf']
-        assembly = mashHits[key]['assembly']
+
+        # find gcf accession
+        # TODO: document this or clean it up to be more readable
+        gcf = (qID[:qID.find("_",5)]).replace("_","")
+        gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)]
+        
+        assembly = qID[:qID.find("_genomic.fna.gz")]
         url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + qID
-        referencePath = outputDir + "/qcResult/" + ID + "/" + mashHits[key]['species'].replace(" ","")
+        referencePath = outputDir + "/qcResult/" + ID + "/" + key.replace(" ","")
         referenceGenomes.append(referencePath)
 
         httpGetFile(url, referencePath + ".gz")
