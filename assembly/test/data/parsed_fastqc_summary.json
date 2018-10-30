@@ -1,0 +1,11 @@
+{"basic_statistics": "PASS",
+ "per_base_sequence_quality": "FAIL",
+ "per_tile_sequence_quality": "WARN",
+ "per_sequence_quality_scores": "PASS",
+ "per_base_sequence_content": "WARN",
+ "per_sequence_gc_content": "WARN",
+ "per_base_n_content": "PASS",
+ "sequence_length_distribution": "WARN",
+ "sequence_duplication_levels": "PASS",
+ "overrepresented_sequences": "PASS",
+ "adapter_content": "PASS"}

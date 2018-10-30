@@ -139,12 +139,13 @@ def main():
     mashPlasmidHits = result_parsers.parse_mash_plasmid_result(pathToMashPlasmidScreenTSV, stats['size'], stats['depth'])
 
     # parse fastqc
-    pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/"
-    pathToFastQCR2 = outputDir + "/qcResult/" + ID + "/" + R2[R2.find(os.path.basename(R2)):R2.find(".")] + "_fastqc/"
-    fastqcR1,fastqcR2 = result_parsers.parse_fastqc_result(pathToFastQCR1, pathToFastQCR2)
+    pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/summary.txt"
+    pathToFastQCR2 = outputDir + "/qcResult/" + ID + "/" + R2[R2.find(os.path.basename(R2)):R2.find(".")] + "_fastqc/summary.txt"
+    fastqcR1 = result_parsers.parse_fastqc_result(pathToFastQCR1)
+    fastqcR2 = result_parsers.parse_fastqc_result(pathToFastQCR2)
     fastqc = {}
     fastqc["R1"]=fastqcR1
-    fastqc["R2"]=fastqcR1
+    fastqc["R2"]=fastqcR2
      
     # parse kraken2 result
     pathToKrakenResult = outputDir + "/qcResult/" + ID + "/kraken2.genome.report"

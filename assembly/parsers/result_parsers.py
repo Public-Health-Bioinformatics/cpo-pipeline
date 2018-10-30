@@ -54,18 +54,16 @@ def parse_kraken_result(path_to_kraken_result):
             kraken_result[kraken_species_record['name']] = kraken_species_record
     return kraken_result
 
-def parse_fastqc_result(path_to_R1_qc, path_to_R2_qc):
+def parse_fastqc_result(path_to_qc_summary):
     """
     Args:
-        path_to_R1_qc (str): Path to the fastqc R1 report directory.
-        path_to_R2_qc (str): Path to the fastqc R2 report directory.
+        path_to_R1_qc (str): Path to the fastqc report summary file.
 
     Returns:
-        tuple(dict1, dict2) where:
-        dict1: Parsed fastqc R1 report.
-               All values except 'fastqc_html_blob' are either "PASS", "WARN", or "FAIL".
+        dict: Parsed fastqc R1 report.
+              All values except are either "PASS", "WARN", or "FAIL".
         For example:
-        { "basic": "PASS",
+        { "basic_statistics": "PASS",
           "per_base_sequence_quality": "PASS",
           "per_tile_sequence_quality": "PASS",
           "per_sequence_quality_scores": "PASS",
@@ -76,48 +74,15 @@ def parse_fastqc_result(path_to_R1_qc, path_to_R2_qc):
           "sequence_duplication_levels": "PASS",
           "overrepresented_sequences": "WARN",
           "adapter_content": "PASS",
-          "fastqc_html_blob": "<html><head><title>BC18-Eco016_R1.fastq.gz FastQC Report</title><style type="text/css">..."
         }
-        dict2: Parsed fastqc R2 report.
-               Structure is identical to Parsed fastqc R1 report.
     """
-    fastqc_R1_summary = pandas.read_csv(path_to_R1_qc + "summary.txt", delimiter='\t', header=None)
-    fastqc_R1_summary_labels = fastqc_R1_summary[0].tolist()
-
-    fastqc_R1 = {}
-    fastqc_R1['basic'] = fastqc_R1_summary_labels[0]
-    fastqc_R1['per_base_sequence_quality'] = fastqc_R1_summary_labels[1]
-    fastqc_R1['per_tile_sequence_quality'] = fastqc_R1_summary_labels[2]
-    fastqc_R1['per_sequence_quality_scores'] = fastqc_R1_summary_labels[3]
-    fastqc_R1['per_base_sequence_content'] = fastqc_R1_summary_labels[4]
-    fastqc_R1['per_sequence_gc_content'] = fastqc_R1_summary_labels[5]
-    fastqc_R1['per_base_n_content'] = fastqc_R1_summary_labels[6]
-    fastqc_R1['sequence_length_distribution'] = fastqc_R1_summary_labels[7]
-    fastqc_R1['sequence_duplication_levels'] = fastqc_R1_summary_labels[8]
-    fastqc_R1['overrepresented_sequences'] = fastqc_R1_summary_labels[9]
-    fastqc_R1['adapter_content'] = fastqc_R1_summary_labels[10]
-    with open(path_to_R1_qc + "fastqc_report.html", "r") as input:
-        fastqc_R1['fastqc_html_blob'] = input.read()
-
-    fastqc_R2_summary = pandas.read_csv(path_to_R2_qc + "summary.txt", delimiter='\t', header=None)
-    fastqc_R2_summary_labels = fastqc_R2_summary[0].tolist()
-
-    fastqc_R2 = {}
-    fastqc_R2['basic'] = fastqc_R2_summary_labels[0]
-    fastqc_R2['per_base_sequence_quality'] = fastqc_R2_summary_labels[1]
-    fastqc_R2['per_tile_sequence_quality'] = fastqc_R2_summary_labels[2]
-    fastqc_R2['per_sequence_quality_scores'] = fastqc_R2_summary_labels[3]
-    fastqc_R2['per_base_sequence_content'] = fastqc_R2_summary_labels[4]
-    fastqc_R2['per_sequence_gc_content'] = fastqc_R2_summary_labels[5]
-    fastqc_R2['per_base_n_content'] = fastqc_R2_summary_labels[6]
-    fastqc_R2['sequence_length_distribution'] = fastqc_R2_summary_labels[7]
-    fastqc_R2['sequence_duplication_levels'] = fastqc_R2_summary_labels[8]
-    fastqc_R2['overrepresented_sequences'] = fastqc_R2_summary_labels[9]
-    fastqc_R2['adapter_content'] = fastqc_R2_summary_labels[10]
-    with open(path_to_R2_qc + "fastqc_report.html", "r") as input:
-        fastqc_R2['fastqc_html_blob'] = input.read()
-
-    return fastqc_R1, fastqc_R2
+    fastqc_summary = {}
+    with open(path_to_qc_summary) as qc_summary:
+        reader = csv.reader(qc_summary, delimiter='\t')
+        for row in reader:
+            field_name = row[1].lower().replace(" ", "_")
+            fastqc_summary[field_name] = row[0]
+    return fastqc_summary
 
 def parse_mash_genome_result(path_to_mash_screen, size, depth):
     """

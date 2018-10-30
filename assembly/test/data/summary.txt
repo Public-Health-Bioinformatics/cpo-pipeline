@@ -1,0 +1,11 @@
+PASS	Basic Statistics	BC11-Cfr001_R1.fastq.gz
+FAIL	Per base sequence quality	BC11-Cfr001_R1.fastq.gz
+WARN	Per tile sequence quality	BC11-Cfr001_R1.fastq.gz
+PASS	Per sequence quality scores	BC11-Cfr001_R1.fastq.gz
+WARN	Per base sequence content	BC11-Cfr001_R1.fastq.gz
+WARN	Per sequence GC content	BC11-Cfr001_R1.fastq.gz
+PASS	Per base N content	BC11-Cfr001_R1.fastq.gz
+WARN	Sequence Length Distribution	BC11-Cfr001_R1.fastq.gz
+PASS	Sequence Duplication Levels	BC11-Cfr001_R1.fastq.gz
+PASS	Overrepresented sequences	BC11-Cfr001_R1.fastq.gz
+PASS	Adapter Content	BC11-Cfr001_R1.fastq.gz

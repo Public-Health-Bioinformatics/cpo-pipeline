@@ -20,6 +20,18 @@ class KrakenResultParserTest(unittest.TestCase):
     def test_parse_kraken_result(self):
         parsed_result = result_parsers.parse_kraken_result(self.test_data_path)
         self.assertDictEqual(parsed_result, self.parsed_kraken_json)
+
+
+class FastqcResultParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/fastqc_summary.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_fastqc_summary.json')) as fastqc_summary_json:
+            self.parsed_fastqc_summary_json = json.load(fastqc_summary_json)
+            fastqc_summary_json.close()
+
+    def test_parse_fastqc_result(self):
+        parsed_result = result_parsers.parse_fastqc_result(self.test_data_path)
+        self.assertDictEqual(parsed_result, self.parsed_fastqc_summary_json)
     
 if __name__ == '__main__':
     unittest.main()
