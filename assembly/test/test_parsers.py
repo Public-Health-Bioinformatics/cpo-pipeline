@@ -33,15 +33,15 @@ class FastqcResultParserTest(unittest.TestCase):
         parsed_result = result_parsers.parse_fastqc_result(self.test_data_path)
         self.assertDictEqual(parsed_result, self.parsed_fastqc_summary_json)
 
-class MashGenomeResultParserTest(unittest.TestCase):
+class MashResultParserTest(unittest.TestCase):
     def setUp(self):
         self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/mashscreen.genome.tsv')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_mash_screen_genome_report.json')) as mash_screen_genome_json:
             self.parsed_mash_screen_genome_json = json.load(mash_screen_genome_json)
             mash_screen_genome_json.close()
 
-    def test_parse_mash_genome_result(self):
-        parsed_result = result_parsers.parse_mash_genome_result(self.test_data_path)
+    def test_parse_mash_result(self):
+        parsed_result = result_parsers.parse_mash_result(self.test_data_path)
         self.assertDictEqual(parsed_result, self.parsed_mash_screen_genome_json)
 
 if __name__ == '__main__':

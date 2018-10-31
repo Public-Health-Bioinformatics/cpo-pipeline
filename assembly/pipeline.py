@@ -132,11 +132,11 @@ def main():
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
-    mashHits = result_parsers.parse_mash_genome_result(pathToMashGenomeScreenTSV, stats['size'], stats['depth'])
+    mashHits = result_parsers.parse_mash_result(pathToMashGenomeScreenTSV)
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
-    mashPlasmidHits = result_parsers.parse_mash_plasmid_result(pathToMashPlasmidScreenTSV, stats['size'], stats['depth'])
+    mashPlasmidHits = result_parsers.parse_mash_result(pathToMashPlasmidScreenTSV)
 
     # parse fastqc
     pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/summary.txt"
@@ -176,10 +176,10 @@ def main():
     output.append("\nKraken2 predicted species (>1%): ")
     for key in krakenGenomes:
         output.append(krakenGenomes[key]['name'])
-    output.append("\nmash predicted genomes (within 300 of highest score): ")
+    output.append("\nmash predicted genomes")
     for key in mashHits:
-        output.append(mashHits[key]['species'])
-    output.append("\nmash predicted plasmids (within 100 of highest score): ")
+        output.append(mashHits[key]['accession'] + "\t" + key)
+    output.append("\nmash predicted plasmids")
     for key in mashPlasmidHits:
         output.append(mashPlasmidHits[key]['query_comment'])
     

@@ -84,7 +84,7 @@ def parse_fastqc_result(path_to_qc_summary):
             fastqc_summary[field_name] = row[0]
     return fastqc_summary
 
-def parse_mash_genome_result(path_to_mash_screen):
+def parse_mash_result(path_to_mash_screen):
     """
     Args:
         path_to_mash_screen (str): Path to the mash screen report file.
@@ -93,12 +93,12 @@ def parse_mash_genome_result(path_to_mash_screen):
         dict: Parsed mash screen report
         For example:
         { "Citrobacter freundii strain CAV1321": { "identity": 0.996805,
-                                "shared_hashes": "935/1000",
-                                "median_multiplicity": 38,
-                                "p_value": 0.00,
-                                "query_ID": "GCF_001022155.1_ASM102215v1_genomic.fna.gz",
-                                "query_comment": "[10 seqs] NZ_CP011612.1 Citrobacter freundii strain CAV1321, complete genome [...]"
-                              },
+                                                   "shared_hashes": "935/1000",
+                                                   "median_multiplicity": 38,
+                                                   "p_value": 0.00,
+                                                   "query_id": "GCF_001022155.1_ASM102215v1_genomic.fna.gz",
+                                                   "query_comment": "[10 seqs] NZ_CP011612.1 Citrobacter freundii strain CAV1321, complete genome [...]"
+                                                 },
           "Another species": { "identity": 0.914483,
                                ...
                              }
@@ -134,70 +134,6 @@ def parse_mash_genome_result(path_to_mash_screen):
             species = str(mash_record['query_comment'])[species_name_start: species_name_stop]    
             mash_result[species] = mash_record
     return mash_result
-
-def parse_mash_plasmid_result(path_to_mash_screen, size, depth):
-    """
-    Args:
-        path_to_mash_screen (str): Path to the mash screen report file.
-        size (int):
-        depth (int):
-
-    Returns:
-        dict: Parsed mash screen report
-        For example:
-        { "NZ_CP010882.1": { "size": ,
-                             "depth": ,
-                             "identity": 0.992291,
-                             "shared_hashes": "850/1000",
-                             "median_multiplicity": 19,
-                             "p_value": 0.00,
-                             "query_ID": "ref|NZ_CP010882.1|",
-                             "query_comment": "Escherichia coli strain MNCRE44 plasmid pMNCRE44_6, complete sequence",
-                             "accession": "NZ_CP010882.1",
-                             "row": "0.992291\t850/1000\t19\t0\tref|NZ_CP010882.1|\tEscherichia coli strain MNCRE44 plasmid pMNCRE44_6, complete sequence",
-                             "species": ""
-                           }
-          "Another accession": { "size": ,
-                                 ...
-                               }
-        }
-
-        See mash docs for more info on mash screen report file:
-        https://mash.readthedocs.io/en/latest/tutorials.html#screening-a-read-set-for-containment-of-refseq-genomes
-    """
-    mash_screen_report = pandas.read_csv(path_to_mash_screen, delimiter='\t', header=None)
-
-    #parse mash result, using winner takes all
-    scores = mash_screen_report[1].values
-    score_cutoff = int(scores[0][:scores[0].index("/")]) - 100
-    index = 0
-
-    #find hits with score > (max_score - 100)
-    for score in scores:
-        parsed_score = int(score[:score.index("/")])
-        if parsed_score >= score_cutoff:
-            index+=1
-        else:
-            break
-
-    mash_plasmid_hits = {}
-    #parse what the species are.
-    for i in range(index):
-        mash_record = {}
-        mash_record['size'] = size
-        mash_record['depth'] = depth
-        mash_record['identity'] = float(mash_screen_report.ix[i, 0])
-        mash_record['shared_hashes'] = mash_screen_report.ix[i, 1]
-        mash_record['median_multiplicity'] = int(mash_screen_report.ix[i, 2])
-        mash_record['p_value'] = float(mash_screen_report.ix[i, 3])
-        mash_record['query_ID'] = mash_screen_report.ix[i, 4] #accession
-        mash_record['query_comment'] = mash_screen_report.ix[i, 5]
-        mash_record['accession'] = mash_record['query_ID'][4:len(mash_record['query_ID'])-1]
-        mash_record['row'] = "\t".join(str(x) for x in mash_screen_report.ix[i].tolist())
-        mash_record['species'] = ""
-        if (mash_record['identity'] >= 0.97):
-            mash_plasmid_hits[mash_record['accession']] = mash_record
-    return mash_plasmid_hits
 
 def parse_read_stats(path_to_mash_log, path_to_total_bp):
     """
