@@ -115,7 +115,7 @@ def parse_mash_genome_result(path_to_mash_screen):
         'shared_hashes': lambda x: x,
         'median_multiplicity': lambda x: int(x),
         'p_value': lambda x: float(x),
-        'query_ID': lambda x: x,
+        'query_id': lambda x: x,
         'query_comment': lambda x: x
     }
     

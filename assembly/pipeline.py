@@ -251,7 +251,7 @@ def main():
 
     referenceGenomes = []
     for key in mashHits:
-        qID = mashHits[key]['query_ID']
+        qID = mashHits[key]['query_id']
 
         # find gcf accession
         # TODO: document this or clean it up to be more readable
