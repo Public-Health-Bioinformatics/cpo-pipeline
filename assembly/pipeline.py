@@ -132,11 +132,11 @@ def main():
 
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
-    mashHits = result_parsers.parse_mash_result(pathToMashGenomeScreenTSV)
+    mash_hits = result_parsers.parse_mash_result(pathToMashGenomeScreenTSV)
 
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
-    mashPlasmidHits = result_parsers.parse_mash_result(pathToMashPlasmidScreenTSV)
+    mash_plasmid_hits = result_parsers.parse_mash_result(pathToMashPlasmidScreenTSV)
 
     # parse fastqc
     pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/summary.txt"
@@ -167,6 +167,7 @@ def main():
         output.append(key + ": " + value)
         if (value == "WARN" or value == "FAIL"):
             notes.append("FastQC: Forward read, " + key + " " + value)
+
     output.append("\nreverse read qc:")
     for key, value in fastqcR2.items():
         output.append(key + ": " + value)
@@ -176,35 +177,54 @@ def main():
     output.append("\nKraken2 predicted species (>1%): ")
     for kraken_genome in kraken_genomes:
         # TODO filter by species and percentage
-        output.append(kraken_genome['name'])
+        output.append(kraken_genome['taxon_name'])
+
     output.append("\nmash predicted genomes")
-    for key in mashHits:
-        output.append(mashHits[key]['accession'] + "\t" + key)
+    for mash_hit in mash_hits:
+        output.append(mash_hit['query_comment'])
+
     output.append("\nmash predicted plasmids")
-    for key in mashPlasmidHits:
-        output.append(mashPlasmidHits[key]['query_comment'])
+    for mash_plasmid_hit in mash_plasmid_hits:
+        output.append(mash_plasmid_hit['query_comment'])
     
     output.append("\nDetailed kraken genome hits: ")
     for kraken_genome in kraken_genomes:
         output.append(
-            kraken_genome['fragment_percent'] + '\t' +
-            kraken_genome['fragment_count_root'] + '\t' +
+            str(kraken_genome['fragment_percent']) + '\t' +
+            str(kraken_genome['fragment_count_root']) + '\t' +
+            str(kraken_genome['fragment_count_taxon']) + '\t' +
             kraken_genome['rank_code'] + '\t' +
             kraken_genome['ncbi_taxon_id'] + '\t' +
             kraken_genome['taxon_name']
         )
+
     output.append("\nDetailed mash genome hits: ")
-    for key in mashHits:
-        output.append(mashHits[key]['row'])
+    for mash_hit in mash_hits:
+        output.append(
+            str(mash_hit['identity']) + '\t' +
+            mash_hit['shared_hashes'] + '\t' +
+            str(mash_hit['median_multiplicity']) + '\t' +
+            str(mash_hit['p_value']) + '\t' +
+            mash_hit['query_id'] + '\t' +
+            mash_hit['query_comment']
+        )
+    
     output.append("\nDetailed mash plasmid hits: ")
-    for key in mashPlasmidHits:
-        output.append(mashPlasmidHits[key]['row'])
+    for mash_plasmid_hit in mash_plasmid_hits:
+        output.append(
+            str(mash_plasmid_hit['identity']) + '\t' +
+            mash_plasmid_hit['shared_hashes'] + '\t' +
+            str(mash_plasmid_hit['median_multiplicity']) + '\t' +
+            str(mash_plasmid_hit['p_value']) + '\t' +
+            mash_plasmid_hit['query_id'] + '\t' +
+            mash_plasmid_hit['query_comment']
+        )
 
     #qcsummary
     output.append("\n\nQC Information:")
 
     present = False
-    # TODO: 
+    # TODO: filter kraken_genomes based on contamination thresholds
     # if (len(kraken_genomes) > 1):
     #     output.append("!!!Kraken2 predicted multiple species, possible contamination?")
     #     notes.append("Kraken2: multiple species, possible contamination.")
@@ -213,7 +233,7 @@ def main():
     #     multiple = False
         
     for kraken_genome in  kraken_genomes:
-        if (kraken_genome['name'] == expectedSpecies):
+        if (kraken_genome['taxon_name'] == expectedSpecies):
             present = True
 
     if present:
@@ -226,17 +246,18 @@ def main():
     if (stats['depth'] < 30):
         output.append("!!!Coverage is lower than 30. Estimated depth: " + str(stats['depth']))
 
-    if (len(mashHits) > 1):
+    # TODO: filter mash_hits based on contamination thresholds
+    if (len(mash_hits) > 1):
         output.append("!!!MASH predicted multiple species, possible contamination?")
         multiple=True
-    elif (len(mashHits) < 1):
+    elif (len(mash_hits) < 1):
         output.append("!!!MASH had no hits, this is an unknown species")
         notes.append("Mash: Unknown Species")
                 
     present=False
-    for key in mashHits:
-        spp = str(mashHits[key]['species'])
-        if (spp.find(expectedSpecies) > -1 ):
+    for mash_hit in mash_hits:
+        species = mash_hit['query_comment']
+        if (species.find(expectedSpecies) > -1):
             present=True
     if present:
         output.append("The expected species is predicted by mash")
@@ -246,7 +267,7 @@ def main():
         output.append("!!!The expected species is NOT predicted by mash, poor resolution? contamination? mislabeling?")
         notes.append("Mash: Not expected species. Possible resolution issues, contamination or mislabeling")
 
-    if (len(mashPlasmidHits) == 0):
+    if (len(mash_plasmid_hits) == 0):
         output.append("!!!no plasmids predicted")
         notes.append("Mash: no plasmid predicted")
 
@@ -258,8 +279,8 @@ def main():
     print("Downloading reference genomes")
 
     referenceGenomes = []
-    for key in mashHits:
-        qID = mashHits[key]['query_id']
+    for mash_hit in mash_hits:
+        qID = mash_hit['query_id']
 
         # find gcf accession
         # TODO: document this or clean it up to be more readable
