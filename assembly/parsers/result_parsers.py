@@ -14,23 +14,23 @@ def parse_kraken_result(path_to_kraken_result):
         path_to_kraken_result (str): Path to the kraken report file.
 
     Returns:
-        dict: Parsed kraken report with species-level results.
+        list(dict): Parsed kraken report with species-level results.
         For example:
-        { "Escherichia coli": { "fragment_percent": 84.08,
-                                "fragment_count_root": 195536,
-                                "fragment_count_taxon": 192561,
-                                "rank_code": "S",
-                                "ncbi_taxon_id": "562",
-                                "name": "Escherichia coli",
-                              }
-          "Another species": { "fragment_percent": 12.1,
-                               ...
-                             }
-        }
+        [
+            { "fragment_percent": 84.08,
+              "fragment_count_root": 195536,
+              "fragment_count_taxon": 192561,
+              "rank_code": "S",
+              "ncbi_taxon_id": "562",
+              "taxon_name": "Escherichia coli",
+            },
+            { "fragment_percent": 12.1,
+              ...
+            }
+        ]
         See kraken manual for more detail on report fields:
         http://ccb.jhu.edu/software/kraken/MANUAL.html#sample-report-output-format
     """
-    kraken_result = {}
 
     # Associate a field name with a function for parsing that field
     kraken_report_fields = {
@@ -39,20 +39,18 @@ def parse_kraken_result(path_to_kraken_result):
         'fragment_count_taxon': lambda x: int(x),
         'rank_code': lambda x: x,
         'ncbi_taxon_id': lambda x: x,
-        'name': lambda x: x.strip()
+        'taxon_name': lambda x: x.strip()
     }
     
     with open(path_to_kraken_result) as krakenfile:
         reader = csv.DictReader(krakenfile, delimiter='\t', fieldnames=list(kraken_report_fields))
-        kraken_species_record = {}
+        parsed_kraken_result = []
+        kraken_record = {}
         for row in reader:
-            # Only parse species-level records (not Family, Genus, etc.)
-            if row['rank_code'] != 'S':
-                continue
             for field_name, parse in kraken_report_fields.items():
-                kraken_species_record[field_name] = parse(row[field_name])
-            kraken_result[kraken_species_record['name']] = kraken_species_record
-    return kraken_result
+                kraken_record[field_name] = parse(row[field_name])
+            parsed_kraken_result.append(kraken_record.copy())
+    return parsed_kraken_result
 
 def parse_fastqc_result(path_to_qc_summary):
     """
@@ -90,25 +88,25 @@ def parse_mash_result(path_to_mash_screen):
         path_to_mash_screen (str): Path to the mash screen report file.
 
     Returns:
-        dict: Parsed mash screen report
+        list(dict): Parsed mash screen report
         For example:
-        { "Citrobacter freundii strain CAV1321": { "identity": 0.996805,
-                                                   "shared_hashes": "935/1000",
-                                                   "median_multiplicity": 38,
-                                                   "p_value": 0.00,
-                                                   "query_id": "GCF_001022155.1_ASM102215v1_genomic.fna.gz",
-                                                   "query_comment": "[10 seqs] NZ_CP011612.1 Citrobacter freundii strain CAV1321, complete genome [...]"
-                                                 },
-          "Another species": { "identity": 0.914483,
-                               ...
-                             }
-        }
+        [
+          { "identity": 0.996805,
+            "shared_hashes": "935/1000",
+            "median_multiplicity": 38,
+            "p_value": 0.00,
+            "query_id": "GCF_001022155.1_ASM102215v1_genomic.fna.gz",
+            "query_comment": "[10 seqs] NZ_CP011612.1 Citrobacter freundii strain CAV1321, complete genome [...]"
+          },
+          { "identity": 0.914483,
+            ...
+          }
+        ]
         See mash docs for more info on mash screen report file:
         https://mash.readthedocs.io/en/latest/tutorials.html#screening-a-read-set-for-containment-of-refseq-genomes
         boolean: true if phiX is present in top hits, false if absent
     
     """
-    mash_result = {}
 
     mash_screen_report_fields = {
         'identity': lambda x: float(x),
@@ -120,20 +118,18 @@ def parse_mash_result(path_to_mash_screen):
     }
     
     # Example mash screen report record (actual report has no header and is tab-delimited):
-    # identity    shared-hashes    median-multiplicity    p-value    query-ID                                    query-comment
+    # identity    shared_hashes    median_multiplicity    p_value    query_id                                    query_comment
     # 0.998697    973/1000         71                     0          GCF_000958965.1_matepair4_genomic.fna.gz    [59 seqs] NZ_LAFU01000001.1 Klebsiella pneumoniae strain CDPH5262 contig000001, whole genome shotgun sequence [...]
 
+    parsed_mash_result = []
     with open(path_to_mash_screen) as mashfile:
         reader = csv.DictReader(mashfile, delimiter='\t', fieldnames=list(mash_screen_report_fields))
         mash_record = {}
         for row in reader:
             for field_name, parse in mash_screen_report_fields.items():
                 mash_record[field_name] = parse(row[field_name])
-            species_name_start = int(mash_record['query_comment'].index(".")) + 3
-            species_name_stop = int(mash_record['query_comment'].index(","))
-            species = str(mash_record['query_comment'])[species_name_start: species_name_stop]    
-            mash_result[species] = mash_record
-    return mash_result
+            parsed_mash_result.append(mash_record.copy())
+    return parsed_mash_result
 
 def parse_read_stats(path_to_mash_log, path_to_total_bp):
     """

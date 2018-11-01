@@ -2,9 +2,9 @@ import os
 import sys
 import unittest
 import json
+import pprint
 
 # add the '../../assembly' directory to the 'sys.path'
-
 TEST_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(TEST_DIR_PATH))
 
@@ -19,7 +19,9 @@ class KrakenResultParserTest(unittest.TestCase):
         
     def test_parse_kraken_result(self):
         parsed_result = result_parsers.parse_kraken_result(self.test_data_path)
-        self.assertDictEqual(parsed_result, self.parsed_kraken_json)
+        paired_results = zip(parsed_result, self.parsed_kraken_json)
+        for parsed_kraken_report_record, parsed_kraken_json_record in paired_results:
+            self.assertDictEqual(parsed_kraken_report_record, parsed_kraken_json_record)
 
 
 class FastqcResultParserTest(unittest.TestCase):
@@ -40,9 +42,12 @@ class MashResultParserTest(unittest.TestCase):
             self.parsed_mash_screen_genome_json = json.load(mash_screen_genome_json)
             mash_screen_genome_json.close()
 
-    def test_parse_mash_result(self):
+    def test_parse_mash_result(self):    
         parsed_result = result_parsers.parse_mash_result(self.test_data_path)
-        self.assertDictEqual(parsed_result, self.parsed_mash_screen_genome_json)
+        paired_results = zip(parsed_result, self.parsed_mash_screen_genome_json)
+        for parsed_mash_report_record, parsed_mash_json_record in paired_results:
+            self.assertDictEqual(parsed_mash_report_record, parsed_mash_json_record)
+
 
 if __name__ == '__main__':
     unittest.main()

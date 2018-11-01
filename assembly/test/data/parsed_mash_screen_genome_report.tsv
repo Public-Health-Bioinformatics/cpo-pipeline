@@ -1,0 +1,6 @@
+identity	shared_hashes	median_multiplicity	p_value	query_id	query_comment
+0.996805	935/1000	38	0	GCF_001022155.1_ASM102215v1_genomic.fna.gz	[10 seqs] NZ_CP011612.1 Citrobacter freundii strain CAV1321, complete genome [...]
+0.914483	153/1000	1	0	GCF_000819615.1_ViralProj14015_genomic.fna.gz	NC_001422.1 Enterobacteria phage phiX174 sensu lato, complete genome
+0.882821	73/1000	1	3.53547e-249	GCF_001902415.1_ASM190241v1_genomic.fna.gz	[9 seqs] NZ_CP018438.1 Klebsiella pneumoniae strain Kp_Goe_822917, complete sequence [...]
+0.869463	53/1000	34	8.51819e-174	GCF_000982845.1_ASM98284v1_genomic.fna.gz	[19 seqs] NZ_LAZI01000001.1 Citrobacter freundii strain SA79 contig_00001, whole genome shotgun sequence [...]
+0.862715	45/1000	1	1.50284e-144	GCF_000958145.1_ASM95814v1_genomic.fna.gz	[115 seqs] NZ_JZYO01000001.1 Enterobacter hormaechei subsp. oharae strain 39366 contig1, whole genome shotgun sequence [...]

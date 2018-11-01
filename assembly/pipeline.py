@@ -149,7 +149,7 @@ def main():
      
     # parse kraken2 result
     pathToKrakenResult = outputDir + "/qcResult/" + ID + "/kraken2.genome.report"
-    krakenGenomes = result_parsers.parse_kraken_result(pathToKrakenResult)
+    kraken_genomes = result_parsers.parse_kraken_result(pathToKrakenResult)
 
     print("Formatting the QC results")
     multiple = False
@@ -174,8 +174,9 @@ def main():
             notes.append("FastQC: Reverse read, " + key + " " + value)
 
     output.append("\nKraken2 predicted species (>1%): ")
-    for key in krakenGenomes:
-        output.append(krakenGenomes[key]['name'])
+    for kraken_genome in kraken_genomes:
+        # TODO filter by species and percentage
+        output.append(kraken_genome['name'])
     output.append("\nmash predicted genomes")
     for key in mashHits:
         output.append(mashHits[key]['accession'] + "\t" + key)
@@ -184,8 +185,14 @@ def main():
         output.append(mashPlasmidHits[key]['query_comment'])
     
     output.append("\nDetailed kraken genome hits: ")
-    for key in krakenGenomes:
-        output.append(krakenGenomes[key]['row'])
+    for kraken_genome in kraken_genomes:
+        output.append(
+            kraken_genome['fragment_percent'] + '\t' +
+            kraken_genome['fragment_count_root'] + '\t' +
+            kraken_genome['rank_code'] + '\t' +
+            kraken_genome['ncbi_taxon_id'] + '\t' +
+            kraken_genome['taxon_name']
+        )
     output.append("\nDetailed mash genome hits: ")
     for key in mashHits:
         output.append(mashHits[key]['row'])
@@ -197,15 +204,16 @@ def main():
     output.append("\n\nQC Information:")
 
     present = False
-    if (len(krakenGenomes) > 1):
-        output.append("!!!Kraken2 predicted multiple species, possible contamination?")
-        notes.append("Kraken2: multiple species, possible contamination.")
-        #multiple = True
-    elif (len(krakenGenomes) == 1):
-        multiple = False
+    # TODO: 
+    # if (len(kraken_genomes) > 1):
+    #     output.append("!!!Kraken2 predicted multiple species, possible contamination?")
+    #     notes.append("Kraken2: multiple species, possible contamination.")
+    #     #multiple = True
+    # elif (len(kraken_genomes) == 1):
+    #     multiple = False
         
-    for key in  krakenGenomes:
-        if (krakenGenomes[key]['name'] == expectedSpecies):
+    for kraken_genome in  kraken_genomes:
+        if (kraken_genome['name'] == expectedSpecies):
             present = True
 
     if present:
