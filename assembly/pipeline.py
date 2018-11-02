@@ -134,10 +134,31 @@ def main():
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
     mash_hits = result_parsers.parse_mash_result(pathToMashGenomeScreenTSV)
 
+    # 'shared_hashes' field is string in format '935/1000'
+    # Threshold is 300 below highest numerator (ie. '935/100' -> 635)
+    mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - 300
+    print("*** mash_hits_score_threshold: " + str(mash_hits_score_threshold))
+    def score_above_threshold(mash_result, score_threshold):
+        score = int(mash_result['shared_hashes'].split("/")[0])
+        if score >= score_threshold:
+            return True
+        else:
+            return False
+        
+    filtered_mash_hits = list(filter(
+        lambda x: score_above_threshold(x, mash_hits_score_threshold),
+        mash_hits))
+    
     # parse plasmid mash
     pathToMashPlasmidScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"
     mash_plasmid_hits = result_parsers.parse_mash_result(pathToMashPlasmidScreenTSV)
-
+    # 'shared_hashes' field is string in format '935/1000'
+    # Threshold is 100 below highest numerator (ie. '935/100' -> 835)
+    mash_plasmid_hits_score_threshold = int(mash_plasmid_hits[0]['shared_hashes'].split("/")[0]) - 100
+    filtered_mash_plasmid_hits = list(filter(
+        lambda x: score_above_threshold(x, mash_plasmid_hits_score_threshold),
+        mash_plasmid_hits))
+    
     # parse fastqc
     pathToFastQCR1 = outputDir + "/qcResult/" + ID + "/" + R1[R1.find(os.path.basename(R1)):R1.find(".")] + "_fastqc/summary.txt"
     pathToFastQCR2 = outputDir + "/qcResult/" + ID + "/" + R2[R2.find(os.path.basename(R2)):R2.find(".")] + "_fastqc/summary.txt"
@@ -180,7 +201,7 @@ def main():
         output.append(kraken_genome['taxon_name'])
 
     output.append("\nmash predicted genomes")
-    for mash_hit in mash_hits:
+    for mash_hit in filtered_mash_hits:
         output.append(mash_hit['query_comment'])
 
     output.append("\nmash predicted plasmids")
@@ -246,16 +267,15 @@ def main():
     if (stats['depth'] < 30):
         output.append("!!!Coverage is lower than 30. Estimated depth: " + str(stats['depth']))
 
-    # TODO: filter mash_hits based on contamination thresholds
-    if (len(mash_hits) > 1):
+    if (len(filtered_mash_hits) > 1):
         output.append("!!!MASH predicted multiple species, possible contamination?")
         multiple=True
-    elif (len(mash_hits) < 1):
+    elif (len(filtered_mash_hits) < 1):
         output.append("!!!MASH had no hits, this is an unknown species")
         notes.append("Mash: Unknown Species")
                 
     present=False
-    for mash_hit in mash_hits:
+    for mash_hit in filtered_mash_hits:
         species = mash_hit['query_comment']
         if (species.find(expectedSpecies) > -1):
             present=True
@@ -279,17 +299,22 @@ def main():
     print("Downloading reference genomes")
 
     referenceGenomes = []
-    for mash_hit in mash_hits:
+    for mash_hit in filtered_mash_hits:
         qID = mash_hit['query_id']
-
+        species_name_start = int(mash_hit['query_comment'].index(".")) + 3
+        species_name_stop = int (mash_hit['query_comment'].index(","))
+        if (mash_hit['query_comment'].find("phiX") > -1):
+            species = "PhiX"
+        else:
+            species = str(mash_hit['query_comment'])[species_name_start: species_name_stop]
         # find gcf accession
         # TODO: document this or clean it up to be more readable
         gcf = (qID[:qID.find("_",5)]).replace("_","")
         gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)]
-        
+        print("*** GCF: " + str(gcf))
         assembly = qID[:qID.find("_genomic.fna.gz")]
         url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + qID
-        referencePath = outputDir + "/qcResult/" + ID + "/" + key.replace(" ","")
+        referencePath = os.path.abspath(outputDir + "/qcResult/" + ID + "/" + species.replace(" ",""))
         referenceGenomes.append(referencePath)
 
         httpGetFile(url, referencePath + ".gz")
