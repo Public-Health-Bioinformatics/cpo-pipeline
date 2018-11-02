@@ -13,7 +13,6 @@ Requires pipeline_qc.sh, pipeline_assembly.sh, pipeline_assembly_contaminant.sh.
 '''
 
 import subprocess
-import pandas
 import optparse
 import os
 import datetime
