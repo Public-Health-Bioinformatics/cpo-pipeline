@@ -66,11 +66,14 @@ source activate bbmap-38.22
 
 #try to seperate out the contaminant reads
 cd "${temp_dir}" #bbsplit creates temp files in the current directory. That cannot be changed. cd first to keep it clean
-bbsplit.sh in1="${reads1_file}" in2="${reads2_file}" ref="${reference_genome}" \
-	   basename="${split_output_dir}"/"${sample_id}"%_#.fq \
-	   outu1="${split_output_dir}"/"${sample_id}"_unmap1.fq \
-	   outu2="${split_output_dir}"/"${sample_id}"_unmap2.fq \
-	   t="$threads" -Xmx"$ram"g
+bbsplit.sh \
+    in1="${reads1_file}" \
+    in2="${reads2_file}" \
+    ref="${reference_genome}" \
+    basename="${split_output_dir}"/"${sample_id}"%_#.fq \
+    outu1="${split_output_dir}"/"${sample_id}"_unmap1.fq \
+    outu2="${split_output_dir}"/"${sample_id}"_unmap2.fq \
+    t="$threads" -Xmx"$ram"g
 
 source deactivate
 
@@ -85,9 +88,13 @@ for i in "${ADDR[@]}"; do
 
 	source activate shovill-1.0.1
 	
-	shovill --R1 "${reads1_proper}" --R2 "${reads2_proper}" \
-		--cpus "$threads" --ram "$ram" --tmpdir "${temp_dir}" \
-		--outdir "${assembly_output_dir}"
+	shovill \
+	    --R1 "${reads1_proper}" \
+	    --R2 "${reads2_proper}" \
+	    --cpus "$threads" \
+	    --ram "$ram" \
+	    --tmpdir "${temp_dir}" \
+	    --outdir "${assembly_output_dir}"
 
 	source deactivate
 
@@ -109,8 +116,11 @@ for i in "${ADDR[@]}"; do
 	
 	source activate quast-4.6.3
 	
-	metaquast "${contig_proper}" -R "${reference_genome}" --threads "$threads" \
-		  -o "${qc_dir}/${sample_id}/${sample_id}.${refG}.quast"
+	metaquast \
+	    "${contig_proper}" \
+	    -R "${reference_genome}" \
+	    --threads "$threads" \
+	    -o "${qc_dir}/${sample_id}/${sample_id}.${refG}.quast"
 	
 	source deactivate
 done
