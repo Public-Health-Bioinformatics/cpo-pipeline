@@ -326,8 +326,6 @@ def main():
     print("step 2: genome assembly and QC")
     correctAssembly = ""
 
-    #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
-    #if (len(mashHits) == 1):
     if (len(referenceGenomes) > 1):
         for item in referenceGenomes:
             if (item.find(expectedSpecies.replace(" ", "")) > -1): #found the right genome
@@ -336,26 +334,15 @@ def main():
         correctAssembly = os.path.basename(referenceGenomes[0])
     if (correctAssembly == ""):
         raise Exception("no reference genome...crashing")
-
-    if (not multiple and correctSpecies):
-        print("Noncontaminated Genome assembly...")            
-        cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
-        result = execute(cmd, curDir)
-    elif (multiple and correctSpecies):
-        #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome (csv, no spaces)	, 7=buscodb
-        print("Contaminated Genome assembly...")
-        cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
-        result = execute(cmd, curDir)
-    elif (multiple and not correctSpecies):
+    
+    if (multiple):
         print("Contaminated Genome assembly...No Correct Species Either")
         raise Exception("contamination and mislabeling...crashing")
-        #cmd = [scriptDir + "/pipeline_assembly_contaminant.sh", ID, R1, R2, outputDir, tempDir, ",".join(referenceGenomes), buscodb, correctAssembly]
-        #result = execute(cmd, curDir)
-    elif (not multiple and not correctSpecies):
-        print("Noncontaminated Genome assembly...No Correct species though")
+    else:
+        #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
         cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
         result = execute(cmd, curDir)
-
+    
     print("Parsing assembly results")
     #get the correct busco and quast result file to parse
     correctAssembly = ""
