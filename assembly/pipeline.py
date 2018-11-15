@@ -177,8 +177,8 @@ def main():
     correctReference = ""
 
     output.append("\n\n~~~~~~~QC summary~~~~~~~")
-    output.append("Estimated genome size: " + str(stats['size']))
-    output.append("Estimated coverage: " + str(stats['depth']))
+    output.append("Estimated genome size: " + str(stats['estimated_genome_size']))
+    output.append("Estimated coverage: " + str(stats['estimated_depth_of_coverage']))
     output.append("Expected isolate species: " + expectedSpecies)
 
     output.append("\nFastQC summary:")
@@ -263,12 +263,12 @@ def main():
         output.append("!!!The expected species is NOT predicted by kraken2, contamination? mislabeling?")
         notes.append("Kraken2: Not expected species. Possible contamination or mislabeling")
 
-    if (stats['depth'] < 30):
-        output.append("!!!Coverage is lower than 30. Estimated depth: " + str(stats['depth']))
+    if (stats['estimated_depth_of_coverage'] < 30):
+        output.append("!!!Coverage is lower than 30. Estimated depth: " + str(stats['estimated_depth_of_coverage']))
 
     if (len(filtered_mash_hits) > 1):
         output.append("!!!MASH predicted multiple species, possible contamination?")
-        multiple=True
+        multiple = True
     elif (len(filtered_mash_hits) < 1):
         output.append("!!!MASH had no hits, this is an unknown species")
         notes.append("Mash: Unknown Species")
