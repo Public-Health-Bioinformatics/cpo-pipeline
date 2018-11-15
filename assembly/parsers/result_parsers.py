@@ -104,8 +104,6 @@ def parse_mash_result(path_to_mash_screen):
         ]
         See mash docs for more info on mash screen report file:
         https://mash.readthedocs.io/en/latest/tutorials.html#screening-a-read-set-for-containment-of-refseq-genomes
-        boolean: true if phiX is present in top hits, false if absent
-    
     """
 
     mash_screen_report_fields = {
@@ -140,20 +138,22 @@ def parse_read_stats(path_to_mash_log, path_to_total_bp):
     Returns:
         dict: Read statistics
         For example:
-          { "size": 5185840,
-            "depth": 22.28
+          { "estimated_genome_size": 5185840,
+            "estimated_depth_of_coverage": 22.28
           }
     """
-    total_bp = int([line.rstrip('\n') for line in open(path_to_total_bp)][0])
-    mash_log = [line.rstrip('\n') for line in open(path_to_mash_log)]
+    with open(path_to_total_bp, 'r') as totalbp_file:
+        total_bp = int(totalbp_file.readline())
+
+    with open(path_to_mash_log, 'r') as mash_log_file:
+        for line in mash_log_file:
+            if (line.find("Estimated genome size:") > -1 ):
+                estimated_genome_size = float(line.split(":")[1].strip())
+    
     read_stats = {}
-    for line in mash_log:
-        if (line.find("Estimated genome size:") > -1 ):
-            size = float(line[line.index(": ") + 2:])
-    depth = total_bp / size
-    depth = float(format(depth, '.2f'))
-    read_stats['size'] = size
-    read_stats['depth'] = depth
+    estimated_depth_of_coverage = total_bp / estimated_genome_size
+    read_stats['estimated_genome_size'] = int('%.0f' % estimated_genome_size)
+    read_stats['estimated_depth_of_coverage'] = float('%.2f' % estimated_depth_of_coverage)
     return read_stats
 
 def parse_busco_result(path_to_busco_result):

@@ -48,6 +48,17 @@ class MashResultParserTest(unittest.TestCase):
         for parsed_mash_report_record, parsed_mash_json_record in paired_results:
             self.assertDictEqual(parsed_mash_report_record, parsed_mash_json_record)
 
+class MashLogParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/mash.log')
+        self.test_totalbp_path = os.path.join(TEST_DIR_PATH, 'data/totalbp')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_mash_log.json')) as mash_log_json:
+            self.parsed_mash_log_json = json.load(mash_log_json)
+            mash_log_json.close()
+
+    def test_parse_read_stats(self):
+        parsed_result = result_parsers.parse_read_stats(self.test_data_path, self.test_totalbp_path)
+        self.assertDictEqual(parsed_result, self.parsed_mash_log_json)
 
 if __name__ == '__main__':
     unittest.main()
