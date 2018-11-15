@@ -6,7 +6,6 @@ during the QC & Assembly phase of the cpo-pipeline.
 """
 
 import csv
-import pandas
 
 def parse_kraken_result(path_to_kraken_result):
     """
