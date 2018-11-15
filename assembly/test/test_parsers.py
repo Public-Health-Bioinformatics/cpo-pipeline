@@ -60,5 +60,16 @@ class MashLogParserTest(unittest.TestCase):
         parsed_result = result_parsers.parse_read_stats(self.test_data_path, self.test_totalbp_path)
         self.assertDictEqual(parsed_result, self.parsed_mash_log_json)
 
+class BuscoResultParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/short_summary_busco.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_busco_summary.json')) as busco_summary_json:
+            self.parsed_busco_summary_json = json.load(busco_summary_json)
+            busco_summary_json.close()
+
+    def test_parse_busco_result(self):
+        parsed_result = result_parsers.parse_busco_result(self.test_data_path)
+        self.assertDictEqual(parsed_result, self.parsed_busco_summary_json)
+
 if __name__ == '__main__':
     unittest.main()

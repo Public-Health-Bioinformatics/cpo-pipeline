@@ -1,0 +1,15 @@
+# BUSCO version is: 3.0.2 
+# The lineage dataset is: enterobacteriales_odb9 (Creation date: 2016-11-01, number of species: 216, number of BUSCOs: 781)
+# To reproduce this run: python /opt/miniconda2/envs/busco-3.0.2/bin/run_busco -i ../../../2018-10-24_7d537af_output/contigs/BC11-Cfr001.fa -o BC11-Cfr001.busco -l /data/ref_databases/busco/enterobacteriales_odb9/ -m genome -c 1 -sp E_coli_K12
+#
+# Summarized benchmarking in BUSCO notation for file ../../../2018-10-24_7d537af_output/contigs/BC11-Cfr001.fa
+# BUSCO was run in mode: genome
+
+	C:100.0%[S:100.0%,D:0.0%],F:0.0%,M:0.0%,n:781
+
+	781	Complete BUSCOs (C)
+	781	Complete and single-copy BUSCOs (S)
+	0	Complete and duplicated BUSCOs (D)
+	0	Fragmented BUSCOs (F)
+	0	Missing BUSCOs (M)
+	781	Total BUSCO groups searched

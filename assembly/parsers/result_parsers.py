@@ -170,7 +170,11 @@ def parse_busco_result(path_to_busco_result):
     Raises:
         Exception: When BUSCO output file is empty
     """
-    busco_output = [line.rstrip('\n') for line in open(path_to_busco_result)]
+    busco_output = []
+    with open(path_to_busco_result, 'r') as busco_result:
+        for line in busco_result:
+            busco_output.append(line)
+    
     if (len(busco_output) > 0):
         busco_result = {}
         busco_result['complete_single'] = int(busco_output[10].split("\t")[1])
