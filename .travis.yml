@@ -22,4 +22,5 @@ install:
   
 script:
   - python assembly/test/test_parsers.py
+  - python typing/test/test_parsers.py
 
