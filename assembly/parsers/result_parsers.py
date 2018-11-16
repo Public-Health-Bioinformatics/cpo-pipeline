@@ -6,6 +6,7 @@ during the QC & Assembly phase of the cpo-pipeline.
 """
 
 import csv
+import re
 
 def parse_kraken_result(path_to_kraken_result):
     """
@@ -193,44 +194,70 @@ def parse_quast_result(path_to_quast_result):
     Returns:
         dict: Parsed QUAST report
         For example:
-        { "contigs_count": 163,
-          "largest_contig": 293450,
-          "N50": 111197,
-          "NG50": 112240,
-          "L50": 16,
-          "LG50": 15,
-          "N75": 57407,
-          "NG75": 65034,
-          "L75": 32,
-          "LG75": 29,
-          "total_length": 5432369,
-          "reference_length": 5169997,
-          "percent_GC": 50.55,
-          "reference_percent_GC": 50.65,
-          "genome_fraction_percent": 96.296,
-          "duplication_ratio": 1.01,
-          "data": ["Assembly	BC18-Eco016","# contigs (>= 0 bp)	163", ...]
+        {
+            "contigs_count": 72,
+            "largest_contig": 692871,
+            "N50": 299446,
+            "NG50": 299446,
+            "L50": 6,
+            "LG50": 6,
+            "N75": 123167,
+            "NG75": 110534,
+            "L75": 12,
+            "LG75": 14,
+            "total_length": 5182695,
+            "reference_length": 5489397,
+            "percent_GC": 51.75,
+            "reference_percent_GC": 51.59,
+            "genome_fraction_percent": 91.202,
+            "duplication_ratio": 1.002
         }
     """
-    quast_output = [line.rstrip('\n') for line in open(path_to_quast_result)]
-    quast_result = {}
-    quast_result['contigs_count'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("# contigs\t") > -1][-1])].split("\t")[1])
-    quast_result['largest_contig'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Largest contig\t") > -1][-1])].split("\t")[1])
-    quast_result['N50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("N50\t") > -1][-1])].split("\t")[1])
-    quast_result['NG50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("NG50\t") > -1][-1])].split("\t")[1])
-    quast_result['L50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("L50\t") > -1][-1])].split("\t")[1])
-    quast_result['LG50'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("LG50\t") > -1][-1])].split("\t")[1])
-    quast_result['N75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("N75\t") > -1][-1])].split("\t")[1])
-    quast_result['NG75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("NG75\t") > -1][-1])].split("\t")[1])
-    quast_result['L75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("L75\t") > -1][-1])].split("\t")[1])
-    quast_result['LG75'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("LG75\t") > -1][-1])].split("\t")[1])
-    quast_result['total_length'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Total length\t") > -1][-1])].split("\t")[1])
-    quast_result['reference_length'] = int(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Reference length\t") > -1][-1])].split("\t")[1])
-    quast_result['percent_GC'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("GC (%)\t") > -1][-1])].split("\t")[1])
-    quast_result['reference_percent_GC'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Reference GC (%)\t") > -1][-1])].split("\t")[1])
-    quast_result['genome_fraction_percent'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Genome fraction (%)\t") > -1][-1])].split("\t")[1])
-    quast_result['duplication_ratio'] = float(quast_output[int([i for i,x in enumerate(quast_output) if x.find("Duplication ratio\t") > -1][-1])].split("\t")[1])
-    quast_result['data'] = quast_output
+    quast_output = []
+    with open(path_to_quast_result, 'r') as quast_result:
+        for line in quast_result:
+            quast_output.append(line)
 
+    def parse_quast_report_line(line):
+        """
+        Takes a line of the quast report and returns the specific data that we're interested in from that line.
+        
+        Collapse multiple spaces into a tab char ('\t'), then split the line on tabs and take the second item.
+        Cast floats to floats and ints to ints.
+        '# contigs        751   ' -> '# contigs\t751\t' -> ['# contigs', '751', ''] -> '751' -> 751
+        """
+        result_data = re.sub(' {2,}', '\t', line).split('\t')[1]
+        if re.match('\d+\.\d+', result_data):
+            return float(result_data)
+        else:
+            return int(result_data)
+
+    # Associate a regex that can be used to identify the line of interest in the quast report
+    # with a string to use as a key in the output dict.
+    quast_report_parsing_regexes = {
+        '^# contigs {2,}\d+': 'contigs_count',
+        '^Largest contig {1,}\d+': 'largest_contig',
+        '^N50 +\d+': 'N50',
+        '^NG50 +\d+': 'NG50',
+        '^L50 +\d+': 'L50',
+        '^LG50 +\d+': 'LG50',
+        '^N75 +\d+': 'N75',
+        '^NG75 +\d+': 'NG75',
+        '^L75 +\d+': 'L75',
+        '^LG75 +\d+': 'LG75',
+        '^Total length {2,}\d+': 'total_length',
+        '^Reference length +\d+': 'reference_length',
+        '^GC \(%\) +\d+\.\d+': 'percent_GC',
+        '^Reference GC \(%\) +\d+\.\d+': 'reference_percent_GC',
+        '^Genome fraction \(%\) +\d+\.\d+': 'genome_fraction_percent',
+        '^Duplication ratio +\d+\.\d+': 'duplication_ratio',
+    }
+    
+    quast_result = {}
+    for line in quast_output:
+        for regex, key in quast_report_parsing_regexes.items():
+            if re.match(regex, line):
+                quast_result[key] = parse_quast_report_line(line)
+    
     return quast_result
 

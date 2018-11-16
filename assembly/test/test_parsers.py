@@ -12,8 +12,8 @@ from parsers import result_parsers
 
 class KrakenResultParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/kraken_report.txt')
-        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_kraken_report.json')) as kraken_report_json:
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/qcResult/SAMPLE-ID/kraken2.genome.report')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_kraken_report.json')) as kraken_report_json:
             self.parsed_kraken_json = json.load(kraken_report_json)
             kraken_report_json.close()
         
@@ -26,8 +26,8 @@ class KrakenResultParserTest(unittest.TestCase):
 
 class FastqcResultParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/fastqc_summary.txt')
-        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_fastqc_summary.json')) as fastqc_summary_json:
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/qcResult/SAMPLE-ID/SAMPLE-ID_R1_fastqc/summary.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_fastqc_summary.json')) as fastqc_summary_json:
             self.parsed_fastqc_summary_json = json.load(fastqc_summary_json)
             fastqc_summary_json.close()
 
@@ -37,8 +37,8 @@ class FastqcResultParserTest(unittest.TestCase):
 
 class MashResultParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/mashscreen.genome.tsv')
-        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_mash_screen_genome_report.json')) as mash_screen_genome_json:
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/qcResult/SAMPLE-ID/mashscreen.genome.tsv')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mash_screen_genome_report.json')) as mash_screen_genome_json:
             self.parsed_mash_screen_genome_json = json.load(mash_screen_genome_json)
             mash_screen_genome_json.close()
 
@@ -50,9 +50,9 @@ class MashResultParserTest(unittest.TestCase):
 
 class MashLogParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/mash.log')
-        self.test_totalbp_path = os.path.join(TEST_DIR_PATH, 'data/totalbp')
-        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_mash_log.json')) as mash_log_json:
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/qcResult/SAMPLE-ID/mash.log')
+        self.test_totalbp_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/qcResult/SAMPLE-ID/totalbp')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mash_log.json')) as mash_log_json:
             self.parsed_mash_log_json = json.load(mash_log_json)
             mash_log_json.close()
 
@@ -62,14 +62,25 @@ class MashLogParserTest(unittest.TestCase):
 
 class BuscoResultParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/short_summary_busco.txt')
-        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_busco_summary.json')) as busco_summary_json:
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/assembly_qc/SAMPLE-ID/SAMPLE-ID.busco/short_summary_SAMPLE-ID.busco.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_busco_summary.json')) as busco_summary_json:
             self.parsed_busco_summary_json = json.load(busco_summary_json)
             busco_summary_json.close()
 
     def test_parse_busco_result(self):
         parsed_result = result_parsers.parse_busco_result(self.test_data_path)
         self.assertDictEqual(parsed_result, self.parsed_busco_summary_json)
+
+class QuastResultParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/assembly_qc/SAMPLE-ID/SAMPLE-ID.quast/report.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_quast_report.json')) as quast_report_json:
+            self.parsed_quast_report_json = json.load(quast_report_json)
+            quast_report_json.close()
+    
+    def test_parse_quast_result(self):
+        parsed_result = result_parsers.parse_quast_result(self.test_data_path)
+        self.assertDictEqual(parsed_result, self.parsed_quast_report_json)
 
 if __name__ == '__main__':
     unittest.main()
