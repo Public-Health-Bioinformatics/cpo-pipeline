@@ -124,11 +124,6 @@ def main():
     result = execute(cmd, curDir)
 
     print("Parsing the QC results")
-    #parse read stats
-    pathToMashLog = outputDir + "/qcResult/" + ID + "/" + "mash.log"
-    pathToTotalBP = outputDir + "/qcResult/" + ID + "/" + "totalbp"
-    stats = result_parsers.parse_read_stats(pathToMashLog, pathToTotalBP)
-
     #parse genome mash results
     pathToMashGenomeScreenTSV = outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"
     mash_hits = result_parsers.parse_mash_result(pathToMashGenomeScreenTSV)
@@ -139,7 +134,7 @@ def main():
     print("*** mash_hits_score_threshold: " + str(mash_hits_score_threshold))
     def score_above_threshold(mash_result, score_threshold):
         score = int(mash_result['shared_hashes'].split("/")[0])
-        if score >= score_threshold:
+        if (score >= score_threshold and mash_result['query_comment'].find("phiX") == -1):
             return True
         else:
             return False
@@ -167,18 +162,115 @@ def main():
     fastqc["R1"]=fastqcR1
     fastqc["R2"]=fastqcR2
      
-    # parse kraken2 result
-    pathToKrakenResult = outputDir + "/qcResult/" + ID + "/kraken2.genome.report"
-    kraken_genomes = result_parsers.parse_kraken_result(pathToKrakenResult)
 
+    #all the qC result are parsed now, lets do some QC logic
+    qc_verdicts = {
+        "Multiple_Species_Contamination":False,
+        "Same_As_Expected_Species":False,
+        "FASTQ_Contains_Plasmids":False,
+        "Acceptable Coverage":False,
+        "Acceptable_FastQC_Forward":False,
+        "Acceptable_FastQC_Reverse":False,
+    }
+
+    #look at mash results first
+    if (len(filtered_mash_hits) > 1):
+        qc_verdicts["Multiple_Species_Contamination"] = True 
+    
+    for mash_hit in filtered_mash_hits:
+        species = mash_hit['query_comment']
+        if (species.find(expectedSpecies) > -1):
+            qc_verdicts["Same_As_Expected_Species"] = True
+    
+    if (len(filtered_mash_plasmid_hits) > 0):
+        qc_verdicts["FASTQ_Contains_Plasmids"] = True
+
+    #look at fastqc results
+    if (fastqc["R1"]["basic_statistics"] == "PASS" and fastqc["R1"]["per_base_sequence_quality"] == "PASS" and fastqc["R1"]["sequence_length_distribution"] == "PASS" ):
+        qc_verdicts["Acceptable_FastQC_Forward"] = True 
+    if (fastqc["R2"]["basic_statistics"] == "PASS" and fastqc["R2"]["per_base_sequence_quality"] == "PASS" and fastqc["R2"]["sequence_length_distribution"] == "PASS" ):
+        qc_verdicts["Acceptable_FastQC_Reverse"] = True 
+    
+    #download a reference genome
+    print("Downloading reference genomes")
+    reference_genomes = []
+    if (not qc_verdicts["Multiple_Species_Contamination"]):
+        for mash_hit in filtered_mash_hits: #for all the mash hits, aka reference genomes
+            qID = mash_hit['query_id'] #hit genome within mash results
+            species_name_start = int(mash_hit['query_comment'].index(".")) + 3 #find the start of species name within query_comment column
+            species_name_stop = int (mash_hit['query_comment'].index(",")) #find the end of the species name within query_comment column
+            if (mash_hit['query_comment'].find("phiX") > -1):
+                species = "PhiX" #phix
+            else:
+                species = str(mash_hit['query_comment'])[species_name_start: species_name_stop] #assign proper species name for reference genome file name
+                # find gcf accession
+                # TODO: document this or clean it up to be more readable
+                gcf = (qID[:qID.find("_",5)]).replace("_","") #find the full gcf accession for ncbi FTP
+                gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)] #break the gcf accession into k=3
+
+                assembly = qID[:qID.find("_genomic.fna.gz")] #find the assembly name
+
+                #build the urls
+                fasta_url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + qID #url to fasta
+                assembly_stat_url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + assembly + "_assembly_stats.txt" #url to assembly stat
+                referencePath = os.path.abspath(outputDir + "/qcResult/" + ID + "/" + species.replace(" ",""))
+                reference_genomes.append(referencePath)
+
+                httpGetFile(fasta_url, referencePath + ".gz") #fetch the fasta gz
+                httpGetFile(assembly_stat_url, referencePath + "_genomeStats.txt") # fetch the genome stat
+                with gzip.open(referencePath + ".gz", 'rb') as f:
+                    gzContent = f.read()
+                with open(referencePath, 'wb') as out:
+                    out.write(gzContent)
+                os.remove(referencePath + ".gz")
+    else: #throw an error if it contains contaminations
+        print("Contaminated Genome assembly...resequencing required")
+        raise Exception("contamination and mislabeling...crashing")
+        
+    #check to make sure we ONLY have ONE reference.
+    if (len(reference_genomes) > 1 ):
+        raise Exception ("there are multiple reference genomes")
+    elif (len(reference_genomes) == 0):
+        raise Exception ("no reference genome identified")
+        
+    
+    #now we estimate our coverage using total reads and expected genome size
+    
+    #find expected genome size
+    reference_stat_path = reference_genomes[0] + "_genomeStats.txt"
+    with open( reference_stat_path, 'r') as reference_stats:
+        genome_stats = reference_stats.read().splitlines()
+    for line in genome_stats:
+        if (line.find("all	all	all	all	total-length") > -1): #find the total length stat
+            expected_genome_size = float(line.split("\t")[5].strip()) 
+
+    #find total base count
+    total_bases_path = outputDir + "/qcResult/" + ID + "/" + "totalbp"
+    with open(total_bases_path, 'r') as totalbp_file:
+        total_bp = float(totalbp_file.readline())
+    
+    #calculate coverage
+    coverage = total_bp / expected_genome_size
+            
+    if (coverage >= 30):
+        qc_verdicts["Acceptable Coverage"] = True
+    
+    print("total bases: " + str(total_bp))
+    print("expected genome size: " + str(expected_genome_size))
+    print("coverage: " + str(coverage))
+    print("")
+    print("contamination: " + str(qc_verdicts["Multiple_Species_Contamination"]))
+    print("same as the expected species: " + str(qc_verdicts["Same_As_Expected_Species"]))
+    print("contains plasmids: " + str(qc_verdicts["FASTQ_Contains_Plasmids"]))
+    print("acceptable coverage: " + str(qc_verdicts["Acceptable Coverage"]))
+    print("acceptable forward reads quality: " + str(qc_verdicts["Acceptable_FastQC_Forward"]))
+    print("acceptable reverse reads quality: " + str(qc_verdicts["Acceptable_FastQC_Reverse"]))
+    
     print("Formatting the QC results")
-    multiple = False
-    correctSpecies = False
-    correctReference = ""
 
     output.append("\n\n~~~~~~~QC summary~~~~~~~")
-    output.append("Estimated genome size: " + str(stats['estimated_genome_size']))
-    output.append("Estimated coverage: " + str(stats['estimated_depth_of_coverage']))
+    output.append("Expected genome size: " + str(expected_genome_size))
+    output.append("Estimated coverage: " + str(coverage))
     output.append("Expected isolate species: " + expectedSpecies)
 
     output.append("\nFastQC summary:")
@@ -194,11 +286,6 @@ def main():
         if (value == "WARN" or value == "FAIL"):
             notes.append("FastQC: Reverse read, " + key + " " + value)
 
-    output.append("\nKraken2 predicted species (>1%): ")
-    for kraken_genome in kraken_genomes:
-        # TODO filter by species and percentage
-        output.append(kraken_genome['taxon_name'])
-
     output.append("\nmash predicted genomes")
     for mash_hit in filtered_mash_hits:
         output.append(mash_hit['query_comment'])
@@ -207,16 +294,6 @@ def main():
     for mash_plasmid_hit in mash_plasmid_hits:
         output.append(mash_plasmid_hit['query_comment'])
     
-    output.append("\nDetailed kraken genome hits: ")
-    for kraken_genome in kraken_genomes:
-        output.append(
-            str(kraken_genome['fragment_percent']) + '\t' +
-            str(kraken_genome['fragment_count_root']) + '\t' +
-            str(kraken_genome['fragment_count_taxon']) + '\t' +
-            kraken_genome['rank_code'] + '\t' +
-            kraken_genome['ncbi_taxon_id'] + '\t' +
-            kraken_genome['taxon_name']
-        )
 
     output.append("\nDetailed mash genome hits: ")
     for mash_hit in mash_hits:
@@ -242,128 +319,19 @@ def main():
 
     #qcsummary
     output.append("\n\nQC Information:")
-
-    present = False
-    # TODO: filter kraken_genomes based on contamination thresholds
-    # if (len(kraken_genomes) > 1):
-    #     output.append("!!!Kraken2 predicted multiple species, possible contamination?")
-    #     notes.append("Kraken2: multiple species, possible contamination.")
-    #     #multiple = True
-    # elif (len(kraken_genomes) == 1):
-    #     multiple = False
-        
-    for kraken_genome in  kraken_genomes:
-        if (kraken_genome['taxon_name'] == expectedSpecies):
-            present = True
-
-    if present:
-        output.append("The expected species is predicted by kraken 2")
-        #correctSpecies = True
-    else:
-        output.append("!!!The expected species is NOT predicted by kraken2, contamination? mislabeling?")
-        notes.append("Kraken2: Not expected species. Possible contamination or mislabeling")
-
-    if (stats['estimated_depth_of_coverage'] < 30):
-        output.append("!!!Coverage is lower than 30. Estimated depth: " + str(stats['estimated_depth_of_coverage']))
-
-    if (len(filtered_mash_hits) > 1):
-        output.append("!!!MASH predicted multiple species, possible contamination?")
-        multiple = True
-    elif (len(filtered_mash_hits) < 1):
-        output.append("!!!MASH had no hits, this is an unknown species")
-        notes.append("Mash: Unknown Species")
-                
-    present=False
-    for mash_hit in filtered_mash_hits:
-        species = mash_hit['query_comment']
-        if (species.find(expectedSpecies) > -1):
-            present=True
-    if present:
-        output.append("The expected species is predicted by mash")
-        correctSpecies = True
-        #notes.append("The expected species is predicted by mash")
-    else:
-        output.append("!!!The expected species is NOT predicted by mash, poor resolution? contamination? mislabeling?")
-        notes.append("Mash: Not expected species. Possible resolution issues, contamination or mislabeling")
-
-    if (len(mash_plasmid_hits) == 0):
-        output.append("!!!no plasmids predicted")
-        notes.append("Mash: no plasmid predicted")
-
-    #hack: throw exception if this analysis should not proceed due to contamination and mislabelling
-    if (multiple and not correctSpecies):
-        out = open(outputDir + "/summary/" + ID +".err", 'a')
-        out.write('GO RESEQUENCE THIS SAMPLE: It has contamination issues AND mislabelled')
-        #raise Exception('GO RESEQUENCE THIS SAMPLE: It has contamination issues AND mislabelled')
-    print("Downloading reference genomes")
-
-    referenceGenomes = []
-    for mash_hit in filtered_mash_hits:
-        qID = mash_hit['query_id']
-        species_name_start = int(mash_hit['query_comment'].index(".")) + 3
-        species_name_stop = int (mash_hit['query_comment'].index(","))
-        if (mash_hit['query_comment'].find("phiX") > -1):
-            species = "PhiX"
-        else:
-            species = str(mash_hit['query_comment'])[species_name_start: species_name_stop]
-        # find gcf accession
-        # TODO: document this or clean it up to be more readable
-        gcf = (qID[:qID.find("_",5)]).replace("_","")
-        gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)]
-        print("*** GCF: " + str(gcf))
-        assembly = qID[:qID.find("_genomic.fna.gz")]
-        url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + qID
-        referencePath = os.path.abspath(outputDir + "/qcResult/" + ID + "/" + species.replace(" ",""))
-        referenceGenomes.append(referencePath)
-
-        httpGetFile(url, referencePath + ".gz")
-        with gzip.open(referencePath + ".gz", 'rb') as f:
-            gzContent = f.read()
-        with open(referencePath, 'wb') as out:
-            out.write(gzContent)
-        os.remove(referencePath + ".gz")
-
-    print("step 2: genome assembly and QC")
-    correctAssembly = ""
-
-    if (len(referenceGenomes) > 1):
-        for item in referenceGenomes:
-            if (item.find(expectedSpecies.replace(" ", "")) > -1): #found the right genome
-                correctAssembly = os.path.basename(item)
-    else:
-        correctAssembly = os.path.basename(referenceGenomes[0])
-    if (correctAssembly == ""):
-        raise Exception("no reference genome...crashing")
     
-    if (multiple):
-        print("Contaminated Genome assembly...No Correct Species Either")
-        raise Exception("contamination and mislabeling...crashing")
-    else:
-        #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
-        cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, referenceGenomes[0], buscodb, correctAssembly]
-        result = execute(cmd, curDir)
+    print("step 2: genome assembly and QC")
+
+    #run the assembly shell script.
+    #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
+    cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, reference_genomes[0], buscodb]
+    result = execute(cmd, curDir)
     
     print("Parsing assembly results")
     #get the correct busco and quast result file to parse
-    correctAssembly = ""
-    buscoPath = "" 
-    quastPath = ""
-    if ((not multiple and correctSpecies) or (not multiple and not correctSpecies)): #only 1 reference genome
-        buscoPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco" + "/short_summary_" + ID + ".busco.txt")
-        quastPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast" + "/report.tsv")
-        correctAssembly = ID
-    elif(multiple and correctSpecies): #multiple reference genome, need to find the one we care about
-        for item in referenceGenomes:
-            if (item.find(expectedSpecies.replace(" ", "")) > -1): #found the right genome
-                buscoPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + "." + os.path.basename(item) + ".busco" + "/short_summary_" + ID + "." + os.path.basename(item) + ".busco.txt")
-                quastPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + "." + os.path.basename(item) + ".quast/runs_per_reference/" + os.path.basename(item) + "/report.tsv")
-                correctAssembly = ID + "." + os.path.basename(item)
-    elif(multiple and not correctSpecies):
-        raise Exception('GO RESEQUENCE THIS SAMPLE: It has contamination issues AND mislabelled')
 
-    if (buscoPath == "" or quastPath == ""):
-        raise Exception('theres no reference genome for this sample for whatever reason...')
-
+    buscoPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco" + "/short_summary_" + ID + ".busco.txt")
+    quastPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast" + "/report.tsv")
     #populate the busco and quast result object
     buscoResults = result_parsers.parse_busco_result(buscoPath)
     quastResults = result_parsers.parse_busco_result(quastPath)

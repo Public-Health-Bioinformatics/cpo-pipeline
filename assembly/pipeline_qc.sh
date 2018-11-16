@@ -9,10 +9,10 @@
 #$ -o ./logs/$JOB_ID.log
 
 ################################################################################
-# J-J-J-Jia @ pipeline_qc.sh: runs seqtk, mash, kraken2 and fastqc for pre-assembly quality checks
+# J-J-J-Jia @ pipeline_qc.sh: runs seqtk, mash, and fastqc for pre-assembly quality checks
 #
 # input parameters: 1=id, 2=forward, 3=reverse, 4=output, 5=mashgenomerefdb, 6=mashplasmidrefdb, 7=kraken2db, 8=kraken2plasmiddb
-# Requires: mash, kraken2, fastqc, seqtk (all conda-ble)
+# Requires: mash, fastqc, seqtk (all conda-ble)
 #
 # pipeline_qc.sh BC16-Cfr035 BC16-Cfr035_S10_L001_R1_001.fastq.gz BC16-Cfr035_S10_L001_R2_001.fastq.gz output refseq.genomes.k21s1000.msh refseq.plasmid.k21s1000.msh 2018-09-20_standard 2018-09-20_plasmid
 ################################################################################
@@ -59,9 +59,6 @@ cat "$R1" > "$qcOutDir"/R1.fastq
 
 source activate mash-2.0
 
-#get estimation of genome size (k-mer method)
-mash sketch -m 3 "$qcOutDir"/R1.fastq -o "$qcOutDir"/R1.fastq -p "$threads" -k 32 2> "$qcOutDir"/mash.log
-
 #identify species using genome database
 echo "comparing to reference genome db"
 mash screen -p "$threads" -w "$refDB" "$qcOutDir"/concatRawReads.fastq | sort -gr > "$qcOutDir"/mashscreen.genome.tsv
@@ -84,17 +81,8 @@ rm -rf "$qcOutDir"/*.zip
 
 source deactivate
 
-#kraken2 species classification
-echo "kraken2 classfiication of reads"
-
-source activate kraken2-2.0.7_beta
-
-kraken2 --db "$k2db" --paired --threads "$threads" --report "$qcOutDir"/kraken2.genome.report --output "$qcOutDir"/kraken2.genome.classification "$R1" "$R2"
-
-source deactivate
-
 #calculate the total number of basepairs in the read
-echo "calculating read stats"
+echo "calculating total bases of forward and reverse"
 
 source activate seqtk-1.3
 
