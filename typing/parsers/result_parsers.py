@@ -10,72 +10,42 @@ import pandas
 import numpy
 import pprint
 
-def parse_mlst_result(path_to_mlst_result, mlst_scheme_map):
+def parse_mlst_result(path_to_mlst_result):
     """
     Args:
-        path_to_mlst_result (str): Path to the kraken report file.
-        mlst_scheme_map (str): Path to MLST scheme map file
+        path_to_mlst_result (str): Path to the mlst report file.
 
     Returns:
         dict: Parsed mlst report.
         For example:
-        { 'ecoli': { 'contig_file': '/path/to/contig.fa',
-                     'species_id': 'ecoli',
-                     'sequence_type': '405',
-                     'species':, 'Escherichia  ;Shigella ',
-                     'row': '/path/to/contig.fa\tecoli\t405\tadk(35)\tfumC(37)\tgyrB(29)\ticd(25)\tmdh(4)\tpurA(5)\trecA(73)'
-                   }
+        {
+            'contig_file': 'SAMPLE-ID.fa',
+            'scheme_id': 'ecoli',
+            'sequence_type': '405',
+            'multi_locus_alleles': {
+	        'adk': '35',
+	        'fumc': '37',
+	        'gyrB': '29',
+	        'icd': '25',
+	        'mdh': '4',
+	        'purA': '5',
+	        'recA': '73'
+            }
         }
     """
     mlst_result = {}
-    scheme = pandas.read_csv(mlst_scheme_map, delimiter='\t', header=0)
-    scheme = scheme.replace(numpy.nan, '', regex=True)
-    taxon = {}
-    #record the scheme as a dictionary
-    """
-    structure of taxon dict:
-    { '-': 'No MLST Match',
-      'abaumannii': 'Acinetobacter baumannii',
-      'abaumannii_2': 'Acinetobacter baumannii',
-      ...
-      'campylobacter': 'Campylobacter coli;Campylobacter jejuni',
-      'cdifficile': 'Clostridium difficile;Peptoclostridium difficile',
-      ...
-    }
-    """
-    taxon["-"] = "No MLST Match"
-    for i in range(len(scheme.index)):
-        key = scheme.iloc[i,0]
-        if (str(scheme.iloc[i,2]) == "nan"):
-            value = str(scheme.iloc[i,1])
-        else:
-            value = str(scheme.iloc[i,1]) + " " + str(scheme.iloc[i,2])
-        
-        if (key in taxon.keys()):
-            taxon[key] = taxon.get(key) + ";" + value
-        else:
-            taxon[key] = value
     #read in the mlst result
-    mlst = pandas.read_csv(path_to_mlst_result, delimiter='\t', header=None)
-    mlst_hit = {}
-    mlst_hit['scheme'] = ""
-    """
-    structure of mlst_hit dict:
-    { "contig_file": "/path/to/contig.fa",
-      "species_id": "ecoli",
-      "sequence_type": "405",
-      "scheme":, "Escherichia  ;Shigella ",
-      "row": "/path/to/contig.fa\tecoli\t405\tadk(35)\tfumC(37)\tgyrB(29)\ticd(25)\tmdh(4)\tpurA(5)\trecA(73)"
-    } 
-    """
-    mlst_hit['contig_file'] = mlst.iloc[0,0]
-    mlst_hit['species_id'] = (mlst.iloc[0,1])
-    mlst_hit['sequence_type'] = str(mlst.iloc[0,2])
-    for i in range(3, len(mlst.columns)):
-        mlst_hit['scheme'] += mlst.iloc[0,i] + ";"
-    mlst_hit['species'] = taxon[mlst_hit['species_id']]
-    mlst_hit['row'] = "\t".join(str(x) for x in mlst.ix[0].tolist())
-    mlst_result[mlst_hit['species_id']] = mlst_hit
+    with open(path_to_mlst_result) as mlst_result_file:
+        reader = csv.reader(mlst_result_file, delimiter='\t')
+        for row in reader:
+            mlst_result['contig_file'] = row[0]
+            mlst_result['scheme_id'] = row[1]
+            mlst_result['sequence_type'] = row[2]
+            mlst_result['multi_locus_alleles'] = {}
+            for field in row[3:]:
+                (locus, allele) = tuple(field.replace(')', '').split('('))
+                mlst_result['multi_locus_alleles'][locus] = allele
+
     return mlst_result
 
 def parse_mobsuite_result(path_to_mobsuite_result):

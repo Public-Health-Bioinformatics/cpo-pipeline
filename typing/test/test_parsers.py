@@ -10,5 +10,17 @@ sys.path.append(os.path.dirname(TEST_DIR_PATH))
 
 from parsers import result_parsers
 
+class MlstResultParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/typing/SAMPLE-ID/SAMPLE-ID.mlst/SAMPLE-ID.mlst')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mlst_report.json')) as mlst_report_json:
+            self.parsed_mlst_report_json = json.load(mlst_report_json)
+            mlst_report_json.close()
+
+    def test_parse_mlst_result(self):
+        parsed_result = result_parsers.parse_mlst_result(self.test_data_path)
+        self.assertDictEqual(parsed_result, self.parsed_mlst_report_json)
+        
+        
 if __name__ == '__main__':
     unittest.main()
