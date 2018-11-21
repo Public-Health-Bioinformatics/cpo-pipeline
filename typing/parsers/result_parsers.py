@@ -16,28 +16,31 @@ def parse_mlst_result(path_to_mlst_result):
         path_to_mlst_result (str): Path to the mlst report file.
 
     Returns:
-        dict: Parsed mlst report.
+        list of dict: Parsed mlst report.
         For example:
-        {
-            'contig_file': 'SAMPLE-ID.fa',
-            'scheme_id': 'ecoli',
-            'sequence_type': '405',
-            'multi_locus_alleles': {
-	        'adk': '35',
-	        'fumc': '37',
-	        'gyrB': '29',
-	        'icd': '25',
-	        'mdh': '4',
-	        'purA': '5',
-	        'recA': '73'
+        [
+            {
+                'contig_file': 'SAMPLE-ID.fa',
+                'scheme_id': 'ecoli',
+                'sequence_type': '405',
+                'multi_locus_alleles': {
+	            'adk': '35',
+	            'fumc': '37',
+	            'gyrB': '29',
+	            'icd': '25',
+	            'mdh': '4',
+	            'purA': '5',
+	            'recA': '73'
+                }
             }
-        }
+        ]
     """
-    mlst_result = {}
+    mlst_results = []
     #read in the mlst result
     with open(path_to_mlst_result) as mlst_result_file:
         reader = csv.reader(mlst_result_file, delimiter='\t')
         for row in reader:
+            mlst_result = {}
             mlst_result['contig_file'] = row[0]
             mlst_result['scheme_id'] = row[1]
             mlst_result['sequence_type'] = row[2]
@@ -45,8 +48,8 @@ def parse_mlst_result(path_to_mlst_result):
             for field in row[3:]:
                 (locus, allele) = tuple(field.replace(')', '').split('('))
                 mlst_result['multi_locus_alleles'][locus] = allele
-
-    return mlst_result
+            mlst_results.append(mlst_result)
+    return mlst_results
 
 def parse_mobsuite_result(path_to_mobsuite_result):
     """

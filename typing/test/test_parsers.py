@@ -19,7 +19,9 @@ class MlstResultParserTest(unittest.TestCase):
 
     def test_parse_mlst_result(self):
         parsed_result = result_parsers.parse_mlst_result(self.test_data_path)
-        self.assertDictEqual(parsed_result, self.parsed_mlst_report_json)
+        paired_results = zip(parsed_result, self.parsed_mlst_report_json)
+        for parsed_mlst_report_record, parsed_mlst_json_record in paired_results:
+            self.assertDictEqual(parsed_mlst_report_record, parsed_mlst_json_record)
         
         
 if __name__ == '__main__':

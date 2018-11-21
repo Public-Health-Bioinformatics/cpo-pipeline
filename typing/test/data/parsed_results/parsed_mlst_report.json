@@ -1,14 +1,16 @@
-{
-    "contig_file": "SAMPLE-ID.fa",
-    "scheme_id": "ecoli",
-    "sequence_type": "405",
-    "multi_locus_alleles": {
-	"adk": "35",
-	"fumC": "37",
-	"gyrB": "29",
-	"icd": "25",
-	"mdh": "4",
-	"purA": "5",
-	"recA": "73"
+[
+    {
+	"contig_file": "SAMPLE-ID.fa",
+	"scheme_id": "ecoli",
+	"sequence_type": "405",
+	"multi_locus_alleles": {
+	    "adk": "35",
+	    "fumC": "37",
+	    "gyrB": "29",
+	    "icd": "25",
+	    "mdh": "4",
+	    "purA": "5",
+	    "recA": "73"
+	}
     }
-}
+]
