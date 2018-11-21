@@ -1,0 +1,39 @@
+[
+    {
+	'scheme_id': 'abaumannii',
+	'genus': 'Acinetobacter',
+	'species': 'Acinetobacter baumannii'
+    },
+    {
+	'scheme_id': 'abaumannii_2',
+	'genus': 'Acinetobacter',
+	'species': 'Acinetobacter baumannii'
+    },
+    {
+	'scheme_id': 'achromobacter',
+	'genus': 'Achromobacter',
+     },
+    {
+	'scheme_id': 'aeromonas',
+	'genus': 'Aeromonas'
+    },
+    {
+	'scheme_id': 'afumigatus',
+	'genus': 'Aspergillus',
+	'species': 'Aspergillus afumigatus'
+    },
+    {
+	'scheme_id': 'aphagocytophilum',
+	'genus': 'Anaplasma',
+	'species': 'Anaplasma aphagocytophilum'
+    },
+    {
+	'scheme_id': 'arcobacter',
+	'genus': 'Arcobacter'
+    },
+    {
+	'scheme_id': 'bburgdorferi',
+	'genus': 'Borrelia',
+	'species': 'Borrelia burgdorferi'
+    }
+ ]

@@ -28,6 +28,7 @@ import numpy
 import configparser
 
 from parsers import result_parsers
+from parsers import input_parsers
 
 def read(path):
     return [line.rstrip('\n') for line in open(path)]
@@ -91,7 +92,7 @@ def main():
     parser.add_option("-a", "--assembly", dest="assembly", type="string", help="Path to assembly file.")
     parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")    
 
-    parser.add_option("-s", "--mlst-scheme-map", dest="mlst_scheme_map", default=config['databases']['mlst-scheme-map'], type="string", help="absolute file path to mlst scheme")
+    parser.add_option("-s", "--mlst-scheme-map", dest="mlst_scheme_map_file", default=config['databases']['mlst-scheme-map'], type="string", help="absolute file path to mlst scheme")
     parser.add_option("-k", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
     parser.add_option("-c", "--card-path", dest="card_path", default=config['databases']['card'], type="string", help="absolute file path to card.json db")
     parser.add_option("-d", "--abricate-datadir", dest="abricate_datadir", default=config['databases']['abricate-datadir'], type="string", help="absolute file path to directory where abricate dbs are stored")
@@ -113,7 +114,7 @@ def main():
     cardPath = options.card_path
     abricate_datadir = options.abricate_datadir
     abricate_cpo_plasmid_db = options.abricate_cpo_plasmid_db
-    mlst_scheme_map = options.mlst_scheme_map
+    mlst_scheme_map_file = options.mlst_scheme_map_file
     # plasmidfinder = str(options.plasmidfinder).lstrip().rstrip()
     outputDir = options.output
 
@@ -137,11 +138,18 @@ def main():
     print("step 3: parsing mlst, plasmid, and amr results")
     
     print("identifying MLST")
-    mlst = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
-    mlstHit = result_parsers.parse_mlst_result(mlst, mlst_scheme_map)
-    ToJson(mlstHit, "mlst.json")
-    mlstHit = list(mlstHit.values())[0]
-
+    mlst_report = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
+    mlstHits = result_parsers.parse_mlst_result(mlst_report)
+    ToJson(mlstHits, "mlst.json")
+    # TODO: Check that there is only one MLST result in the report, and handle
+    #       cases where the report is malformed.
+    mlstHit = mlstHits[0]
+    mlst_scheme_map = input_parsers.parse_scheme_species_map(mlst_scheme_map_file)
+    mlst_species = None
+    for scheme in mlst_scheme_map:
+        if 'species' in scheme and scheme['scheme_id'] == mlstHit['scheme_id']:
+            mlst_species = scheme['species']
+            
     #endregion
 
     #region parse mobsuite, resfinder and rgi results
@@ -194,12 +202,11 @@ def main():
     #region output parsed mlst information
     print("formatting mlst outputs")
     output.append("\n\n\n~~~~~~~MLST summary~~~~~~~")
-    output.append("MLST determined species: " + mlstHit['species'])
+    output.append("MLST determined species: " + mlst_species)
     output.append("\nMLST Details: ")
-    output.append(mlstHit['row'])
-
+    
     output.append("\nMLST information: ")
-    if (mlstHit['species'] == expected_species):
+    if (mlst_species == expected_species):
         output.append("MLST determined species is the same as expected species")
         #notes.append("MLST determined species is the same as expected species")
     else:
@@ -255,9 +262,9 @@ def main():
     temp += expected_species + "\t"
 
     #move into MLST
-    temp += mlstHit['species'] + "\t"
+    temp += mlst_species + "\t"
     temp += str(mlstHit['sequence_type']) + "\t"
-    temp += mlstHit['scheme'] + "\t"
+    temp += mlstHit['scheme_id'] + "\t"
     
     #now onto AMR genes
     temp += ";".join(carbapenamases) + "\t"
