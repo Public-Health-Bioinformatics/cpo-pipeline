@@ -182,6 +182,10 @@ def parse_mob_recon_mobtyper_aggregate_report(path_to_mob_recon_mobtyper_aggrega
             ...
         ]
     """
+    # A few of the field names in the mobtyper_aggregate_report
+    # include special characters '(' and ')' or aren't very descriptive
+    # 'gc' -> 'percent_gc' so we list them explicitly here instead of reading
+    # from the report header.
     mob_recon_mobtyper_aggregate_report_fieldnames = [
         'file_id',
         'num_contigs',
