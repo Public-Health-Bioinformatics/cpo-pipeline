@@ -207,7 +207,7 @@ def parse_mob_recon_mobtyper_aggregate_report(path_to_mob_recon_mobtyper_aggrega
                                 delimiter='\t')
         next(reader) # skip header
         integer_fields = ['num_contigs', 'total_length']
-        float_fields = ['percent_gc']
+        float_fields = ['percent_gc', 'mash_neighbor_distance']
         array_fields = [
             'rep_types',
             'rep_type_accessions',
@@ -224,7 +224,6 @@ def parse_mob_recon_mobtyper_aggregate_report(path_to_mob_recon_mobtyper_aggrega
                 row[key] = float(row[key])
             for key in array_fields:
                 row[key] = row[key].split(',')
-            pprint.pprint(row)
             mob_recon_mobtyper_aggregate_report_results.append(row)
 
     return mob_recon_mobtyper_aggregate_report_results

@@ -3,6 +3,7 @@ import sys
 import unittest
 import json
 import pprint
+from collections import OrderedDict
 
 # add the '../../typing' directory to the 'sys.path'
 TEST_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -55,7 +56,7 @@ class MobReconMobTyperAggregateReportParserTest(unittest.TestCase):
     def setUp(self):
         self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/typing/SAMPLE-ID/SAMPLE-ID.recon/mobtyper_aggregate_report.txt')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mob_recon_mobtyper_aggregate_report.json')) as mob_recon_mobtyper_aggregate_report_json_file:
-            self.parsed_mob_recon_mobtyper_aggregate_report_json = json.load(mob_recon_mobtyper_aggregate_report_json_file)
+            self.parsed_mob_recon_mobtyper_aggregate_report_json = json.load(mob_recon_mobtyper_aggregate_report_json_file, object_pairs_hook=OrderedDict)
             mob_recon_mobtyper_aggregate_report_json_file.close()
 
     def test_parse_mob_recon_mobtyper_aggregate_report(self):
