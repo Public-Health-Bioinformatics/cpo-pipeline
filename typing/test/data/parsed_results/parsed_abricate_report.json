@@ -1,0 +1,17 @@
+[
+    {
+        "file": "contigs.fa",
+        "sequence": "contig00044",
+        "start": 3183,
+        "end": 3995,
+        "gene": "NDM-1",
+        "coverage": "1-813/813",
+        "coverage_map": "===============",
+        "gaps": "0/0",
+        "percent_coverage": 100.00,
+        "percent_identity": 100.00,
+        "database": "bccdc",
+        "accession": "CAZ39946.1",
+        "product": "  subclass B1 metallo-beta-lactamase NDM-1 "
+    }     
+]

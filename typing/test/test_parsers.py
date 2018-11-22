@@ -64,6 +64,19 @@ class MobReconMobTyperAggregateReportParserTest(unittest.TestCase):
         paired_results = zip(parsed_result, self.parsed_mob_recon_mobtyper_aggregate_report_json)
         for parsed_mob_recon_mobtyper_aggregate_report_record, parsed_mob_recon_mobtyper_aggregate_report_json_record in paired_results:
             self.assertDictEqual(parsed_mob_recon_mobtyper_aggregate_report_record, parsed_mob_recon_mobtyper_aggregate_report_json_record)
-        
+
+class AbricateResultParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/resistance/SAMPLE-ID/SAMPLE-ID.cp')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_abricate_report.json')) as abricate_report_json_file:
+            self.parsed_abricate_report_json = json.load(abricate_report_json_file)
+            abricate_report_json_file.close()
+
+    def test_parse_abricate_result(self):
+        parsed_result = result_parsers.parse_abricate_result(self.test_data_path)
+        paired_results = zip(parsed_result, self.parsed_abricate_report_json)
+        for parsed_abricate_report_record, parsed_abricate_json_record in paired_results:
+            self.assertDictEqual(parsed_abricate_report_record, parsed_abricate_json_record)
+
 if __name__ == '__main__':
     unittest.main()

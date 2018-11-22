@@ -346,6 +346,63 @@ def parse_mobsuite_plasmids(path_to_mobsuite_result):
         mobsuite[mr['file_id']] = mr
     return mobsuite
 
+def parse_abricate_result(path_to_abricate_result):
+    """
+    Args:
+        path_to_resfinder_result (str): Path to the abricate report file.
+    
+    Returns:
+        list of dict: Parsed abricate report.
+        For example:
+        [
+            {
+                'file': 'contigs.fa',
+                'sequence': 'contig00044',
+                'start': 3183,
+                'end': 3995,
+                'gene': 'NDM-1',
+                'coverage': '1-813/813',
+                'coverage_map': '===============',
+                'gaps': '0/0',
+                'percent_coverage': 100.00,
+                'percent_identity': 100.00,
+                'database': 'bccdc',
+                'accession': 'CAZ39946.1',
+                'product': '  subclass B1 metallo-beta-lactamase NDM-1 '
+            },
+            ...
+        ]
+    """
+    abricate_report_fieldnames = [
+        'file',
+        'sequence',
+        'start',
+        'end',
+        'gene',
+        'coverage',
+        'coverage_map',
+        'gaps',
+        'percent_coverage',
+        'percent_identity',
+        'database',
+        'accession',
+        'product'
+    ]
+    abricate_report_results = []
+    with open(path_to_abricate_result) as abricate_report_file:
+        reader = csv.DictReader(abricate_report_file, fieldnames=abricate_report_fieldnames, delimiter='\t')
+        next(reader) # skip header
+        integer_fields = ['start', 'end']
+        float_fields = ['percent_coverage', 'percent_identity']
+        for row in reader:
+            for key in integer_fields:
+                row[key] = int(row[key])
+            for key in float_fields:
+                row[key] = float(row[key])
+            abricate_report_results.append(row)
+
+    return abricate_report_results
+    
 def parse_resfinder_result(path_to_resfinder_results, plasmid_contigs, likely_plasmid_contigs):
     """
     Args:
