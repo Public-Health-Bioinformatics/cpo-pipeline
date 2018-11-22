@@ -127,7 +127,109 @@ def parse_mob_recon_contig_report(path_to_mob_recon_contig_report):
             mob_recon_contig_report_results.append(row)
 
     return mob_recon_contig_report_results
-    
+
+def parse_mob_recon_mobtyper_aggregate_report(path_to_mob_recon_mobtyper_aggregate_report):
+    """
+    Args:
+        path_to_mob_recon_mobtyper_aggregate_report (str): Path to the mob_recon mobtyper_aggregate_report file.
+
+    Returns:
+        list of dict: Parsed mob_recon mobtyper_aggregate_report.
+        For example:
+        [
+            {
+                'file_id': 'plasmid_683.fa',
+                'num_contigs': 35,
+                'total_length': 532060,
+                'percent_gc': 52.48656166597752,
+                'rep_types': [
+                    'IncL/M',
+                    'rep_cluster_1254'
+                ],
+                'rep_type_accessions': [
+                    '000148__NC_021488_00028',
+                    '000562__KT346360_00001'
+                ],
+                'relaxase_types': [
+                    'MOBP'
+                ],
+                'relaxase_type_accessions': [
+                    'NC_004464_00056'
+                ],
+                'mpf_type': 'MPF_1',
+                'mpf_type_accessions': [
+                    'NC_004464_00073',
+                    'NC_005246_00069',
+                    'NC_019154_00069',
+                    'NC_004464_00068',
+                    'NC_004464_00066',
+                    'NC_019344_00078',
+                    'NC_019063_00094',
+                    'NC_005246_00057',
+                    'NC_004464_00105'
+                ],
+                'orit_types': [
+                    '-'
+                ],
+                'orit_accessions': [
+                    '-'
+                ],
+                'predicted_mobility': 'Conjugative',
+                'mash_nearest_neighbor': 'JX988621',
+                'mash_neighbor_distance': 0.00560872,
+                'mash_neighbor_cluster': '683'
+            },
+            ...
+        ]
+    """
+    mob_recon_mobtyper_aggregate_report_fieldnames = [
+        'file_id',
+        'num_contigs',
+        'total_length',
+        'percent_gc',
+        'rep_types',
+        'rep_type_accessions',
+        'relaxase_types',
+        'relaxase_type_accessions',
+        'mpf_type',
+        'mpf_type_accessions',
+        'orit_types',
+        'orit_accessions',
+        'predicted_mobility',
+        'mash_nearest_neighbor',
+        'mash_neighbor_distance',
+        'mash_neighbor_cluster'
+    ]
+    mob_recon_mobtyper_aggregate_report_results = []
+    with open(path_to_mob_recon_mobtyper_aggregate_report) as mob_recon_mobtyper_aggregate_report_file:
+        reader = csv.DictReader(mob_recon_mobtyper_aggregate_report_file,
+                                fieldnames=mob_recon_mobtyper_aggregate_report_fieldnames,
+                                delimiter='\t')
+        next(reader) # skip header
+        integer_fields = ['num_contigs', 'total_length']
+        float_fields = ['percent_gc']
+        array_fields = [
+            'rep_types',
+            'rep_type_accessions',
+            'relaxase_types',
+            'relaxase_type_accessions',
+            'mpf_type_accessions',
+            'orit_types',
+            'orit_accessions'
+        ]
+        for row in reader:
+            for key in integer_fields:
+                row[key] = int(row[key])
+            for key in float_fields:
+                row[key] = float(row[key])
+            for key in array_fields:
+                row[key] = row[key].split(',')
+            pprint.pprint(row)
+            mob_recon_mobtyper_aggregate_report_results.append(row)
+
+    return mob_recon_mobtyper_aggregate_report_results
+
+
 def parse_mobsuite_result(path_to_mobsuite_result):
     """
     Args:
