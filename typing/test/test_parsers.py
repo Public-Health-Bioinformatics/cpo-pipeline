@@ -37,7 +37,19 @@ class MlstResultParserTest(unittest.TestCase):
         paired_results = zip(parsed_result, self.parsed_mlst_report_json)
         for parsed_mlst_report_record, parsed_mlst_json_record in paired_results:
             self.assertDictEqual(parsed_mlst_report_record, parsed_mlst_json_record)
-        
+
+class MobReconContigReportParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/typing/SAMPLE-ID/SAMPLE-ID.recon/contig_report.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mob_recon_contig_report.json')) as mob_recon_contig_report_json_file:
+            self.parsed_mob_recon_contig_report_json = json.load(mob_recon_contig_report_json_file)
+            mob_recon_contig_report_json_file.close()
+
+    def test_parse_mlst_result(self):
+        parsed_result = result_parsers.parse_mob_recon_contig_report(self.test_data_path)
+        paired_results = zip(parsed_result, self.parsed_mob_recon_contig_report_json)
+        for parsed_mob_recon_contig_report_record, parsed_mob_recon_contig_report_json_record in paired_results:
+            self.assertDictEqual(parsed_mob_recon_contig_report_record, parsed_mob_recon_contig_report_json_record)
         
 if __name__ == '__main__':
     unittest.main()

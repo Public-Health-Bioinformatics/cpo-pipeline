@@ -51,6 +51,83 @@ def parse_mlst_result(path_to_mlst_result):
             mlst_results.append(mlst_result)
     return mlst_results
 
+def parse_mob_recon_contig_report(path_to_mob_recon_contig_report):
+    """
+    Args:
+        path_to_mob_recon_contig_report (str): Path to the mob_recon contig_report file.
+
+    Returns:
+        list of dict: Parsed mob_recon contig_report.
+        For example:
+        [
+            {
+                'file_id': 'contigs.fa',
+                'cluster_id': '683',
+                'contig_id': 'contigs.fa|contig00054_len=2672_cov=424.9_corr=0_origname=NODE_54_length_2672_cov_424.949312_pilon_sw=shovill-spades/1.0.1_date=20181024',
+                'contig_length': 2672,
+                'circularity_status': 'Incomplete',
+                'rep_type': 'IncL/M',
+                'rep_type_accession': '000148__NC_021488_00028',
+                'relaxase_type': 'MOBP',
+                'relaxase_type_accession': 'NC_004464_00056',
+                'mash_nearest_neighbor': 'JX988621',
+                'mash_neighbor_distance': 0.00560872,
+                'repetitive_dna_id': 'KX646543',
+                'match_type': 'ISL3',
+                'score': 10178.0,
+                'contig_match_start': 22,
+                'contig_match_end': 5535
+            },
+            ...
+        ]
+        Note: several of these fields may be empty for some records.
+    """
+    def parse_value_maybe(value):
+        if value == "":
+            return None
+        else:
+            return value
+
+    # Ideally we would let the csv.DictReader pick these up automatically
+    # from the header, but there's a bug in mob_recon that adds extra whitespace
+    # in front of 'mash_nearest_neighbor' in the header, so we list them explicitly.
+    mob_recon_contig_report_fieldnames = [
+        'file_id',
+        'cluster_id',
+        'contig_id',
+        'contig_length',
+        'circularity_status',
+        'rep_type',
+        'rep_type_accession',
+        'relaxase_type',
+        'relaxase_type_accession',
+        'mash_nearest_neighbor',
+        'mash_neighbor_distance',
+        'repetitive_dna_id',
+        'match_type',
+        'score',
+        'contig_match_start',
+        'contig_match_end'
+    ]
+    mob_recon_contig_report_results = []
+    with open(path_to_mob_recon_contig_report) as mob_recon_contig_report_file:
+        reader = csv.DictReader(mob_recon_contig_report_file, fieldnames=mob_recon_contig_report_fieldnames, delimiter='\t')
+        next(reader) # skip header
+        integer_fields = ['contig_length', 'contig_match_start', 'contig_match_end']
+        float_fields = ['mash_neighbor_distance', 'score']
+        for row in reader:
+            for key in row.keys():
+                row[key] = parse_value_maybe(row[key])
+            for key in integer_fields:
+                if row[key]:
+                    row[key] = int(row[key])
+            for key in float_fields:
+                if row[key]:
+                    row[key] = float(row[key])
+            mob_recon_contig_report_results.append(row)
+
+    return mob_recon_contig_report_results
+    
 def parse_mobsuite_result(path_to_mobsuite_result):
     """
     Args:
