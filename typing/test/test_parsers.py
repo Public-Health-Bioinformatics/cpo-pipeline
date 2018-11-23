@@ -78,5 +78,18 @@ class AbricateResultParserTest(unittest.TestCase):
         for parsed_abricate_report_record, parsed_abricate_json_record in paired_results:
             self.assertDictEqual(parsed_abricate_report_record, parsed_abricate_json_record)
 
+class RgiTxtReportParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/resistance/SAMPLE-ID/SAMPLE-ID.rgi.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_rgi_txt_report.json')) as rgi_txt_report_json_file:
+            self.parsed_rgi_txt_report_json = json.load(rgi_txt_report_json_file, object_pairs_hook=OrderedDict)
+            rgi_txt_report_json_file.close()
+
+    def test_parse_rgi_result_txt(self):
+        parsed_result = result_parsers.parse_rgi_result_txt(self.test_data_path)
+        paired_results = zip(parsed_result, self.parsed_rgi_txt_report_json)
+        for parsed_rgi_txt_report_record, parsed_rgi_txt_report_json_record in paired_results:
+            self.assertDictEqual(parsed_rgi_txt_report_record, parsed_rgi_txt_report_json_record)
+
 if __name__ == '__main__':
     unittest.main()
