@@ -145,7 +145,7 @@ def main():
     #       cases where the report is malformed.
     mlstHit = mlstHits[0]
     mlst_scheme_map = input_parsers.parse_scheme_species_map(mlst_scheme_map_file)
-    mlst_species = None
+    mlst_species = "Undefined"
     for scheme in mlst_scheme_map:
         if 'species' in scheme and scheme['scheme_id'] == mlstHit['scheme_id']:
             mlst_species = scheme['species']
