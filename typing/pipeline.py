@@ -160,23 +160,53 @@ def main():
     origins = []
 
     #parse mobsuite results
-    mobfindercontig = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
-    mSuite = result_parsers.parse_mobsuite_result(mobfindercontig)
+    mob_recon_contig_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
+    mSuite = result_parsers.parse_mobsuite_result(mob_recon_contig_report_path)
+    mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(mob_recon_contig_report_path)
     ToJson(mSuite, "mobsuite.json")
-    mobfinderaggregate = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
-    mSuitePlasmids = result_parsers.parse_mobsuite_plasmids(mobfinderaggregate)
+    mob_recon_aggregate_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
+    mSuitePlasmids = result_parsers.parse_mobsuite_plasmids(mob_recon_aggregate_report_path)
     ToJson(mSuitePlasmids, "mobsuitePlasmids.json")
+    mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(mob_recon_aggregate_report_path)
+    
+    # for key in mSuite:
+    #     if mSuite[key]['contig_num'] not in plasmidContigs and mSuite[key]['contig_num'] not in likelyPlasmidContigs:
+    #         if not (mSuite[key]['rep_type'] == ''):
+    #             plasmidContigs.append(mSuite[key]['contig_num'])
+    #         else:
+    #             likelyPlasmidContigs.append(mSuite[key]['contig_num'])
+    # for key in mSuite:
+    #     if mSuite[key]['rep_type'] not in origins:
+    #         origins.append(mSuite[key]['rep_type'])
 
-    for key in mSuite:
-        if mSuite[key]['contig_num'] not in plasmidContigs and mSuite[key]['contig_num'] not in likelyPlasmidContigs:
-            if not (mSuite[key]['rep_type'] == ''):
-                plasmidContigs.append(mSuite[key]['contig_num'])
+    def extract_contig_num(contig_id):
+        """
+        Args:
+            contig_id (str): contig_id field from mob_recon contig_report.txt
+            For example: "contigs.fa|contig00054_len=2672_cov=424.9_corr=0_origname=NODE_54_length_2672_cov_424.949312_pilon_sw=shovill-spades/1.0.1_date=20181024"
+        Returns:
+            str: contig number.
+            For example: "00054"
+        """
+        prefix = '|contig'
+        suffix = '_len='
+        prefix_index = contig_id.find(prefix) + len(prefix)
+        suffix_index = contig_id.find(suffix)
+        contig_num = contig_id[prefix_index:suffix_index]
+        return contig_num
+    
+    for contig_report_record in mob_recon_contig_report:
+        contig_num = extract_contig_num(contig_report_record['contig_id'])
+        if contig_num not in plasmidContigs and contig_num not in likelyPlasmidContigs:
+            if contig_report_record['rep_type']:
+                plasmidContigs.append(contig_num)
             else:
-                likelyPlasmidContigs.append(mSuite[key]['contig_num'])
-    for key in mSuite:
-        if mSuite[key]['rep_type'] not in origins:
-            origins.append(mSuite[key]['rep_type'])
-
+                likelyPlasmidContigs.append(contig_num)
+        if contig_report_record['rep_type']:
+            if contig_report_record['rep_type'] not in origins:
+                print("Inserting " + contig_report_record['rep_type'] + " into origins")
+                origins.append(contig_report_record['rep_type'])
+        
     #parse resfinder AMR results
     abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
     rFinder = result_parsers.parse_resfinder_result(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
