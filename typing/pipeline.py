@@ -161,23 +161,13 @@ def main():
 
     #parse mobsuite results
     mob_recon_contig_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
-    mSuite = result_parsers.parse_mobsuite_result(mob_recon_contig_report_path)
     mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(mob_recon_contig_report_path)
-    ToJson(mSuite, "mobsuite.json")
+
     mob_recon_aggregate_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
     mSuitePlasmids = result_parsers.parse_mobsuite_plasmids(mob_recon_aggregate_report_path)
     ToJson(mSuitePlasmids, "mobsuitePlasmids.json")
     mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(mob_recon_aggregate_report_path)
     
-    # for key in mSuite:
-    #     if mSuite[key]['contig_num'] not in plasmidContigs and mSuite[key]['contig_num'] not in likelyPlasmidContigs:
-    #         if not (mSuite[key]['rep_type'] == ''):
-    #             plasmidContigs.append(mSuite[key]['contig_num'])
-    #         else:
-    #             likelyPlasmidContigs.append(mSuite[key]['contig_num'])
-    # for key in mSuite:
-    #     if mSuite[key]['rep_type'] not in origins:
-    #         origins.append(mSuite[key]['rep_type'])
 
     def extract_contig_num(contig_id):
         """
@@ -194,19 +184,29 @@ def main():
         suffix_index = contig_id.find(suffix)
         contig_num = contig_id[prefix_index:suffix_index]
         return contig_num
-    
-    for contig_report_record in mob_recon_contig_report:
-        contig_num = extract_contig_num(contig_report_record['contig_id'])
-        if contig_num not in plasmidContigs and contig_num not in likelyPlasmidContigs:
+
+    def record_plasmid_contigs(mob_recon_contig_report, plasmidContigs, likelyPlasmidContigs):
+        for contig_report_record in mob_recon_contig_report:
+            contig_num = extract_contig_num(contig_report_record['contig_id'])
+            if contig_num not in plasmidContigs and contig_num not in likelyPlasmidContigs:
+                if contig_report_record['rep_type']:
+                    plasmidContigs.append(contig_num)
+                else:
+                    likelyPlasmidContigs.append(contig_num)
+        return (plasmidContigs, likelyPlasmidContigs)
+
+    def record_plasmid_origins(mob_recon_contig_report, origins):
+        for contig_report_record in mob_recon_contig_report:
             if contig_report_record['rep_type']:
-                plasmidContigs.append(contig_num)
-            else:
-                likelyPlasmidContigs.append(contig_num)
-        if contig_report_record['rep_type']:
-            if contig_report_record['rep_type'] not in origins:
-                print("Inserting " + contig_report_record['rep_type'] + " into origins")
-                origins.append(contig_report_record['rep_type'])
-        
+                if contig_report_record['rep_type'] not in origins:
+                    print("Inserting " + contig_report_record['rep_type'] + " into origins")
+                    origins.append(contig_report_record['rep_type'])
+        return origins
+
+    plasmidContigs, likelyPlasmidContigs = record_plasmid_contigs(mob_recon_contig_report)
+
+    origins = record_plasmid_origins(mob_recon_contig_report)
+    
     #parse resfinder AMR results
     abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
     rFinder = result_parsers.parse_resfinder_result(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
@@ -258,8 +258,8 @@ def main():
     output.append(";".join(likelyPlasmidContigs))
 
     output.append("\nmob-suite prediction details: ")
-    for key in mSuite:
-        output.append(mSuite[key]['row'])
+    for mob_recon_contig_report_record in mob_recon_contig_report:
+        output.append('\t'.join([str(x) for x in mob_recon_contig_report_record.values()]))
 
     output.append("\n\n\n~~~~~~~~AMR Genes~~~~~~~~\n")
     output.append("predicted carbapenamase Genes: ")
