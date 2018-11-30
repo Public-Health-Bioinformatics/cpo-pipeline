@@ -155,10 +155,6 @@ def main():
     #region parse mobsuite, resfinder and rgi results
     print("identifying plasmid contigs and amr genes")
 
-    plasmidContigs = []
-    likelyPlasmidContigs = []
-    origins = []
-
     #parse mobsuite results
     mob_recon_contig_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
     mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(mob_recon_contig_report_path)
@@ -185,17 +181,20 @@ def main():
         contig_num = contig_id[prefix_index:suffix_index]
         return contig_num
 
-    def record_plasmid_contigs(mob_recon_contig_report, plasmidContigs, likelyPlasmidContigs):
+    def record_plasmid_contigs(mob_recon_contig_report):
+        plasmid_contigs = []
+        likely_plasmid_contigs = []
         for contig_report_record in mob_recon_contig_report:
             contig_num = extract_contig_num(contig_report_record['contig_id'])
-            if contig_num not in plasmidContigs and contig_num not in likelyPlasmidContigs:
+            if contig_num not in plasmid_contigs and contig_num not in likely_plasmid_contigs:
                 if contig_report_record['rep_type']:
-                    plasmidContigs.append(contig_num)
+                    plasmid_contigs.append(contig_num)
                 else:
-                    likelyPlasmidContigs.append(contig_num)
-        return (plasmidContigs, likelyPlasmidContigs)
+                    likely_plasmid_contigs.append(contig_num)
+        return (plasmid_contigs, likely_plasmid_contigs)
 
-    def record_plasmid_origins(mob_recon_contig_report, origins):
+    def record_plasmid_origins(mob_recon_contig_report):
+        origins = []
         for contig_report_record in mob_recon_contig_report:
             if contig_report_record['rep_type']:
                 if contig_report_record['rep_type'] not in origins:
@@ -203,17 +202,17 @@ def main():
                     origins.append(contig_report_record['rep_type'])
         return origins
 
-    plasmidContigs, likelyPlasmidContigs = record_plasmid_contigs(mob_recon_contig_report)
+    plasmid_contigs, likely_plasmid_contigs = record_plasmid_contigs(mob_recon_contig_report)
 
     origins = record_plasmid_origins(mob_recon_contig_report)
     
     #parse resfinder AMR results
     abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
-    rFinder = result_parsers.parse_resfinder_result(abricate, plasmidContigs, likelyPlasmidContigs)#outputDir + "/predictions/" + ID + ".cp", plasmidContigs, likelyPlasmidContigs) #**********************
+    rFinder = result_parsers.parse_resfinder_result(abricate, plasmid_contigs, likely_plasmid_contigs)
     ToJson(rFinder, "resfinder.json")
 
     rgi = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
-    rgiAMR = result_parsers.parse_rgi_result(rgi, plasmidContigs, likelyPlasmidContigs) # outputDir + "/predictions/" + ID + ".rgi.txt", plasmidContigs, likelyPlasmidContigs)#***********************
+    rgiAMR = result_parsers.parse_rgi_result(rgi, plasmid_contigs, likely_plasmid_contigs)
     ToJson(rgiAMR, "rgi.json")
 
     carbapenamases = []
@@ -252,10 +251,10 @@ def main():
     output.append(";".join(origins))
 
     output.append("\ndefinitely plasmid contigs")
-    output.append(";".join(plasmidContigs))
+    output.append(";".join(plasmid_contigs))
     
     output.append("\nlikely plasmid contigs")
-    output.append(";".join(likelyPlasmidContigs))
+    output.append(";".join(likely_plasmid_contigs))
 
     output.append("\nmob-suite prediction details: ")
     for mob_recon_contig_report_record in mob_recon_contig_report:
@@ -316,8 +315,8 @@ def main():
         mobility += str(mSuitePlasmids[keys]['predicted_mobility']) + ";"
         neighbour += str(mSuitePlasmids[keys]['mash_nearest_neighbor']) + ";"
     temp += plasmidID + "\t" + contigs + "\t" + lengths + "\t" + rep_type + "\t" + mobility + "\t" + neighbour + "\t"
-    temp += ";".join(plasmidContigs) + "\t"
-    temp += ";".join(likelyPlasmidContigs)
+    temp += ";".join(plasmid_contigs) + "\t"
+    temp += ";".join(likely_plasmid_contigs)
     tsvOut.append(temp)
 
     summaryDir = outputDir + "/summary/" + ID
