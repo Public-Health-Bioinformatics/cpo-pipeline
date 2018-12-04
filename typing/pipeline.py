@@ -14,7 +14,6 @@ Requires the pipeline_prediction.sh script. the directory of where it's store ca
 '''
 
 import subprocess
-import pandas
 import optparse
 import os
 import datetime
@@ -23,15 +22,11 @@ import time
 import urllib.request
 import gzip
 import collections
-import json
-import numpy
 import configparser
 
 from parsers import result_parsers
 from parsers import input_parsers
 
-def read(path):
-    return [line.rstrip('\n') for line in open(path)]
 
 def execute(command, curDir):
     process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -52,32 +47,6 @@ def execute(command, curDir):
     else:
         raise subprocess.CalledProcessError(exitCode, command)
 
-def httpGetFile(url, filepath=""):
-    if (filepath == ""):
-        return urllib.request.urlretrieve(url)
-    else:
-        urllib.request.urlretrieve(url, filepath)
-        return True
-
-def gunzip(inputpath="", outputpath=""):
-    if (outputpath == ""):
-        with gzip.open(inputpath, 'rb') as f:
-            gzContent = f.read()
-        return gzContent
-    else:
-        with gzip.open(inputpath, 'rb') as f:
-            gzContent = f.read()
-        with open(outputpath, 'wb') as out:
-            out.write(gzContent)
-        return True
-
-def ToJson(dictObject, outputPath):
-    #outDir = outputDir + '/summary/' + ID + ".json/"
-    #if not (os.path.exists(outDir)):
-        #os.makedirs(outDir)
-    #with open(outputPath, 'w') as f:
-      #json.dump([ob.__dict__ for ob in dictObject.values()], f, ensure_ascii=False)
-    return ""
 
 def main():
 
@@ -104,8 +73,6 @@ def main():
     # parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
     
     (options, args) = parser.parse_args()
-    # if len(args) != 8:
-        # parser.error("incorrect number of arguments, all 7 is required")
     curDir = os.getcwd()
     ID = str(options.id).lstrip().rstrip()
     assembly = options.assembly
@@ -115,32 +82,21 @@ def main():
     abricate_datadir = options.abricate_datadir
     abricate_cpo_plasmid_db = options.abricate_cpo_plasmid_db
     mlst_scheme_map_file = options.mlst_scheme_map_file
-    # plasmidfinder = str(options.plasmidfinder).lstrip().rstrip()
     outputDir = options.output
 
-    notes = []
-    #init the output list
-    output = []
-    jsonOutput = []
 
     print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
-    output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
 
-    #region call the typing script
     print("running pipeline_typing.sh")
     #input parameters: 1=id, 2=assembly, 3=output, 4=cardPath, 5=abricate_datadir, 6=abricate_cpo_plasmid_db
     cmd = [script_path + "/pipeline_typing.sh", ID, assembly, outputDir, cardPath, abricate_datadir, abricate_cpo_plasmid_db]
     result = execute(cmd, curDir)
-    #endregion
-
-    #region parse the mlst results
     
     print("step 3: parsing mlst, plasmid, and amr results")
     
     print("identifying MLST")
     mlst_report = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
     mlstHits = result_parsers.parse_mlst_result(mlst_report)
-    ToJson(mlstHits, "mlst.json")
     # TODO: Check that there is only one MLST result in the report, and handle
     #       cases where the report is malformed.
     mlstHit = mlstHits[0]
@@ -149,24 +105,19 @@ def main():
     for scheme in mlst_scheme_map:
         if 'species' in scheme and scheme['scheme_id'] == mlstHit['scheme_id']:
             mlst_species = scheme['species']
-            
-    #endregion
 
-    #region parse mobsuite, resfinder and rgi results
     print("identifying plasmid contigs and amr genes")
 
-    #parse mobsuite results
     mob_recon_contig_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
     mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(mob_recon_contig_report_path)
 
-    mob_recon_aggregate_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt" 
-    mSuitePlasmids = result_parsers.parse_mobsuite_plasmids(mob_recon_aggregate_report_path)
-    ToJson(mSuitePlasmids, "mobsuitePlasmids.json")
+    mob_recon_aggregate_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt"
     mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(mob_recon_aggregate_report_path)
     
 
     def extract_contig_num(contig_id):
         """
+        Given a contig_id from a mob_recon contig_report.txt file, return only the contig number.
         Args:
             contig_id (str): contig_id field from mob_recon contig_report.txt
             For example: "contigs.fa|contig00054_len=2672_cov=424.9_corr=0_origname=NODE_54_length_2672_cov_424.949312_pilon_sw=shovill-spades/1.0.1_date=20181024"
@@ -181,149 +132,97 @@ def main():
         contig_num = contig_id[prefix_index:suffix_index]
         return contig_num
 
-    def record_plasmid_contigs(mob_recon_contig_report):
+    def get_plasmid_contigs(mob_recon_contig_report):
+        """
+        Given a list of dicts generated by parsing a mob_recon contig_report.txt file, 
+        return a list of plasmid contigs.
+        Args:
+            mob_recon_contig_report (list of dict):
+        Returns:
+            list: plasmid contigs
+            For example: ['00021', '00022', '00032', ...]
+        """
         plasmid_contigs = []
+        for contig_report_record in mob_recon_contig_report:
+            contig_num = extract_contig_num(contig_report_record['contig_id'])
+            if contig_num not in plasmid_contigs and contig_report_record['rep_type']:
+                plasmid_contigs.append(contig_num)
+        return plasmid_contigs
+
+    def get_likely_plasmid_contigs(mob_recon_report):
+        """
+        Given a list of dicts generated by parsing a mob_recon contig_report.txt file, 
+        return a list of likely plasmid contigs.
+        Args:
+            mob_recon_contig_report (list of dict):
+        Returns:
+            list: likely plasmid contigs
+            For example: ['00054', '00039', '00061', ...]
+        """
         likely_plasmid_contigs = []
         for contig_report_record in mob_recon_contig_report:
             contig_num = extract_contig_num(contig_report_record['contig_id'])
-            if contig_num not in plasmid_contigs and contig_num not in likely_plasmid_contigs:
-                if contig_report_record['rep_type']:
-                    plasmid_contigs.append(contig_num)
-                else:
-                    likely_plasmid_contigs.append(contig_num)
-        return (plasmid_contigs, likely_plasmid_contigs)
-
-    def record_plasmid_origins(mob_recon_contig_report):
+            if contig_num not in likely_plasmid_contigs and not contig_report_record['rep_type']:
+                likely_plasmid_contigs.append(contig_num)
+        return likely_plasmid_contigs
+    
+    def get_plasmid_origins(mob_recon_contig_report):
+        """
+        Given a list of dicts generated by parsing a mob_recon contig_report.txt file, 
+        return a list of plasmid origins.
+        Args:
+            mob_recon_contig_report (list of dict):
+        Returns:
+            list: plasmid origins
+            For example: ['rep_cluster_1254', 'IncL/M', 'IncN', ...]
+        """        
         origins = []
         for contig_report_record in mob_recon_contig_report:
             if contig_report_record['rep_type']:
                 if contig_report_record['rep_type'] not in origins:
-                    print("Inserting " + contig_report_record['rep_type'] + " into origins")
                     origins.append(contig_report_record['rep_type'])
         return origins
 
-    plasmid_contigs, likely_plasmid_contigs = record_plasmid_contigs(mob_recon_contig_report)
-
-    origins = record_plasmid_origins(mob_recon_contig_report)
+    plasmid_contigs = get_plasmid_contigs(mob_recon_contig_report)
+    likely_plasmid_contigs = get_likely_plasmid_contigs(mob_recon_contig_report)
+    origins = get_plasmid_origins(mob_recon_contig_report)
     
-    #parse resfinder AMR results
-    abricate = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
-    rFinder = result_parsers.parse_resfinder_result(abricate, plasmid_contigs, likely_plasmid_contigs)
-    ToJson(rFinder, "resfinder.json")
-
-    rgi = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
-    rgiAMR = result_parsers.parse_rgi_result(rgi, plasmid_contigs, likely_plasmid_contigs)
-    ToJson(rgiAMR, "rgi.json")
-
-    carbapenamases = []
-    amrGenes = []
-    for keys in rFinder:
-        carbapenamases.append(rFinder[keys]['short_gene'] + "(" + rFinder[keys]['source'] + ")")
-    for keys in rgiAMR:
-        if (rgiAMR[keys]['drug_class'].find("carbapenem") > -1):
-            if (rgiAMR[keys]['best_hit_aro'] not in carbapenamases):
-                carbapenamases.append(rgiAMR[keys]['best_hit_aro'] + "(" + rgiAMR[keys]['source'] + ")")
-        else:
-            if (rgiAMR[keys]['best_hit_aro'] not in amrGenes):
-                amrGenes.append(rgiAMR[keys]['best_hit_aro'] + "(" + rgiAMR[keys]['source'] + ")")
-    #endregion
-
-    #region output parsed mlst information
-    print("formatting mlst outputs")
-    output.append("\n\n\n~~~~~~~MLST summary~~~~~~~")
-    output.append("MLST determined species: " + mlst_species)
-    output.append("\nMLST Details: ")
+    abricate_report_path = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
+    abricate_report = result_parsers.parse_abricate_result(abricate_report_path)
     
-    output.append("\nMLST information: ")
-    if (mlst_species == expected_species):
-        output.append("MLST determined species is the same as expected species")
-        #notes.append("MLST determined species is the same as expected species")
-    else:
-        output.append("!!!MLST determined species is NOT the same as expected species, contamination? mislabeling?")
-        notes.append("MLST: Not expected species. Possible contamination or mislabeling")
+    rgi_report_path = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
+    rgi_report = result_parsers.parse_rgi_result_txt(rgi_report_path)
 
-    #endregion
-
-    #region output the parsed plasmid/amr results
-    output.append("\n\n\n~~~~~~~~Plasmids~~~~~~~~\n")
+    def get_abricate_carbapenemases(abricate_report):
+        """
+        Given a list of dicts generated by parsing an abricate report file, 
+        return a list of carbapenemases.
+        Args:
+            abricate_report (list of dict):
+        Returns:
+            list: likely plasmid contigs
+            For example: ['NDM-1', '', '', ...]
+        """
+        abricate_carbapenemases = []
+        for abricate_report_record in abricate_report:
+            abricate_carbapenemases.append(abricate_report_record['gene'])
+        return abricate_carbapenemases
     
-    output.append("predicted plasmid origins: ")
-    output.append(";".join(origins))
-
-    output.append("\ndefinitely plasmid contigs")
-    output.append(";".join(plasmid_contigs))
-    
-    output.append("\nlikely plasmid contigs")
-    output.append(";".join(likely_plasmid_contigs))
-
-    output.append("\nmob-suite prediction details: ")
-    for mob_recon_contig_report_record in mob_recon_contig_report:
-        output.append('\t'.join([str(x) for x in mob_recon_contig_report_record.values()]))
-
-    output.append("\n\n\n~~~~~~~~AMR Genes~~~~~~~~\n")
-    output.append("predicted carbapenamase Genes: ")
-    output.append(",".join(carbapenamases))
-    output.append("other RGI AMR Genes: ")
-    for key in rgiAMR:
-        output.append(rgiAMR[key]['best_hit_aro'] + "(" + rgiAMR[key]['source'] + ")")
-
-    output.append("\nDetails about the carbapenamase Genes: ")
-    for key in rFinder:
-        output.append(rFinder[key]['row'])
-    output.append("\nDetails about the RGI AMR Genes: ")
-    for key in rgiAMR:
-        output.append(rgiAMR[key]['row'])
-
-    #write summary to a file
-    summaryDir = outputDir + "/summary/" + ID
-    os.makedirs(summaryDir, exist_ok=True)
-    out = open(summaryDir + "/summary.txt", 'w')
-    for item in output:
-        out.write("%s\n" % item)
-
-
-    #TSV output
-    tsvOut = []
-    tsvOut.append("ID\tExpected Species\tMLST Species\tSequence Type\tMLST Scheme\tCarbapenem Resistance Genes\tOther AMR Genes\tTotal Plasmids\tPlasmids ID\tNum_Contigs\tPlasmid Length\tPlasmid RepType\tPlasmid Mobility\tNearest Reference\tDefinitely Plasmid Contigs\tLikely Plasmid Contigs")
-    #start with ID
-    temp = ""
-    temp += (ID + "\t")
-    temp += expected_species + "\t"
-
-    #move into MLST
-    temp += mlst_species + "\t"
-    temp += str(mlstHit['sequence_type']) + "\t"
-    temp += mlstHit['scheme_id'] + "\t"
-    
-    #now onto AMR genes
-    temp += ";".join(carbapenamases) + "\t"
-    temp += ";".join(amrGenes) + "\t"
-
-    #lastly plasmids
-    temp+= str(len(mSuitePlasmids)) + "\t"
-    plasmidID = ""
-    contigs = ""
-    lengths = ""
-    rep_type = ""
-    mobility = ""
-    neighbour = ""
-    for keys in mSuitePlasmids:
-        plasmidID += str(mSuitePlasmids[keys]['mash_neighbor_cluster']) + ";"
-        contigs += str(mSuitePlasmids[keys]['num_contigs']) + ";"
-        lengths += str(mSuitePlasmids[keys]['total_length']) + ";"
-        rep_type += str(mSuitePlasmids[keys]['rep_types']) + ";"
-        mobility += str(mSuitePlasmids[keys]['predicted_mobility']) + ";"
-        neighbour += str(mSuitePlasmids[keys]['mash_nearest_neighbor']) + ";"
-    temp += plasmidID + "\t" + contigs + "\t" + lengths + "\t" + rep_type + "\t" + mobility + "\t" + neighbour + "\t"
-    temp += ";".join(plasmid_contigs) + "\t"
-    temp += ";".join(likely_plasmid_contigs)
-    tsvOut.append(temp)
-
-    summaryDir = outputDir + "/summary/" + ID
-    out = open(summaryDir + "/summary.tsv", 'w')
-    for item in tsvOut:
-        out.write("%s\n" % item)
-    #endregion
+    def get_rgi_carbapenemases(rgi_report):
+        """
+        Given a list of dicts generated by parsing an rgi report file, 
+        return a list of carbapenemases.
+        Args:
+            rgi_report (list of dict):
+        Returns:
+            list: likely plasmid contigs
+            For example: ['', '', '', ...]
+        """
+        rgi_carbapenemases = []
+        for rgi_report_record in rgi_report:
+            if re.search("carbapenem", rgi_report_record['drug_class']):
+                rgi_carbapenemases.append(rgi_report_record['best_hit_aro'])
+        return rgi_carbapenemases
 
 if __name__ == "__main__":
     start = time.time()
