@@ -1,0 +1,81 @@
+[
+    {
+	"file_id": "plasmid_683.fasta",
+        "num_contigs": 35,
+        "total_length": 532060,
+        "percent_gc": 52.48656166597752,
+        "rep_types": [
+	    "IncL/M",
+	    "rep_cluster_1254"
+	],
+        "rep_type_accessions": [
+	    "000148__NC_021488_00028",
+	    "000562__KT346360_00001"
+	],
+        "relaxase_types": [
+	    "MOBP"
+	],
+        "relaxase_type_accessions": [
+	    "NC_004464_00056"
+	],
+        "mpf_type": "MPF_I",
+        "mpf_type_accessions": [
+	    "NC_004464_00073",
+	    "NC_005246_00069",
+	    "NC_019154_00069",
+	    "NC_004464_00068",
+	    "NC_004464_00066",
+	    "NC_019344_00078",
+	    "NC_019063_00094",
+	    "NC_005246_00057",
+	    "NC_004464_00105"
+	],
+        "orit_types": [
+	    "-"
+	],
+        "orit_accessions": [
+	    "-"
+	],
+        "predicted_mobility": "Conjugative",
+        "mash_nearest_neighbor": "JX988621",
+        "mash_neighbor_distance": 0.00560872,
+        "mash_neighbor_cluster": "683"
+    },
+    {
+	"file_id": "plasmid_933.fasta",
+        "num_contigs": 10,
+        "total_length": 194465,
+        "percent_gc": 51.41285064150361,
+        "rep_types": [
+	    "IncN"
+	],
+        "rep_type_accessions": [
+	    "000155__CP018649"
+	],
+        "relaxase_types": [
+	    "MOBF"
+	],
+        "relaxase_type_accessions": [
+	    "NC_015599_00019"
+	],
+        "mpf_type": "MPF_T",
+        "mpf_type_accessions": [
+	    "NC_009131_00030",
+	    "NC_011617_00041",
+	    "NC_014368_00014",
+	    "NC_007682_00044",
+	    "NC_008612_00190",
+	    "NC_022375_00024"
+	],
+        "orit_types": [
+	    "MOBF"
+	],
+        "orit_accessions": [
+	    "NZ_CP016498"
+	],
+        "predicted_mobility": "Conjugative",
+        "mash_nearest_neighbor": "CP014524",
+        "mash_neighbor_distance": 0.00819369,
+        "mash_neighbor_cluster": "933"
+    }
+]
