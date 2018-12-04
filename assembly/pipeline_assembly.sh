@@ -102,7 +102,7 @@ source activate busco-3.0.2
 
 cd "${qc_dir}"/"${sample_id}"
 run_busco \
-    -i "../../../${contigs_dir}/${sample_id}.fa" \
+    -i "${contigs_dir}/${sample_id}.fa" \
     -o "${sample_id}.busco" \
     -l "${busco_db}" \
     -m genome \

@@ -113,6 +113,29 @@ def main():
     #init the output list
     output = []
     
+    #dictionary to store QC PASS/FAIL flags
+    qc_verdicts = {
+        "multiple_species_contamination":False,
+        "same_as_expected_species":False,
+        "fastq_contains_plasmids":False,
+        "acceptable_coverage":False,
+        "acceptable_fastqc_forward":False,
+        "acceptable_fastqc_reverse":False,
+        "acceptable_quast_assembly_metrics":False,
+        "acceptable_busco_assembly_metrics": False
+    }
+    
+    qc_cutoffs = {
+        "mash_hits_genome_score_cutoff":300, #genome mash will include all hits with scores (top hit score - $thisvalue)
+        "mash_hits_plasmid_score_cutoff":100, #plasmid mash will include all hits with scores (top hit score - $thisvalue)
+        "coverage_cutoff":30, #sequencing coverage greater than ($thisvalue) will pass the QC
+        "quast_assembly_length_cutoff":0.10, #QUAST QC: assembly length within +-($thisvalue) percent in reference to reference length will pass the QC 
+        "quast_percent_gc_cutoff":0.05, #QUAST QC: percent GC within +-($thisvalue) percent in reference to reference percent GC will pass the QC 
+        "genome_fraction_percent_cutoff":0.90, #QUAST QC: genome_fraction_percent greater than ($thisvalue) will pass the QC
+        "busco_complete_single_cutoff":0.90, #BUSCO QC: complete single genes greater than ($thisvalue) percent will pass the QC
+        "busco_complete_duplicate_cutoff":0.10 #BUSCO QC: complete duplicate genes less than ($thisvalue) percent will pass the QC
+    }
+    
     print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
     output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
 
@@ -130,7 +153,7 @@ def main():
 
     # 'shared_hashes' field is string in format '935/1000'
     # Threshold is 300 below highest numerator (ie. '935/100' -> 635)
-    mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - 300
+    mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - int(qc_cutoffs["mash_hits_genome_score_cutoff"])
     print("*** mash_hits_score_threshold: " + str(mash_hits_score_threshold))
     def score_above_threshold(mash_result, score_threshold):
         score = int(mash_result['shared_hashes'].split("/")[0])
@@ -148,7 +171,7 @@ def main():
     mash_plasmid_hits = result_parsers.parse_mash_result(pathToMashPlasmidScreenTSV)
     # 'shared_hashes' field is string in format '935/1000'
     # Threshold is 100 below highest numerator (ie. '935/100' -> 835)
-    mash_plasmid_hits_score_threshold = int(mash_plasmid_hits[0]['shared_hashes'].split("/")[0]) - 100
+    mash_plasmid_hits_score_threshold = int(mash_plasmid_hits[0]['shared_hashes'].split("/")[0]) - int(qc_cutoffs["mash_hits_plasmid_score_cutoff"])
     filtered_mash_plasmid_hits = list(filter(
         lambda x: score_above_threshold(x, mash_plasmid_hits_score_threshold),
         mash_plasmid_hits))
@@ -161,40 +184,30 @@ def main():
     fastqc = {}
     fastqc["R1"]=fastqcR1
     fastqc["R2"]=fastqcR2
-     
 
     #all the qC result are parsed now, lets do some QC logic
-    qc_verdicts = {
-        "Multiple_Species_Contamination":False,
-        "Same_As_Expected_Species":False,
-        "FASTQ_Contains_Plasmids":False,
-        "Acceptable Coverage":False,
-        "Acceptable_FastQC_Forward":False,
-        "Acceptable_FastQC_Reverse":False,
-    }
-
     #look at mash results first
     if (len(filtered_mash_hits) > 1):
-        qc_verdicts["Multiple_Species_Contamination"] = True 
+        qc_verdicts["multiple_species_contamination"] = True 
     
     for mash_hit in filtered_mash_hits:
         species = mash_hit['query_comment']
         if (species.find(expectedSpecies) > -1):
-            qc_verdicts["Same_As_Expected_Species"] = True
+            qc_verdicts["same_as_expected_species"] = True
     
     if (len(filtered_mash_plasmid_hits) > 0):
-        qc_verdicts["FASTQ_Contains_Plasmids"] = True
+        qc_verdicts["fastq_contains_plasmids"] = True
 
     #look at fastqc results
     if (fastqc["R1"]["basic_statistics"] == "PASS" and fastqc["R1"]["per_base_sequence_quality"] == "PASS" and fastqc["R1"]["sequence_length_distribution"] == "PASS" ):
-        qc_verdicts["Acceptable_FastQC_Forward"] = True 
+        qc_verdicts["acceptable_fastqc_forward"] = True 
     if (fastqc["R2"]["basic_statistics"] == "PASS" and fastqc["R2"]["per_base_sequence_quality"] == "PASS" and fastqc["R2"]["sequence_length_distribution"] == "PASS" ):
-        qc_verdicts["Acceptable_FastQC_Reverse"] = True 
+        qc_verdicts["acceptable_fastqc_reverse"] = True 
     
     #download a reference genome
     print("Downloading reference genomes")
     reference_genomes = []
-    if (not qc_verdicts["Multiple_Species_Contamination"]):
+    if (not qc_verdicts["multiple_species_contamination"]):
         for mash_hit in filtered_mash_hits: #for all the mash hits, aka reference genomes
             qID = mash_hit['query_id'] #hit genome within mash results
             species_name_start = int(mash_hit['query_comment'].index(".")) + 3 #find the start of species name within query_comment column
@@ -232,7 +245,6 @@ def main():
         raise Exception ("there are multiple reference genomes")
     elif (len(reference_genomes) == 0):
         raise Exception ("no reference genome identified")
-        
     
     #now we estimate our coverage using total reads and expected genome size
     
@@ -252,20 +264,53 @@ def main():
     #calculate coverage
     coverage = total_bp / expected_genome_size
             
-    if (coverage >= 30):
-        qc_verdicts["Acceptable Coverage"] = True
+    if (coverage >= int(qc_cutoffs["coverage_cutoff"])):
+        qc_verdicts["acceptable_coverage"] = True
+
+    #time to assemble the reads then QC the assemblies
+    print("step 2: genome assembly and QC")
+
+    #run the assembly shell script.
+    #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
+    cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, reference_genomes[0], buscodb]
+    result = execute(cmd, curDir)
     
+    print("Parsing assembly results")
+    #get the correct busco and quast result file to parse
+    buscoPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco" + "/short_summary_" + ID + ".busco.txt")
+    quastPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast" + "/report.txt")
+    #populate the busco and quast result object
+    buscoResults = result_parsers.parse_busco_result(buscoPath)
+    quastResults = result_parsers.parse_quast_result(quastPath)
+    
+    #assembly QC logic    
+    '''
+    BUSCO PASS CRITERIA:
+    1. complete singles > 90% of total genes
+    2. complte duplicates < 90% of total genes
+    '''
+    if (float(buscoResults["complete_single"]) / float(buscoResults["total"]) >= float(qc_cutoffs["busco_complete_single_cutoff"]) and float(buscoResults["complete_duplicate"]) / float(buscoResults["total"]) <= float(qc_cutoffs["busco_complete_duplicate_cutoff"])):
+        qc_verdicts["acceptable_busco_assembly_metrics"] = True
+
+    '''
+    QUAST PASS CRITERIA:
+    1. total length vs reference length +-10%
+    2. percent gc versus reference percent gc +- 5%
+    3. genome fraction percent > 90
+    '''   
+    if ((float(quastResults["total_length"]) <= float(quastResults["reference_length"]) * (1 + float(qc_cutoffs["quast_assembly_length_cutoff"])) and float(quastResults["total_length"]) >= float(quastResults["reference_length"]) * (1 - float(qc_cutoffs["quast_assembly_length_cutoff"]))) and (float(quastResults["percent_GC"]) <= float(quastResults["reference_percent_GC"]) * (1+ float(qc_cutoffs["quast_percent_gc_cutoff"])) and float(quastResults["percent_GC"]) >= float(quastResults["reference_percent_GC"]) * (1 - float(qc_cutoffs["quast_percent_gc_cutoff"]))) and (float(quastResults["genome_fraction_percent"]) >= int(qc_cutoffs["genome_fraction_percent_cutoff"]))): 
+        qc_verdicts["acceptable_quast_assembly_metrics"] = True
+
+    #print QC results to screen
     print("total bases: " + str(total_bp))
     print("expected genome size: " + str(expected_genome_size))
     print("coverage: " + str(coverage))
     print("")
-    print("contamination: " + str(qc_verdicts["Multiple_Species_Contamination"]))
-    print("same as the expected species: " + str(qc_verdicts["Same_As_Expected_Species"]))
-    print("contains plasmids: " + str(qc_verdicts["FASTQ_Contains_Plasmids"]))
-    print("acceptable coverage: " + str(qc_verdicts["Acceptable Coverage"]))
-    print("acceptable forward reads quality: " + str(qc_verdicts["Acceptable_FastQC_Forward"]))
-    print("acceptable reverse reads quality: " + str(qc_verdicts["Acceptable_FastQC_Reverse"]))
-    
+    for key,value in qc_verdicts.items():
+        print (str(key) + ": " + str(value))
+        
+    '''
+    #print QC results into a txt
     print("Formatting the QC results")
 
     output.append("\n\n~~~~~~~QC summary~~~~~~~")
@@ -316,26 +361,8 @@ def main():
             mash_plasmid_hit['query_id'] + '\t' +
             mash_plasmid_hit['query_comment']
         )
-
-    #qcsummary
-    output.append("\n\nQC Information:")
+    '''
     
-    print("step 2: genome assembly and QC")
-
-    #run the assembly shell script.
-    #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
-    cmd = [scriptDir + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, reference_genomes[0], buscodb]
-    result = execute(cmd, curDir)
-    
-    print("Parsing assembly results")
-    #get the correct busco and quast result file to parse
-
-    buscoPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco" + "/short_summary_" + ID + ".busco.txt")
-    quastPath = (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast" + "/report.tsv")
-    #populate the busco and quast result object
-    buscoResults = result_parsers.parse_busco_result(buscoPath)
-    quastResults = result_parsers.parse_busco_result(quastPath)
-
 if __name__ == "__main__":
     start = time.time()
     print("Starting workflow...")
