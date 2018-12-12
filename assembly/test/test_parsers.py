@@ -60,6 +60,28 @@ class MashLogParserTest(unittest.TestCase):
         parsed_result = result_parsers.parse_read_stats(self.test_data_path, self.test_totalbp_path)
         self.assertDictEqual(parsed_result, self.parsed_mash_log_json)
 
+class TotalBpParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/qcResult/SAMPLE-ID/totalbp')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_totalbp.json')) as totalbp_json:
+            self.parsed_totalbp_json = json.load(totalbp_json)
+            totalbp_json.close()
+    
+    def test_parse_total_bp(self):
+        parsed_result = result_parsers.parse_total_bp(self.test_data_path)
+        self.assertEqual(parsed_result, self.parsed_totalbp_json['total_bp'])
+
+class ReferenceGenomeStatsParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/qcResult/SAMPLE-ID/GCF_001022155.1_ASM102215v1_assembly_stats.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_reference_genome_stats.json')) as reference_genome_stats_json:
+            self.parsed_reference_genome_stats_json = json.load(reference_genome_stats_json)
+            reference_genome_stats_json.close()
+    
+    def test_parse_reference_genome_stats(self):
+        parsed_result = result_parsers.parse_reference_genome_stats(self.test_data_path)
+        self.assertEqual(parsed_result, self.parsed_reference_genome_stats_json['reference_genome_total_length'])
+
 class BuscoResultParserTest(unittest.TestCase):
     def setUp(self):
         self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/assembly_qc/SAMPLE-ID/SAMPLE-ID.busco/short_summary_SAMPLE-ID.busco.txt')
@@ -81,6 +103,7 @@ class QuastResultParserTest(unittest.TestCase):
     def test_parse_quast_result(self):
         parsed_result = result_parsers.parse_quast_result(self.test_data_path)
         self.assertDictEqual(parsed_result, self.parsed_quast_report_json)
+
 
 if __name__ == '__main__':
     unittest.main()

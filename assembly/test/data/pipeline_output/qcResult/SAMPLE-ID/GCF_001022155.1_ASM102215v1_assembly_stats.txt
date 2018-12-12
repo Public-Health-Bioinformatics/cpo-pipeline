@@ -1,0 +1,181 @@
+# Assembly Statistics Report
+# Assembly name:  ASM102215v1
+# Organism name:  Citrobacter freundii (enterobacteria)
+# Infraspecific name:  strain=CAV1321
+# Taxid:          546
+# BioSample:      SAMN03733741
+# BioProject:     PRJNA246471
+# Submitter:      University of Oxford
+# Date:           2015-6-9
+# Assembly type:  n/a
+# Release type:   major
+# Assembly level: Complete Genome
+# Genome representation: full
+# Assembly method: HGAP3 v. 2.3.0
+# Genome coverage: 115X
+# Sequencing technology: PacBio
+# GenBank assembly accession: GCA_001022155.1
+# RefSeq assembly accession: GCF_001022155.1
+# RefSeq assembly and GenBank assemblies identical: yes
+#
+## Assembly-Units:
+## GenBank Unit Accession	RefSeq Unit Accession	Assembly-Unit name
+## GCA_001022165.1	GCF_001022165.1	Primary Assembly
+#
+# Statistic Types
+# Statistic	Description
+# molecule-count	Number of chromosomes and plasmids in full assembly
+# region-count	Number of genomic regions defined in full assembly
+# spanned-gaps	Number of spanned gaps. Spanned gaps are gaps within a scaffold
+# top-level-count	Number of chromosomes or plasmids, unplaced/unlocalized scaffolds, alt-loci scaffolds, and patch scaffolds
+# total-gap-length	Total length of gaps
+# total-length	Total sequence length including bases and gaps
+# ungapped-length	Total length excluding gaps
+# unspanned-gaps	Number of unspanned gaps. Unspanned gaps are gaps between scaffolds
+#
+# Sequence-type Description
+# all	statistic covers all the sequences in the unit-assembly and molecule(s) specified.
+# molecule	statistic covers the specified molecule. molecule-name and molecule-type/loc will be given.
+# unlocalized	statistic covers the sequences assigned to a molecule but with no position. molecule-name and molecule-type/loc will be given.
+# unplaced	statistic covers the sequences not assigned to any molecule in the assembly.
+#
+# unit-name	molecule-name	molecule-type/loc	sequence-type	statistic	value
+all	all	all	all	total-length	5489397
+all	all	all	all	spanned-gaps	0
+all	all	all	all	unspanned-gaps	0
+all	all	all	all	region-count	0
+all	all	all	all	total-gap-length	0
+all	all	all	all	molecule-count	10
+all	all	all	all	top-level-count	10
+Primary Assembly	all	all	all	total-length	5489397
+Primary Assembly	all	all	all	ungapped-length	5489397
+Primary Assembly	all	all	all	spanned-gaps	0
+Primary Assembly	all	all	all	unspanned-gaps	0
+Primary Assembly	all	all	assembled-molecule	total-length	5489397
+Primary Assembly	all	all	assembled-molecule	ungapped-length	5489397
+Primary Assembly	all	all	assembled-molecule	spanned-gaps	0
+Primary Assembly	all	all	assembled-molecule	unspanned-gaps	0
+Primary Assembly	all	all	unlocalized-scaffold	total-length	0
+Primary Assembly	all	all	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	all	all	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	all	all	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	na	Chromosome	all	total-length	4976908
+Primary Assembly	na	Chromosome	all	ungapped-length	4976908
+Primary Assembly	na	Chromosome	all	spanned-gaps	0
+Primary Assembly	na	Chromosome	all	unspanned-gaps	0
+Primary Assembly	na	Chromosome	assembled-molecule	total-length	4976908
+Primary Assembly	na	Chromosome	assembled-molecule	ungapped-length	4976908
+Primary Assembly	na	Chromosome	assembled-molecule	spanned-gaps	0
+Primary Assembly	na	Chromosome	assembled-molecule	unspanned-gaps	0
+Primary Assembly	na	Chromosome	unlocalized-scaffold	total-length	0
+Primary Assembly	na	Chromosome	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	na	Chromosome	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	na	Chromosome	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pCAV1321-135	Plasmid	all	total-length	135117
+Primary Assembly	pCAV1321-135	Plasmid	all	ungapped-length	135117
+Primary Assembly	pCAV1321-135	Plasmid	all	spanned-gaps	0
+Primary Assembly	pCAV1321-135	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pCAV1321-135	Plasmid	assembled-molecule	total-length	135117
+Primary Assembly	pCAV1321-135	Plasmid	assembled-molecule	ungapped-length	135117
+Primary Assembly	pCAV1321-135	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pCAV1321-135	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pCAV1321-135	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pCAV1321-135	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pCAV1321-135	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pCAV1321-135	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pCAV1321-1916	Plasmid	all	total-length	1916
+Primary Assembly	pCAV1321-1916	Plasmid	all	ungapped-length	1916
+Primary Assembly	pCAV1321-1916	Plasmid	all	spanned-gaps	0
+Primary Assembly	pCAV1321-1916	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pCAV1321-1916	Plasmid	assembled-molecule	total-length	1916
+Primary Assembly	pCAV1321-1916	Plasmid	assembled-molecule	ungapped-length	1916
+Primary Assembly	pCAV1321-1916	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pCAV1321-1916	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pCAV1321-1916	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pCAV1321-1916	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pCAV1321-1916	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pCAV1321-1916	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pCAV1321-3223	Plasmid	all	total-length	3223
+Primary Assembly	pCAV1321-3223	Plasmid	all	ungapped-length	3223
+Primary Assembly	pCAV1321-3223	Plasmid	all	spanned-gaps	0
+Primary Assembly	pCAV1321-3223	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pCAV1321-3223	Plasmid	assembled-molecule	total-length	3223
+Primary Assembly	pCAV1321-3223	Plasmid	assembled-molecule	ungapped-length	3223
+Primary Assembly	pCAV1321-3223	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pCAV1321-3223	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pCAV1321-3223	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pCAV1321-3223	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pCAV1321-3223	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pCAV1321-3223	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pCAV1321-3820	Plasmid	all	total-length	3820
+Primary Assembly	pCAV1321-3820	Plasmid	all	ungapped-length	3820
+Primary Assembly	pCAV1321-3820	Plasmid	all	spanned-gaps	0
+Primary Assembly	pCAV1321-3820	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pCAV1321-3820	Plasmid	assembled-molecule	total-length	3820
+Primary Assembly	pCAV1321-3820	Plasmid	assembled-molecule	ungapped-length	3820
+Primary Assembly	pCAV1321-3820	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pCAV1321-3820	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pCAV1321-3820	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pCAV1321-3820	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pCAV1321-3820	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pCAV1321-3820	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pCAV1321-4310	Plasmid	all	total-length	4310
+Primary Assembly	pCAV1321-4310	Plasmid	all	ungapped-length	4310
+Primary Assembly	pCAV1321-4310	Plasmid	all	spanned-gaps	0
+Primary Assembly	pCAV1321-4310	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pCAV1321-4310	Plasmid	assembled-molecule	total-length	4310
+Primary Assembly	pCAV1321-4310	Plasmid	assembled-molecule	ungapped-length	4310
+Primary Assembly	pCAV1321-4310	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pCAV1321-4310	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pCAV1321-4310	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pCAV1321-4310	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pCAV1321-4310	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pCAV1321-4310	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pCAV1321-4938	Plasmid	all	total-length	4938
+Primary Assembly	pCAV1321-4938	Plasmid	all	ungapped-length	4938
+Primary Assembly	pCAV1321-4938	Plasmid	all	spanned-gaps	0
+Primary Assembly	pCAV1321-4938	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pCAV1321-4938	Plasmid	assembled-molecule	total-length	4938
+Primary Assembly	pCAV1321-4938	Plasmid	assembled-molecule	ungapped-length	4938
+Primary Assembly	pCAV1321-4938	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pCAV1321-4938	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pCAV1321-4938	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pCAV1321-4938	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pCAV1321-4938	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pCAV1321-4938	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pCAV1321-71	Plasmid	all	total-length	70610
+Primary Assembly	pCAV1321-71	Plasmid	all	ungapped-length	70610
+Primary Assembly	pCAV1321-71	Plasmid	all	spanned-gaps	0
+Primary Assembly	pCAV1321-71	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pCAV1321-71	Plasmid	assembled-molecule	total-length	70610
+Primary Assembly	pCAV1321-71	Plasmid	assembled-molecule	ungapped-length	70610
+Primary Assembly	pCAV1321-71	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pCAV1321-71	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pCAV1321-71	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pCAV1321-71	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pCAV1321-71	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pCAV1321-71	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	all	total-length	243709
+Primary Assembly	pKPC_CAV1321-244	Plasmid	all	ungapped-length	243709
+Primary Assembly	pKPC_CAV1321-244	Plasmid	all	spanned-gaps	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	assembled-molecule	total-length	243709
+Primary Assembly	pKPC_CAV1321-244	Plasmid	assembled-molecule	ungapped-length	243709
+Primary Assembly	pKPC_CAV1321-244	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pKPC_CAV1321-244	Plasmid	unlocalized-scaffold	unspanned-gaps	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	all	total-length	44846
+Primary Assembly	pKPC_CAV1321-45	Plasmid	all	ungapped-length	44846
+Primary Assembly	pKPC_CAV1321-45	Plasmid	all	spanned-gaps	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	all	unspanned-gaps	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	assembled-molecule	total-length	44846
+Primary Assembly	pKPC_CAV1321-45	Plasmid	assembled-molecule	ungapped-length	44846
+Primary Assembly	pKPC_CAV1321-45	Plasmid	assembled-molecule	spanned-gaps	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	assembled-molecule	unspanned-gaps	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	unlocalized-scaffold	total-length	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	unlocalized-scaffold	ungapped-length	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	unlocalized-scaffold	spanned-gaps	0
+Primary Assembly	pKPC_CAV1321-45	Plasmid	unlocalized-scaffold	unspanned-gaps	0
