@@ -1,0 +1,46 @@
+[
+    {
+	"id": "BC11-Cfr001",
+	"expected_species": "Citrobacter freundii",
+	"mlst_species": "Citrobacter freundii",
+	"sequence_type": "22",
+	"mlst_scheme": "cfreundii",
+	"carbapenem_resistance_genes": [
+	    "NDM-1",
+	    "Haemophilus influenzae PBP3 conferring resistance to beta-lactam antibiotics",
+	    "marA"
+	],
+	"other_amr_genes": [
+	    "mdtB",
+	    "TEM-1",
+	    "msrE"
+	],
+	"plasmids": [
+	    {
+		"id": "683",
+		"num_contigs": 112,
+		"length_bp": 1702592,
+		"rep_type": "IncL/M,rep_cluster_1254",
+		"mobility": "Conjugative",
+		"nearest_reference": "JX988621"
+	    },
+	    {
+		"id": "933",
+		"num_contigs": 32,
+		"length_bp": 622288,
+		"rep_type": "IncN",
+		"mobility": "Conjugative",
+		"nearest_reference": "CP014524"
+	    },
+	    {
+		"id": "748",
+		"num_contigs": 160,
+		"length_bp": 1279040,
+		"rep_type": "IncFIB",
+		"mobility": "Non-mobilizable",
+		"nearest_reference": "CP017059"
+	    }
+	    
+	]
+    }
+]

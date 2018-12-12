@@ -1,0 +1,2 @@
+id	expected_species	mlst_species	sequence_type	mlst_scheme	carbapenem_resistance_genes	other_amr_genes	plasmid_id	plasmid_num_contigs	plasmid_length_bp	plasmid_rep_type	plasmid_mobility	plasmid_nearest_reference
+BC11-Cfr001	Citrobacter freundii	Citrobacter freundii	22	cfreundii	NDM-1;Haemophilus influenzae PBP3 conferring resistance to beta-lactam antibiotics;marA	mdtB;TEM-1;msrE;	683;933;748;	112;32;160;	1702592;622288;1279040;	IncL/M,rep_cluster_1254;IncN;IncFIB;	Conjugative;Conjugative;Non-mobilizable;	JX988621;CP014524;CP017059;
