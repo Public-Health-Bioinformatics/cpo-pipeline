@@ -27,8 +27,6 @@ script-path = /home/dfornika/code/cpo-pipeline/assembly
 [databases]
 mash-genomedb = /data/ref_databases/mash/refseq.genomes.k21s1000.msh
 mash-plasmiddb = /data/ref_databases/mash/refseq.plasmid.k21s1000.msh
-kraken2-genomedb = /data/ref_databases/kraken2/2018-09-20_standard
-kraken2-plasmiddb = /data/ref_databases/kraken2/2018-09-20_plasmid
 busco-db = /data/ref_databases/busco/enterobacteriales_odb9
 ```
 
