@@ -92,34 +92,33 @@ def main():
            "--input", assembly,
            "--output_file", "/".join([outputDir, "typing", ID, ID + ".mlst", ID + ".mlst"])]
     _ = execute(cmd, curDir)
-
+    
     print("running mob_recon on assembly")
     cmd = [script_path + "/job_scripts/mob_recon.sh",
            "--input", assembly,
            "--output_dir", "/".join([outputDir, "typing", ID, ID + ".recon"])]
     _ = execute(cmd, curDir)
-
+    
     print("running abricate on assembly against CPO plasmid DB")
     cmd = [script_path + "/job_scripts/abricate.sh",
            "--input", assembly,
            "--datadir", abricate_datadir,
            "--database", abricate_cpo_plasmid_db,
-           "--output_file", "/".join([outputDir, "typing", ID, ID + ".cp"])]
+           "--output_file", "/".join([outputDir, "resistance", ID, ID + ".cp"])]
     _ = execute(cmd, curDir)
-
+     
     print("running rgi on assembly")
     cmd = [script_path + "/job_scripts/rgi.sh",
            "--input", assembly,
            "--card_json", card_path,
-           "--database", abricate_cpo_plasmid_db,
-           "--output_file", "/".join([outputDir, "typing", ID, ID + ".cp"])]
+           "--output_file", "/".join([outputDir, "resistance", ID, ID + ".rgi"])]
     _ = execute(cmd, curDir)
     
     
     print("step 3: parsing mlst, plasmid, and amr results")
     
     print("identifying MLST")
-    mlst_report = outputDir + "/typing/" + ID + "/" + ID + ".mlst/" + ID + ".mlst" 
+    mlst_report = outputDir + "/" + "typing" + "/" + ID + "/" + ID + ".mlst" + "/" + ID + ".mlst" 
     mlstHits = result_parsers.parse_mlst_result(mlst_report)
     # TODO: Check that there is only one MLST result in the report, and handle
     #       cases where the report is malformed.
@@ -132,10 +131,10 @@ def main():
 
     print("identifying plasmid contigs and amr genes")
 
-    mob_recon_contig_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "contig_report.txt" 
+    mob_recon_contig_report_path = outputDir + "/" + "typing" + "/" + ID + "/" + ID + ".recon" + "/" + "contig_report.txt" 
     mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(mob_recon_contig_report_path)
 
-    mob_recon_aggregate_report_path = outputDir + "/typing/" + ID + "/" + ID + ".recon/" + "mobtyper_aggregate_report.txt"
+    mob_recon_aggregate_report_path = outputDir + "/" + "typing" + "/" + ID + "/" + ID + ".recon"+ "/" + "mobtyper_aggregate_report.txt"
     mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(mob_recon_aggregate_report_path)
     
 
