@@ -8,18 +8,10 @@ The `assembly/pipeline_qc.sh` script requires the following conda environments:
 
  - `mash-2.0`
  - `fastqc-0.11.7`
- - `kraken2-2.0.7_beta`
  - `seqtk-1.3`
 
 The `assembly/pipeline_assembly.sh` script requires the following conda environments:
 
- - `shovill-1.0.1`
- - `quast-4.6.3`
- - `busco-3.0.2`
-
-The `assembly/pipeline_assembly_contaminant.sh` script requires the following conda environments:
-
- - `bbmap-38.22`
  - `shovill-1.0.1`
  - `quast-4.6.3`
  - `busco-3.0.2`
