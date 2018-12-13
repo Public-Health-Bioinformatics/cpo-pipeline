@@ -86,9 +86,6 @@ def main():
     #used for parsing 
     parser.add_option("-e", "--expected", dest="expectedSpecies", default="NA/NA/NA", type="string", help="expected species of the isolate")
     
-    #parallelization, useless, these are hard coded to 8cores/64G RAM
-    #parser.add_option("-t", "--threads", dest="threads", default=8, type="int", help="number of cpu to use")
-    #parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
 
     (options,args) = parser.parse_args()
 
@@ -99,9 +96,6 @@ def main():
     kraken2db = options.kraken2GenomeRefDB
     kraken2plasmiddb=options.kraken2PlasmidRefDB
     expectedSpecies = options.expectedSpecies
-    #threads = options.threads
-    #memory = options.memory
-    tempDir = outputDir + "/shovillTemp"
     script_path = options.script_path
     buscodb = options.buscodb
     ID = options.id
@@ -143,16 +137,16 @@ def main():
         "totalbp_path": (outputDir + "/qcResult/" + ID + "/" + "totalbp"),
         "reference_genome_fasta_path": (""), #built later
         "reference_genome_stat_path": (""), #built later
-        "busco_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco" + "/short_summary_" + ID + ".busco.txt"),
-        "quast_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast" + "/report.txt")
+        "busco_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco"),
+        "quast_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast")
     }
     
     
     print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
     output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
-
+    
     print("step 1: preassembly QC")
-
+    
     print("running mash_screen.sh on genomic db")
     cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
            "--queries", mashdb, "--output_file", file_paths['mash_genome_path']]
@@ -162,12 +156,12 @@ def main():
     cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
            "--queries", mashplasmiddb, "--output_file", file_paths['mash_plasmid_path']]
     _ = execute(cmd, curDir)
-
+    
     print("running fastqc")
     cmd = [script_path + "/job_scripts/fastqc.sh", "--R1", R1, "--R2", R2,
            "--output_dir", file_paths['fastqc_output_path']]
     _ = execute(cmd, curDir)
-
+    
     print("running seqtk to calculate totalbp")
     cmd = [script_path + "/job_scripts/seqtk_totalbp.sh", "--R1", R1, "--R2", R2,
            "--output_file", file_paths['totalbp_path']]
@@ -284,15 +278,32 @@ def main():
     #time to assemble the reads then QC the assemblies
     print("step 2: genome assembly and QC")
 
-    #run the assembly shell script.
-    #input parameters: 1 = id, 2= forward, 3 = reverse, 4 = output, 5=tmpdir for shovill, 6=reference genome, 7=buscoDB
-    cmd = [script_path + "/pipeline_assembly.sh", ID, R1, R2, outputDir, tempDir, reference_genomes[0], buscodb]
-    result = execute(cmd, curDir)
+    print("running shovill assembler")
+    cmd = [script_path + "/job_scripts/shovill.sh",
+           "--R1", R1, "--R2", R2,
+           "--mincov", "3", "--minlen", "500", 
+           "--output_dir", "/".join([outputDir, "assembly", ID])]
+    _ = execute(cmd, curDir)
+
+    print("running busco")
+    cmd = [script_path + "/job_scripts/busco.sh",
+           "--input", "/".join([outputDir, ID, "contigs.fa"]),
+           "--mincov", "3", "--minlen", "500", 
+           "--output_dir", file_paths['busco_path']]
+    _ = execute(cmd, curDir)
+
+    print("running quast")
+    cmd = [script_path + "/job_scripts/quast.sh",
+           "--input", "/".join([outputDir, ID, "contigs.fa"]),
+           "--reference_genome", reference_genomes[0], 
+           "--output_dir", file_paths['quast_path']]
+    _ = execute(cmd, curDir)
+    
     
     print("Parsing assembly results")
     #populate the busco and quast result object
-    buscoResults = result_parsers.parse_busco_result(file_paths["busco_path"])
-    quastResults = result_parsers.parse_quast_result(file_paths["quast_path"])
+    buscoResults = result_parsers.parse_busco_result(file_paths["busco_path"] + "/short_summary_" + ID + ".busco.txt")
+    quastResults = result_parsers.parse_quast_result(file_paths["quast_path"] + "/report.txt")
     
     #assembly QC logic    
     '''
