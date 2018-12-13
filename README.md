@@ -8,7 +8,7 @@ This codebase is derived from the [CPO_Prediction](https://github.com/imasianxd/
 
 ## Requirements
 
-I is expected that several bioinformatics tools are provided as tool-specific conda environments. Each environment is activated in turn by calling:
+It is expected that several bioinformatics tools are provided as tool-specific conda environments. Each environment is activated in turn by calling:
 
 ```
 source activate <tool-version>
