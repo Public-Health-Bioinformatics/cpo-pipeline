@@ -20,8 +20,7 @@ then
 fi
 
 assembly=""
-datadir=""
-db=""
+card_json=""
 output_file=""
 
 while [[ $# -gt 0 ]]
@@ -50,11 +49,17 @@ do
   esac
 done
 
+echo "${card_json}"
+
 mkdir -p $(dirname "${output_file}")
 
-source activate rgi-4.0.3
+echo "going to cd into " $(dirname "${output_file}") "..."
 
 cd $(dirname "${output_file}")
+
+pwd
+
+source activate rgi-4.0.3
 
 rgi load \
     -i "${card_json}" \
