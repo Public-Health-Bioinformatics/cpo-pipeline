@@ -24,7 +24,6 @@
 #  </requirements>
 
 import subprocess
-import pandas
 import optparse
 import os
 import datetime
@@ -32,9 +31,6 @@ import sys
 import time
 import urllib.request
 import gzip
-import collections
-import json
-import numpy
 import ete3 as e
 
 from parsers import result_parsers
@@ -62,25 +58,7 @@ def execute(command): #subprocess.popen call bash command
     else:
         raise subprocess.CalledProcessError(exitCode, command)
 
-def httpGetFile(url, filepath=""): #download a file from the web
-    if (filepath == ""):
-        return urllib.request.urlretrieve(url)
-    else:
-        urllib.request.urlretrieve(url, filepath)
-        return True
-    
-def gunzip(inputpath="", outputpath=""): #gunzip
-    if (outputpath == ""):
-        with gzip.open(inputpath, 'rb') as f:
-            gzContent = f.read()
-        return gzContent
-    else:
-        with gzip.open(inputpath, 'rb') as f:
-            gzContent = f.read()
-        with open(outputpath, 'wb') as out:
-            out.write(gzContent)
-        return True
-    
+
 def addFace(name): #function to add a facet to a tree
     #if its the reference branch, populate the faces with column headers
     face = e.faces.TextFace(name,fsize=10,tight_text=True)
@@ -95,6 +73,7 @@ def main():
     #parses some parameters
     parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
     parser.add_option("-m", "--metadata", dest="metadataPath", type="string", default="./pipelineTest/metadata.tabular", help="absolute file path to metadata file")
+    parser.add_option("-r", "--reference", dest="reference_path", type="string", help="absolute file path to reference genome fasta file")
     parser.add_option("-o", "--output_file", dest="outputFile", type="string", default="tree.png", help="Output graphics file. Use ending 'png', 'pdf' or 'svg' to specify file format.")
     
     (options,args) = parser.parse_args()
@@ -102,6 +81,7 @@ def main():
     treePath = str(options.treePath).lstrip().rstrip()
     distancePath = str(options.distancePath).lstrip().rstrip()
     metadataPath = str(options.metadataPath).lstrip().rstrip()
+    reference_path = options.reference_path
     
     sensitivePath = str(options.sensitivePath).lstrip().rstrip()
     sensitiveCols = str(options.sensitiveCols).lstrip().rstrip()
@@ -114,13 +94,38 @@ def main():
     treeFile = "".join(read(treePath))
 
     os.environ['QT_QPA_PLATFORM']='offscreen'
+    
+    print("running snippy on assembly")
+    for ID in IDs:
+        cmd = [script_path + "/job_scripts/snippy.sh",
+               "--reference", reference_path,
+               "--contigs", " ".join(contigs),
+               "--output_dir", "/".join([outputDir, "tree", ID, ID + ".snippy"])]
+        _ = execute(cmd, curDir)
 
-    #region call the typing script
-    print("running pipeline_tree.sh")
-    #input parameters: 1=outputDir, 2=reference, 3=contigs
-    cmd = [script_path + "/pipeline_tree.sh", outputDir, reference, contigs]
-    result = execute(cmd, curDir)
-    #endregion
+    print("running snippy-core on assemblies")
+    cmd = [script_path + "/job_scripts/snippy-core.sh",
+           "--reference", reference_path,
+           snippy_dirs]
+    _ = execute(cmd, curDir)
+
+    print("running snp-dists on assemblies")
+    cmd = [script_path + "/job_scripts/snp-dists.sh",
+           "--alignment", alignment,
+           "--output_file", "/".join([outputDir, "tree", tree_name + ".tsv"])]
+    _ = execute(cmd, curDir)
+
+    print("running snp-dists on assemblies")
+    cmd = [script_path + "/job_scripts/snp-dists.sh",
+           "--alignment", alignment,
+           "--output_file", "/".join([outputDir, "tree", tree_name + ".tsv"])]
+    _ = execute(cmd, curDir)
+
+    print("running clustalw on alignment")
+    cmd = [script_path + "/job_scripts/clustalw_tree.sh",
+           "--alignment", alignment]
+    _ = execute(cmd, curDir)
+    
     
     distanceDict = {} #store the distance matrix as rowname:list<string>
     
