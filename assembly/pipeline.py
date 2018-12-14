@@ -24,6 +24,8 @@ import collections
 import json
 import configparser
 import pprint
+import shutil
+import errno
 
 from parsers import result_parsers
 
@@ -131,14 +133,14 @@ def main():
     }
     
     file_paths = {
-        "mash_genome_path": (outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"),
-        "mash_plasmid_path": (outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"),
-        "fastqc_output_path":(outputDir + "/qcResult/" + ID + "/" + "fastqc"),
-        "totalbp_path": (outputDir + "/qcResult/" + ID + "/" + "totalbp"),
+        "mash_genome_path": "/".join([outputDir, ID, "pre-assembly_qc", "mashscreen.genome.tsv"]),
+        "mash_plasmid_path": "/".join([outputDir, ID, "pre-assembly_qc", "mashscreen.plasmid.tsv"]),
+        "fastqc_output_path": "/".join([outputDir, ID, "pre-assembly_qc", "fastqc"]),
+        "totalbp_path": "/".join([outputDir, ID, "pre-assembly_qc", "totalbp"]),
         "reference_genome_fasta_path": (""), #built later
         "reference_genome_stat_path": (""), #built later
-        "busco_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco"),
-        "quast_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast")
+        "busco_path": "/".join([outputDir, ID, "post-assembly_qc", ID + ".busco"]),
+        "quast_path": "/".join([outputDir, ID, "post-assembly_qc", ID + ".quast"]),
     }
     
     
@@ -147,25 +149,25 @@ def main():
     
     print("step 1: preassembly QC")
     
-    print("running mash_screen.sh on genomic db")
-    cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
-           "--queries", mashdb, "--output_file", file_paths['mash_genome_path']]
-    _ = execute(cmd, curDir)
-    
-    print("running mash_screen.sh on plasmid db")
-    cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
-           "--queries", mashplasmiddb, "--output_file", file_paths['mash_plasmid_path']]
-    _ = execute(cmd, curDir)
-    
-    print("running fastqc")
-    cmd = [script_path + "/job_scripts/fastqc.sh", "--R1", R1, "--R2", R2,
-           "--output_dir", file_paths['fastqc_output_path']]
-    _ = execute(cmd, curDir)
-    
-    print("running seqtk to calculate totalbp")
-    cmd = [script_path + "/job_scripts/seqtk_totalbp.sh", "--R1", R1, "--R2", R2,
-           "--output_file", file_paths['totalbp_path']]
-    _ = execute(cmd, curDir)
+    # print("running mash_screen.sh on genomic db")
+    # cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
+    #        "--queries", mashdb, "--output_file", file_paths['mash_genome_path']]
+    # _ = execute(cmd, curDir)
+    # 
+    # print("running mash_screen.sh on plasmid db")
+    # cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
+    #        "--queries", mashplasmiddb, "--output_file", file_paths['mash_plasmid_path']]
+    # _ = execute(cmd, curDir)
+    # 
+    # print("running fastqc")
+    # cmd = [script_path + "/job_scripts/fastqc.sh", "--R1", R1, "--R2", R2,
+    #        "--output_dir", file_paths['fastqc_output_path']]
+    # _ = execute(cmd, curDir)
+    # 
+    # print("running seqtk to calculate totalbp")
+    # cmd = [script_path + "/job_scripts/seqtk_totalbp.sh", "--R1", R1, "--R2", R2,
+    #        "--output_file", file_paths['totalbp_path']]
+    # _ = execute(cmd, curDir)
     
     print("Parsing the QC results")
     #parse genome mash results
@@ -243,17 +245,24 @@ def main():
                 assembly_stat_url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + assembly + "_assembly_stats.txt" #url to assembly stat
                 
                 #build the save paths
-                referencePath = os.path.abspath(outputDir + "/qcResult/" + ID + "/" + species.replace(" ",""))
-                file_paths["reference_genome_fasta_path"] = (referencePath + ".fasta")
-                file_paths["reference_genome_stat_path"] =  (referencePath + "_genomeStats.txt")
+                reference_dir_path = os.path.abspath("/".join([outputDir, ID, "reference"]))
+                try:
+                    os.makedirs(reference_dir_path)
+                except OSError as exc:
+                    if exc.errno != errno.EEXIST:
+                        raise
+                    pass
+                file_paths["reference_genome_fasta_path"] = reference_dir_path + "/" + species.replace(" ","") + ".fasta"
+                file_paths["reference_genome_stat_path"] =  reference_dir_path + "/" + species.replace(" ","") + "_genomeStats.txt"
                 reference_genomes.append(str(file_paths["reference_genome_fasta_path"]))
 
                 #fetch the files
-                httpGetFile(fasta_url, file_paths["reference_genome_fasta_path"] + ".gz") #fetch the fasta gz
-                httpGetFile(assembly_stat_url, file_paths["reference_genome_stat_path"]) # fetch the genome stat
+                with open(file_paths["reference_genome_fasta_path"], 'w') as reference_genome_fasta_file:
+                    shutil.copyfileobj(
+                        gzip.GzipFile(fileobj=urllib.request.urlopen(fasta_url), mode='rb'), reference_genome_fasta_file
+                    )
+                urllib.request.urlretrieve(assembly_stat_url, file_paths["reference_genome_stat_path"])
                 
-                #unzip the files
-                gunzip(file_paths["reference_genome_fasta_path"] + ".gz")
 
     else: #throw an error if it contains contaminations
         print("Contaminated Genome assembly...resequencing required")
