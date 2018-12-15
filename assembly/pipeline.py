@@ -48,24 +48,72 @@ def execute(command, curDir):
     else:
         raise subprocess.CalledProcessError(exitCode, command)
 
-def httpGetFile(url, filepath=""):
-    if (filepath == ""):
-        return urllib.request.urlretrieve(url)
-    else:
-        urllib.request.urlretrieve(url, filepath)
-        return True
 
-def gunzip(file_path):
-    with gzip.open(file_path, 'rb') as f:
-        gzContent = f.read()
-    with open(file_path.replace(".gz",""), 'wb') as out:
-        out.write(gzContent)    
-    os.remove(file_path)
-    if (os.path.exists(file_path.replace(".gz",""))):
+def busco_results_qc_check(busco_results):
+    '''
+    BUSCO PASS CRITERIA:
+    1. complete singles > 90% of total genes
+    2. complte duplicates < 90% of total genes
+    Args:
+        busco_results (dict): Busco results
+    Returns:
+        boolean: Assembly passes our BUSCO quality criteria
+    '''
+    complete_single = busco_results['complete_single']
+    total = busco_results['total']
+    busco_complete_single_cutoff = busco_results['busco_complete_single_cutoff']
+    busco_complete_duplicate_cutoff = busco_results['busco_complete_duplicate_cutoff']
+    if (complete_single / total) >= busco_complete_single_cutoff and \
+       (complete_duplicate / total) <= busco_complete_duplicate_cutoff:
         return True
     else:
-        raise Exception("Reference genome downloaded, but cannot be gunzipped")
+        return False
+    
+def quast_results_qc_check(quast_results):
+    '''
+    QUAST PASS CRITERIA:
+    1. total length vs reference length +-10%
+    2. percent gc versus reference percent gc +- 5%
+    3. genome fraction percent > 90
+    Args:
+        quast_results (dict): Quast results
 
+    Returns:
+        boolean: Assembly passes our QUAST quality criteria
+    '''
+    total_length = quast_results['total_length']
+    reference_length = quast_results['reference_length']
+    assembly_length_cutoff = quast_results['quast_assembly_length_cutoff']
+    assembly_percent_gc = quast_results['percent_GC']
+    reference_percent_gc = quast_results['reference_percent_GC']
+    percent_gc_cutoff = quast_results['quast_percent_gc_cutoff']
+    genome_fraction_percent = quast_results['genome_fraction_percent']
+    genome_fraction_percent_cutoff = quast_results['genome_fraction_percent_cutoff']
+    if total_length <= (reference_length * (1 + assembly_length_cutoff)) and \
+       total_length >= (reference_length * (1 - assembly_length_cutoff)) and \
+       assembly_percent_gc <= (reference_percent_gc * (1 + percent_gc_cutoff)) and \
+       assembly_percent_gc >= (reference_percent_gc * (1 - quast_percent_gc_cutoff)) and \
+       genome_fraction_percent >= genome_fraction_percent_cutoff:
+        return True
+    else:
+        return False
+
+def mash_query_id_to_ncbi_ftp_path(query_id):
+    """
+    Args:
+        query_id (str): Mash query ID (column 5 of mash screen report)
+    Returns:
+        list: Directory names used to locate reference genome on ftp://ftp.ncbi.nlm.nih.gov/genomes/all/
+        For example:
+            "GCF/001/022/155"
+    """
+    prefix = query_id.split('_')[0]
+    digits = query_id.split('_')[1].split('.')[0]
+    path_list = [prefix] + [digits[i:i+3] for i in range(0, len(digits), 3)]
+    
+    return "/".join(path_list)
+
+    
 def main():
     
     config = configparser.ConfigParser()
@@ -139,8 +187,8 @@ def main():
         "totalbp_path": "/".join([outputDir, ID, "pre-assembly_qc", "totalbp"]),
         "reference_genome_fasta_path": (""), #built later
         "reference_genome_stat_path": (""), #built later
-        "busco_path": "/".join([outputDir, ID, "post-assembly_qc", ID + ".busco"]),
-        "quast_path": "/".join([outputDir, ID, "post-assembly_qc", ID + ".quast"]),
+        "busco_path": "/".join([outputDir, ID, "post-assembly_qc", "busco"]),
+        "quast_path": "/".join([outputDir, ID, "post-assembly_qc", "quast"]),
     }
     
     
@@ -149,25 +197,25 @@ def main():
     
     print("step 1: preassembly QC")
     
-    # print("running mash_screen.sh on genomic db")
-    # cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
-    #        "--queries", mashdb, "--output_file", file_paths['mash_genome_path']]
-    # _ = execute(cmd, curDir)
-    # 
-    # print("running mash_screen.sh on plasmid db")
-    # cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
-    #        "--queries", mashplasmiddb, "--output_file", file_paths['mash_plasmid_path']]
-    # _ = execute(cmd, curDir)
-    # 
-    # print("running fastqc")
-    # cmd = [script_path + "/job_scripts/fastqc.sh", "--R1", R1, "--R2", R2,
-    #        "--output_dir", file_paths['fastqc_output_path']]
-    # _ = execute(cmd, curDir)
-    # 
-    # print("running seqtk to calculate totalbp")
-    # cmd = [script_path + "/job_scripts/seqtk_totalbp.sh", "--R1", R1, "--R2", R2,
-    #        "--output_file", file_paths['totalbp_path']]
-    # _ = execute(cmd, curDir)
+    print("running mash_screen.sh on genomic db")
+    cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
+           "--queries", mashdb, "--output_file", file_paths['mash_genome_path']]
+    _ = execute(cmd, curDir)
+    
+    print("running mash_screen.sh on plasmid db")
+    cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
+           "--queries", mashplasmiddb, "--output_file", file_paths['mash_plasmid_path']]
+    _ = execute(cmd, curDir)
+    
+    print("running fastqc")
+    cmd = [script_path + "/job_scripts/fastqc.sh", "--R1", R1, "--R2", R2,
+           "--output_dir", file_paths['fastqc_output_path']]
+    _ = execute(cmd, curDir)
+    
+    print("running seqtk to calculate totalbp")
+    cmd = [script_path + "/job_scripts/seqtk_totalbp.sh", "--R1", R1, "--R2", R2,
+           "--output_file", file_paths['totalbp_path']]
+    _ = execute(cmd, curDir)
     
     print("Parsing the QC results")
     #parse genome mash results
@@ -226,7 +274,7 @@ def main():
     reference_genomes = []
     if (not qc_verdicts["multiple_species_contamination"]):
         for mash_hit in filtered_mash_hits: #for all the mash hits, aka reference genomes
-            qID = mash_hit['query_id'] #hit genome within mash results
+            query_id = mash_hit['query_id'] #hit genome within mash results
             species_name_start = int(mash_hit['query_comment'].index(".")) + 3 #find the start of species name within query_comment column
             species_name_stop = int (mash_hit['query_comment'].index(",")) #find the end of the species name within query_comment column
             if (mash_hit['query_comment'].find("phiX") > -1):
@@ -235,16 +283,27 @@ def main():
                 species = str(mash_hit['query_comment'])[species_name_start: species_name_stop] #assign proper species name for reference genome file name
                 # find gcf accession
                 # TODO: document this or clean it up to be more readable
-                gcf = (qID[:qID.find("_",5)]).replace("_","") #find the full gcf accession for ncbi FTP
-                gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)] #break the gcf accession into k=3
 
-                assembly = qID[:qID.find("_genomic.fna.gz")] #find the assembly name
+                ncbi_ftp_path = mash_query_id_to_ncbi_ftp_path(query_id)
+
+                assembly = query_id[:query_id.find("_genomic.fna.gz")] #find the assembly name
 
                 #build the urls
-                fasta_url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + qID #url to fasta
-                assembly_stat_url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + assembly + "_assembly_stats.txt" #url to assembly stat
+                ncbi_ftp_server_base = "ftp://ftp.ncbi.nlm.nih.gov"
+                fasta_url = "/".join([
+                    ncbi_ftp_server_base, "genomes", "all",
+                    ncbi_ftp_path,
+                    assembly,
+                    query_id
+                ])
+                assembly_stat_url = "/".join([
+                    ncbi_ftp_server_base, "genomes", "all",
+                    ncbi_ftp_path,
+                    assembly,
+                    assembly + "_assembly_stats.txt"
+                ])
                 
-                #build the save paths
+                # build the save paths
                 reference_dir_path = os.path.abspath("/".join([outputDir, ID, "reference"]))
                 try:
                     os.makedirs(reference_dir_path)
@@ -252,15 +311,16 @@ def main():
                     if exc.errno != errno.EEXIST:
                         raise
                     pass
-                file_paths["reference_genome_fasta_path"] = reference_dir_path + "/" + species.replace(" ","") + ".fasta"
-                file_paths["reference_genome_stat_path"] =  reference_dir_path + "/" + species.replace(" ","") + "_genomeStats.txt"
-                reference_genomes.append(str(file_paths["reference_genome_fasta_path"]))
+                
+                file_paths["reference_genome_fasta_path"] = reference_dir_path + "/" + species.replace(" ","_") + ".fasta"
+                file_paths["reference_genome_stat_path"] =  reference_dir_path + "/" + species.replace(" ","_") + "_genomeStats.txt"
+                reference_genomes.append(file_paths["reference_genome_fasta_path"])
 
                 #fetch the files
-                with open(file_paths["reference_genome_fasta_path"], 'w') as reference_genome_fasta_file:
-                    shutil.copyfileobj(
-                        gzip.GzipFile(fileobj=urllib.request.urlopen(fasta_url), mode='rb'), reference_genome_fasta_file
-                    )
+                response = urllib.request.urlopen(fasta_url)
+                with gzip.GzipFile(fileobj=response) as remote_ref:
+                    with open(file_paths["reference_genome_fasta_path"], 'wb') as local_ref:
+                        shutil.copyfileobj(remote_ref, local_ref)
                 urllib.request.urlretrieve(assembly_stat_url, file_paths["reference_genome_stat_path"])
                 
 
@@ -291,19 +351,19 @@ def main():
     cmd = [script_path + "/job_scripts/shovill.sh",
            "--R1", R1, "--R2", R2,
            "--mincov", "3", "--minlen", "500", 
-           "--output_dir", "/".join([outputDir, "assembly", ID])]
+           "--output_dir", "/".join([outputDir, ID, "assembly"])]
     _ = execute(cmd, curDir)
-
+    
     print("running busco")
     cmd = [script_path + "/job_scripts/busco.sh",
-           "--input", "/".join([outputDir, ID, "contigs.fa"]),
-           "--mincov", "3", "--minlen", "500", 
+           "--input", "/".join([outputDir, ID, "assembly", "contigs.fa"]),
+           "--database", buscodb, 
            "--output_dir", file_paths['busco_path']]
     _ = execute(cmd, curDir)
 
     print("running quast")
     cmd = [script_path + "/job_scripts/quast.sh",
-           "--input", "/".join([outputDir, ID, "contigs.fa"]),
+           "--input", "/".join([outputDir, ID, "assembly", "contigs.fa"]),
            "--reference_genome", reference_genomes[0], 
            "--output_dir", file_paths['quast_path']]
     _ = execute(cmd, curDir)
@@ -311,26 +371,11 @@ def main():
     
     print("Parsing assembly results")
     #populate the busco and quast result object
-    buscoResults = result_parsers.parse_busco_result(file_paths["busco_path"] + "/short_summary_" + ID + ".busco.txt")
-    quastResults = result_parsers.parse_quast_result(file_paths["quast_path"] + "/report.txt")
-    
-    #assembly QC logic    
-    '''
-    BUSCO PASS CRITERIA:
-    1. complete singles > 90% of total genes
-    2. complte duplicates < 90% of total genes
-    '''
-    if (float(buscoResults["complete_single"]) / float(buscoResults["total"]) >= float(qc_cutoffs["busco_complete_single_cutoff"]) and float(buscoResults["complete_duplicate"]) / float(buscoResults["total"]) <= float(qc_cutoffs["busco_complete_duplicate_cutoff"])):
-        qc_verdicts["acceptable_busco_assembly_metrics"] = True
+    busco_results = result_parsers.parse_busco_result(file_paths["busco_path"] + "/short_summary_" + ID + ".busco.txt")
+    quast_results = result_parsers.parse_quast_result(file_paths["quast_path"] + "/report.txt")    
 
-    '''
-    QUAST PASS CRITERIA:
-    1. total length vs reference length +-10%
-    2. percent gc versus reference percent gc +- 5%
-    3. genome fraction percent > 90
-    '''   
-    if ((float(quastResults["total_length"]) <= float(quastResults["reference_length"]) * (1 + float(qc_cutoffs["quast_assembly_length_cutoff"])) and float(quastResults["total_length"]) >= float(quastResults["reference_length"]) * (1 - float(qc_cutoffs["quast_assembly_length_cutoff"]))) and (float(quastResults["percent_GC"]) <= float(quastResults["reference_percent_GC"]) * (1+ float(qc_cutoffs["quast_percent_gc_cutoff"])) and float(quastResults["percent_GC"]) >= float(quastResults["reference_percent_GC"]) * (1 - float(qc_cutoffs["quast_percent_gc_cutoff"]))) and (float(quastResults["genome_fraction_percent"]) >= int(qc_cutoffs["genome_fraction_percent_cutoff"]))): 
-        qc_verdicts["acceptable_quast_assembly_metrics"] = True
+    qc_verdicts["acceptable_busco_assembly_metrics"] = busco_results_qc_check(busco_results)
+    qc_verdicts["acceptable_quast_assembly_metrics"] = quast_results_qc_check(quast_results)
 
     #print QC results to screen
     print("total bases: " + str(total_bp))
