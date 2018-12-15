@@ -51,15 +51,18 @@ done
 
 mkdir -p "${output_dir}"
 
+contigs_abspath=$(readlink -f "${contigs}")
+
+cd $(dirname "${output_dir}")
+
 source activate busco-3.0.2
 
 run_busco \
-    -i "${contigs}" \
-    -o "${output_dir}" \
+    -i "${contigs_abspath}" \
+    -o $(basename "${output_dir}") \
     -l "${database}" \
     -m genome \
     -c 1 \
-    -sp E_coli_K12 \
     -f
 
 source deactivate
