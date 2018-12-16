@@ -100,7 +100,7 @@ def main():
         cmd = [script_path + "/job_scripts/snippy.sh",
                "--reference", reference_path,
                "--contigs", " ".join(contigs),
-               "--output_dir", "/".join([outputDir, "tree", ID, ID + ".snippy"])]
+               "--output_dir", "/".join([outputDir, ID, "tree", "snippy"])]
         _ = execute(cmd, curDir)
 
     print("running snippy-core on assemblies")
@@ -112,13 +112,13 @@ def main():
     print("running snp-dists on assemblies")
     cmd = [script_path + "/job_scripts/snp-dists.sh",
            "--alignment", alignment,
-           "--output_file", "/".join([outputDir, "tree", tree_name + ".tsv"])]
+           "--output_file", "/".join([outputDir, ID, "tree", tree_name + ".tsv"])]
     _ = execute(cmd, curDir)
 
     print("running snp-dists on assemblies")
     cmd = [script_path + "/job_scripts/snp-dists.sh",
            "--alignment", alignment,
-           "--output_file", "/".join([outputDir, "tree", tree_name + ".tsv"])]
+           "--output_file", "/".join([outputDir, ID, "tree", tree_name + ".tsv"])]
     _ = execute(cmd, curDir)
 
     print("running clustalw on alignment")
