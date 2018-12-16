@@ -32,7 +32,7 @@ before_install:
   - hash -r
   - conda update -q -y conda
   - conda info -a
-  - conda install drmaa
+  - conda install -y -q drmaa
 
 script:
   - python assembly/test/test_parsers.py
