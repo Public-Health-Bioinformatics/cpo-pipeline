@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -R|--reference_genome BUSCO_DB -o|--output_dir OUTPUT_DIR\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -R|--reference_genome REFERENCE_GENOME_FASTA -o|--output_dir OUTPUT_DIR\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -20,7 +20,7 @@ then
 fi
 
 contigs=""
-database=""
+reference_genome=""
 output_dir=""
 
 while [[ $# -gt 0 ]]
@@ -35,8 +35,8 @@ do
     shift # past value
     ;;
     -R|--reference_genome)
-    # busco db
-    database="$2"
+    # Reference genome
+    reference_genome="$2"
     shift # past argument
     shift # past value
     ;;
@@ -54,9 +54,9 @@ mkdir -p "${output_dir}"
 source activate quast-4.6.3
 
 quast \
-    "${contigs}" \
     -R "${reference_genome}" \
-    -o "${output_dir}" \
-    --threads 8
+    --output-dir "${output_dir}" \
+    --threads 8 \
+    "${contigs}" \
 
 source deactivate

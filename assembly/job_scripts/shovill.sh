@@ -73,7 +73,7 @@ shovill \
     --R2 "${input_r2_fastq}" \
     --cpus 16 \
     --ram 32 \
-    --tmpdir "${output_dir}"/shovill_tmp \
+    --tmpdir shovill_tmp \
     --outdir "${output_dir}"
 
 source deactivate

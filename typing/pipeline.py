@@ -53,10 +53,8 @@ def main():
     config = configparser.ConfigParser()
     config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
 
-    #parses some parameters
     parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
     #required
-    #MLSTHIT, mobsuite, resfinder, rgi, mlstscheme
     parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")
     parser.add_option("-a", "--assembly", dest="assembly", type="string", help="Path to assembly file.")
     parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")    
@@ -66,17 +64,12 @@ def main():
     parser.add_option("-c", "--card-path", dest="card_path", default=config['databases']['card'], type="string", help="absolute file path to card.json db")
     parser.add_option("-d", "--abricate-datadir", dest="abricate_datadir", default=config['databases']['abricate-datadir'], type="string", help="absolute file path to directory where abricate dbs are stored")
     parser.add_option("-p", "--abricate-cpo-plasmid-db", dest="abricate_cpo_plasmid_db", default=config['databases']['abricate-cpo-plasmid-db'], type="string", help="name of abricate cpo plasmid db to use")
-    parser.add_option("-e", "--expected-species", dest="expected_species", default="NA/NA/NA", type="string", help="expected species of the isolate")
     
-    # parallelization, useless, these are hard coded to 8cores/64G RAM
-    # parser.add_option("-t", "--threads", dest="threads", default=8, type="int", help="number of cpu to use")
-    # parser.add_option("-p", "--memory", dest="memory", default=64, type="int", help="memory to use in GB")
     
     (options, args) = parser.parse_args()
     curDir = os.getcwd()
     ID = str(options.id).lstrip().rstrip()
     assembly = options.assembly
-    expected_species = options.expected_species
     script_path = options.script_path
     card_path = options.card_path
     abricate_datadir = options.abricate_datadir
@@ -90,13 +83,13 @@ def main():
     print("running mlst on assembly")
     cmd = [script_path + "/job_scripts/mlst.sh",
            "--input", assembly,
-           "--output_file", "/".join([outputDir, "typing", ID, ID + ".mlst", ID + ".mlst"])]
+           "--output_file", "/".join([outputDir, ID, "typing", "mlst", "mlst.tsv"])]
     _ = execute(cmd, curDir)
     
     print("running mob_recon on assembly")
     cmd = [script_path + "/job_scripts/mob_recon.sh",
            "--input", assembly,
-           "--output_dir", "/".join([outputDir, "typing", ID, ID + ".recon"])]
+           "--output_dir", "/".join([outputDir, ID, "typing", "mob_recon"])]
     _ = execute(cmd, curDir)
     
     print("running abricate on assembly against CPO plasmid DB")
@@ -104,21 +97,21 @@ def main():
            "--input", assembly,
            "--datadir", abricate_datadir,
            "--database", abricate_cpo_plasmid_db,
-           "--output_file", "/".join([outputDir, "resistance", ID, ID + ".cp"])]
+           "--output_file", "/".join([outputDir, ID, "resistance", "abricate", "abricate.tsv"])]
     _ = execute(cmd, curDir)
      
     print("running rgi on assembly")
     cmd = [script_path + "/job_scripts/rgi.sh",
            "--input", assembly,
            "--card_json", card_path,
-           "--output_file", "/".join([outputDir, "resistance", ID, ID + ".rgi"])]
+           "--output_file", "/".join([outputDir, ID, "resistance", "rgi", "rgi"])]
     _ = execute(cmd, curDir)
     
     
     print("step 3: parsing mlst, plasmid, and amr results")
     
     print("identifying MLST")
-    mlst_report = outputDir + "/" + "typing" + "/" + ID + "/" + ID + ".mlst" + "/" + ID + ".mlst" 
+    mlst_report = "/".join([outputDir, ID, "typing", "mlst", "mlst.tsv"]) 
     mlstHits = result_parsers.parse_mlst_result(mlst_report)
     # TODO: Check that there is only one MLST result in the report, and handle
     #       cases where the report is malformed.
@@ -131,10 +124,10 @@ def main():
 
     print("identifying plasmid contigs and amr genes")
 
-    mob_recon_contig_report_path = outputDir + "/" + "typing" + "/" + ID + "/" + ID + ".recon" + "/" + "contig_report.txt" 
+    mob_recon_contig_report_path = "/".join([outputDir, ID, "typing", "mob_recon", "contig_report.txt"])
     mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(mob_recon_contig_report_path)
 
-    mob_recon_aggregate_report_path = outputDir + "/" + "typing" + "/" + ID + "/" + ID + ".recon"+ "/" + "mobtyper_aggregate_report.txt"
+    mob_recon_aggregate_report_path = "/".join([outputDir, ID, "typing", "mob_recon", "mobtyper_aggregate_report.txt"])
     mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(mob_recon_aggregate_report_path)
     
 
@@ -210,10 +203,10 @@ def main():
     likely_plasmid_contigs = get_likely_plasmid_contigs(mob_recon_contig_report)
     origins = get_plasmid_origins(mob_recon_contig_report)
     
-    abricate_report_path = outputDir + "/resistance/" + ID + "/" + ID + ".cp"
+    abricate_report_path = "/".join([outputDir, ID, "resistance", "abricate", "abricate.tsv"])
     abricate_report = result_parsers.parse_abricate_result(abricate_report_path)
     
-    rgi_report_path = outputDir + "/resistance/" + ID + "/" + ID + ".rgi.txt"
+    rgi_report_path = "/".join([outputDir, ID, "resistance", "rgi", "rgi.txt"])
     rgi_report = result_parsers.parse_rgi_result_txt(rgi_report_path)
 
     def get_abricate_carbapenemases(abricate_report):

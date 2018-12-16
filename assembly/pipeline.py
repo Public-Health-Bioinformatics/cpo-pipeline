@@ -2,12 +2,12 @@
 
 '''
 This script is a wrapper for module one of the cpo-pipeline including QC and Assembly.
-It uses Mash2.0, Kraken2.0 and fastqc to check for sequence contamination, quality information and identify a reference genome.
+It uses Mash2.0 and fastqc to check for sequence contamination, quality information and identify a reference genome.
 Then attempts to assemble the reads, attempting to filter contamination away if required.
 
 Example usage:
 
-  pipeline.py -i BC11-Kpn005_S2 -f BC11-Kpn005_S2_L001_R1_001.fastq.gz -r BC11-Kpn005_S2_L001_R2_001.fastq.gz -o output_dir -e "Klebsiella pneumoniae" 
+  pipeline.py -i BC11-Kpn005_S2 --R1 BC11-Kpn005_S2_L001_R1_001.fastq.gz --R2 BC11-Kpn005_S2_L001_R2_001.fastq.gz -o output_dir
 
 Requires pipeline_qc.sh, pipeline_assembly.sh, pipeline_assembly_contaminant.sh. where these scripts are located can be specified with -k. 
 '''
@@ -24,6 +24,9 @@ import collections
 import json
 import configparser
 import pprint
+import shutil
+import errno
+import re
 
 from parsers import result_parsers
 
@@ -46,24 +49,89 @@ def execute(command, curDir):
     else:
         raise subprocess.CalledProcessError(exitCode, command)
 
-def httpGetFile(url, filepath=""):
-    if (filepath == ""):
-        return urllib.request.urlretrieve(url)
-    else:
-        urllib.request.urlretrieve(url, filepath)
-        return True
 
-def gunzip(file_path):
-    with gzip.open(file_path, 'rb') as f:
-        gzContent = f.read()
-    with open(file_path.replace(".gz",""), 'wb') as out:
-        out.write(gzContent)    
-    os.remove(file_path)
-    if (os.path.exists(file_path.replace(".gz",""))):
+def busco_qc_check(busco_results, qc_thresholds):
+    """
+    BUSCO PASS CRITERIA:
+    1. complete singles > 90% of total genes
+    2. complte duplicates < 90% of total genes
+    Args:
+        busco_results (dict): Busco results
+        qc_thresholds (dict): Threshold values for determining QC pass/fail
+    Returns:
+        boolean: Assembly passes our BUSCO quality criteria
+    """
+    complete_single = busco_results['complete_single']
+    complete_duplicate = busco_results['complete_duplicate']
+    total = busco_results['total']
+    busco_complete_single_cutoff = qc_thresholds['busco_complete_single_cutoff']
+    busco_complete_duplicate_cutoff = qc_thresholds['busco_complete_duplicate_cutoff']
+    if (complete_single / total) >= busco_complete_single_cutoff and \
+       (complete_duplicate / total) <= busco_complete_duplicate_cutoff:
         return True
     else:
-        raise Exception("Reference genome downloaded, but cannot be gunzipped")
+        return False
+    
+def quast_qc_check(quast_results, qc_thresholds):
+    """
+    QUAST PASS CRITERIA:
+    1. total length vs reference length +-10%
+    2. percent gc versus reference percent gc +- 5%
+    3. genome fraction percent > 90
+    Args:
+        quast_results (dict): Quast results
+        qc_thresholds (dict): Threshold values for determining QC pass/fail
+    Returns:
+        boolean: Assembly passes our QUAST quality criteria
+    """
+    total_length = quast_results['total_length']
+    reference_length = quast_results['reference_length']
+    assembly_percent_gc = quast_results['percent_GC']
+    reference_percent_gc = quast_results['reference_percent_GC']
+    genome_fraction_percent = quast_results['genome_fraction_percent']
+    percent_gc_cutoff = qc_thresholds['quast_percent_gc_cutoff']
+    assembly_length_cutoff = qc_thresholds['quast_assembly_length_cutoff']
+    genome_fraction_percent_cutoff = qc_thresholds['quast_genome_fraction_percent_cutoff']
+    if total_length <= (reference_length * (1 + assembly_length_cutoff)) and \
+       total_length >= (reference_length * (1 - assembly_length_cutoff)) and \
+       assembly_percent_gc <= (reference_percent_gc * (1 + percent_gc_cutoff)) and \
+       assembly_percent_gc >= (reference_percent_gc * (1 - percent_gc_cutoff)) and \
+       genome_fraction_percent >= genome_fraction_percent_cutoff:
+        return True
+    else:
+        return False
 
+def fastqc_qc_check(fastqc_results):
+    """
+    Args:
+        fastqc_results (dict): FastQC results
+    Returns:
+        boolean: Sequence data passes our FastQC quality criteria
+    """
+    if fastqc_results["basic_statistics"] == "PASS" and \
+       fastqc_results["per_base_sequence_quality"] == "PASS" and \
+       fastqc_results["sequence_length_distribution"] == "PASS":
+        return True
+    else:
+        return False
+    
+def mash_query_id_to_ncbi_ftp_path(query_id):
+    """
+    Args:
+        query_id (str): Mash query ID (column 5 of mash screen report)
+    Returns:
+        list: Directory names used to locate reference genome 
+              on ftp://ftp.ncbi.nlm.nih.gov/genomes/all/
+        For example:
+            "GCF/001/022/155"
+    """
+    prefix = query_id.split('_')[0]
+    digits = query_id.split('_')[1].split('.')[0]
+    path_list = [prefix] + [digits[i:i+3] for i in range(0, len(digits), 3)]
+    
+    return "/".join(path_list)
+
+    
 def main():
     
     config = configparser.ConfigParser()
@@ -72,19 +140,14 @@ def main():
     #parses some parameters
     parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
     parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")    
-    parser.add_option("-f", "--forward", dest="R1", type="string", help="absolute file path forward read (R1)")
-    parser.add_option("-r", "--reverse", dest="R2", type="string", help="absolute file path to reverse read (R2)")
-    parser.add_option("-m", "--mash-genomedb", dest="mashGenomeRefDB", default = config['databases']['mash-genomedb'], type="string", help="absolute path to mash reference database")
-    parser.add_option("-n", "--mash-plasmiddb", dest="mashPlasmidRefDB", default = config['databases']['mash-plasmiddb'], type="string", help="absolute path to mash reference database")
-    parser.add_option("-z", "--kraken2-genomedb", dest="kraken2GenomeRefDB", default = config['databases']['kraken2-genomedb'], type="string", help="absolute path to kraken reference database")
-    parser.add_option("-v", "--kraken2-plasmiddb", dest="kraken2PlasmidRefDB", default = config['databases']['kraken2-plasmiddb'], type="string", help="absolute path to kraken reference database")
-    parser.add_option("-x", "--busco-db", dest="buscodb", default = config['databases']['busco-db'], type="string", help="absolute path to busco reference database")
+    parser.add_option("-1", "--R1", dest="R1", type="string", help="absolute file path forward read (R1)")
+    parser.add_option("-2", "--R2", dest="R2", type="string", help="absolute file path to reverse read (R2)")
+    parser.add_option("-g", "--mash-genomedb", dest="mashGenomeRefDB", default = config['databases']['mash-genomedb'], type="string", help="absolute path to mash reference database")
+    parser.add_option("-p", "--mash-plasmiddb", dest="mashPlasmidRefDB", default = config['databases']['mash-plasmiddb'], type="string", help="absolute path to mash reference database")
+    parser.add_option("-b", "--busco-db", dest="buscodb", default = config['databases']['busco-db'], type="string", help="absolute path to busco reference database")
 
     parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")
-    parser.add_option("-k", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
-
-    #used for parsing 
-    parser.add_option("-e", "--expected", dest="expectedSpecies", default="NA/NA/NA", type="string", help="expected species of the isolate")
+    parser.add_option("-s", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
     
 
     (options,args) = parser.parse_args()
@@ -93,9 +156,6 @@ def main():
     outputDir = options.output
     mashdb = options.mashGenomeRefDB
     mashplasmiddb=options.mashPlasmidRefDB
-    kraken2db = options.kraken2GenomeRefDB
-    kraken2plasmiddb=options.kraken2PlasmidRefDB
-    expectedSpecies = options.expectedSpecies
     script_path = options.script_path
     buscodb = options.buscodb
     ID = options.id
@@ -110,7 +170,6 @@ def main():
     #dictionary to store QC PASS/FAIL flags
     qc_verdicts = {
         "multiple_species_contamination": None,
-        "same_as_expected_species": None,
         "fastq_contains_plasmids": None,
         "acceptable_coverage": None,
         "acceptable_fastqc_forward": None,
@@ -119,34 +178,37 @@ def main():
         "acceptable_busco_assembly_metrics": None
     }
     
-    qc_cutoffs = {
+    qc_thresholds = {
         "mash_hits_genome_score_cutoff":300, #genome mash will include all hits with scores (top hit score - $thisvalue)
         "mash_hits_plasmid_score_cutoff":100, #plasmid mash will include all hits with scores (top hit score - $thisvalue)
         "coverage_cutoff":30, #sequencing coverage greater than ($thisvalue) will pass the QC
         "quast_assembly_length_cutoff":0.10, #QUAST QC: assembly length within +-($thisvalue) percent in reference to reference length will pass the QC 
         "quast_percent_gc_cutoff":0.05, #QUAST QC: percent GC within +-($thisvalue) percent in reference to reference percent GC will pass the QC 
-        "genome_fraction_percent_cutoff":0.90, #QUAST QC: genome_fraction_percent greater than ($thisvalue) will pass the QC
+        "quast_genome_fraction_percent_cutoff":0.90, #QUAST QC: genome_fraction_percent greater than ($thisvalue) will pass the QC
         "busco_complete_single_cutoff":0.90, #BUSCO QC: complete single genes greater than ($thisvalue) percent will pass the QC
         "busco_complete_duplicate_cutoff":0.10 #BUSCO QC: complete duplicate genes less than ($thisvalue) percent will pass the QC
     }
     
     file_paths = {
-        "mash_genome_path": (outputDir + "/qcResult/" + ID + "/" + "mashscreen.genome.tsv"),
-        "mash_plasmid_path": (outputDir + "/qcResult/" + ID + "/" + "mashscreen.plasmid.tsv"),
-        "fastqc_output_path":(outputDir + "/qcResult/" + ID + "/" + "fastqc"),
-        "totalbp_path": (outputDir + "/qcResult/" + ID + "/" + "totalbp"),
+        "mash_genome_path": "/".join([outputDir, ID, "pre-assembly_qc", "mashscreen.genome.tsv"]),
+        "mash_plasmid_path": "/".join([outputDir, ID, "pre-assembly_qc", "mashscreen.plasmid.tsv"]),
+        "fastqc_output_path": "/".join([outputDir, ID, "pre-assembly_qc", "fastqc"]),
+        "totalbp_path": "/".join([outputDir, ID, "pre-assembly_qc", "totalbp"]),
         "reference_genome_fasta_path": (""), #built later
         "reference_genome_stat_path": (""), #built later
-        "busco_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".busco"),
-        "quast_path": (outputDir + "/assembly_qc/" + ID + "/" + ID + ".quast")
+        "busco_path": "/".join([outputDir, ID, "post-assembly_qc", "busco"]),
+        "quast_path": "/".join([outputDir, ID, "post-assembly_qc", "quast"]),
     }
     
     
-    print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
-    output.append(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nR1: " + R1 + "\nR2: " + R2)
+    print(str(datetime.datetime.now()))
+    print("ID: " + ID)
+    print("R1: " + R1)
+    print("R2: " + R2)
     
     print("step 1: preassembly QC")
-    
+
+
     print("running mash_screen.sh on genomic db")
     cmd = [script_path + "/job_scripts/mash_screen.sh", "--R1", R1, "--R2", R2,
            "--queries", mashdb, "--output_file", file_paths['mash_genome_path']]
@@ -166,14 +228,15 @@ def main():
     cmd = [script_path + "/job_scripts/seqtk_totalbp.sh", "--R1", R1, "--R2", R2,
            "--output_file", file_paths['totalbp_path']]
     _ = execute(cmd, curDir)
-    
+
+
     print("Parsing the QC results")
     #parse genome mash results
     mash_hits = result_parsers.parse_mash_result(file_paths["mash_genome_path"])
     mash_hits = sorted(mash_hits, key=lambda k: k['identity'], reverse=True)
     # 'shared_hashes' field is string in format '935/1000'
     # Threshold is 300 below highest numerator (ie. '935/100' -> 635)
-    mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - int(qc_cutoffs["mash_hits_genome_score_cutoff"])
+    mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - int(qc_thresholds["mash_hits_genome_score_cutoff"])
     print("*** mash_hits_score_threshold: " + str(mash_hits_score_threshold))
     def score_above_threshold(mash_result, score_threshold):
         score = int(mash_result['shared_hashes'].split("/")[0])
@@ -191,7 +254,7 @@ def main():
     mash_plasmid_hits = sorted(mash_plasmid_hits, key=lambda k: k['identity'], reverse=True)
     # 'shared_hashes' field is string in format '935/1000'
     # Threshold is 100 below highest numerator (ie. '935/100' -> 835)
-    mash_plasmid_hits_score_threshold = int(mash_plasmid_hits[0]['shared_hashes'].split("/")[0]) - int(qc_cutoffs["mash_hits_plasmid_score_cutoff"])
+    mash_plasmid_hits_score_threshold = int(mash_plasmid_hits[0]['shared_hashes'].split("/")[0]) - int(qc_thresholds["mash_hits_plasmid_score_cutoff"])
     filtered_mash_plasmid_hits = list(filter(
         lambda x: score_above_threshold(x, mash_plasmid_hits_score_threshold),
         mash_plasmid_hits))
@@ -203,58 +266,65 @@ def main():
     #all the qC result are parsed now, lets do some QC logic
     #look at mash results first
     if (len(filtered_mash_hits) > 1):
-        qc_verdicts["multiple_species_contamination"] = True 
+        qc_verdicts["multiple_species_contamination"] = True
+    else:
+        qc_verdicts["multiple_species_contamination"] = False
     
-    for mash_hit in filtered_mash_hits:
-        species = mash_hit['query_comment']
-        if (species.find(expectedSpecies) > -1):
-            qc_verdicts["same_as_expected_species"] = True
     
     if (len(filtered_mash_plasmid_hits) > 0):
         qc_verdicts["fastq_contains_plasmids"] = True
+    else:
+        qc_verdicts["fastq_contains_plasmids"] = False
 
     #look at fastqc results
-    if (fastqc_R1["basic_statistics"] == "PASS" and fastqc_R1["per_base_sequence_quality"] == "PASS" and fastqc_R1["sequence_length_distribution"] == "PASS" ):
-        qc_verdicts["acceptable_fastqc_forward"] = True 
-    if (fastqc_R2["basic_statistics"] == "PASS" and fastqc_R2["per_base_sequence_quality"] == "PASS" and fastqc_R2["sequence_length_distribution"] == "PASS" ):
-        qc_verdicts["acceptable_fastqc_reverse"] = True 
-    pprint.pprint(qc_verdicts)
+    qc_verdicts["acceptable_fastqc_forward"] = fastqc_qc_check(fastqc_R1) 
+    qc_verdicts["acceptable_fastqc_reverse"] = fastqc_qc_check(fastqc_R2) 
+    
     #download a reference genome
     print("Downloading reference genomes")
     reference_genomes = []
     if (not qc_verdicts["multiple_species_contamination"]):
-        for mash_hit in filtered_mash_hits: #for all the mash hits, aka reference genomes
-            qID = mash_hit['query_id'] #hit genome within mash results
-            species_name_start = int(mash_hit['query_comment'].index(".")) + 3 #find the start of species name within query_comment column
-            species_name_stop = int (mash_hit['query_comment'].index(",")) #find the end of the species name within query_comment column
-            if (mash_hit['query_comment'].find("phiX") > -1):
-                species = "PhiX" #phix
-            else:
-                species = str(mash_hit['query_comment'])[species_name_start: species_name_stop] #assign proper species name for reference genome file name
-                # find gcf accession
-                # TODO: document this or clean it up to be more readable
-                gcf = (qID[:qID.find("_",5)]).replace("_","") #find the full gcf accession for ncbi FTP
-                gcf = [gcf[i:i+3] for i in range(0, len(gcf), 3)] #break the gcf accession into k=3
-
-                assembly = qID[:qID.find("_genomic.fna.gz")] #find the assembly name
-
+        for mash_hit in filtered_mash_hits:
+            query_id = mash_hit['query_id']
+            if not re.match("phiX", mash_hit['query_comment']):
+                ncbi_ftp_path = mash_query_id_to_ncbi_ftp_path(query_id)
+                assembly = query_id[:query_id.find("_genomic.fna.gz")]
                 #build the urls
-                fasta_url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + qID #url to fasta
-                assembly_stat_url = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/" + gcf[0] + "/" + gcf[1] + "/" + gcf[2] + "/" + gcf[3] + "/" + assembly + "/" + assembly + "_assembly_stats.txt" #url to assembly stat
+                ncbi_ftp_server_base = "ftp://ftp.ncbi.nlm.nih.gov"
+                fasta_url = "/".join([
+                    ncbi_ftp_server_base, "genomes", "all",
+                    ncbi_ftp_path,
+                    assembly,
+                    query_id
+                ])
+                assembly_stat_url = "/".join([
+                    ncbi_ftp_server_base, "genomes", "all",
+                    ncbi_ftp_path,
+                    assembly,
+                    assembly + "_assembly_stats.txt"
+                ])
                 
-                #build the save paths
-                referencePath = os.path.abspath(outputDir + "/qcResult/" + ID + "/" + species.replace(" ",""))
-                file_paths["reference_genome_fasta_path"] = (referencePath + ".fasta")
-                file_paths["reference_genome_stat_path"] =  (referencePath + "_genomeStats.txt")
-                reference_genomes.append(str(file_paths["reference_genome_fasta_path"]))
+                # build the save paths
+                reference_dir_path = os.path.abspath("/".join([outputDir, ID, "reference"]))
+                try:
+                    os.makedirs(reference_dir_path)
+                except OSError as exc:
+                    if exc.errno != errno.EEXIST:
+                        raise
+                    pass
+                
+                file_paths["reference_genome_fasta_path"] = reference_dir_path + "/" + re.sub(".gz$", "", query_id)
+                file_paths["reference_genome_stat_path"] =  reference_dir_path + "/" + assembly + "_assembly_stats.txt"
+                reference_genomes.append(file_paths["reference_genome_fasta_path"])
 
                 #fetch the files
-                httpGetFile(fasta_url, file_paths["reference_genome_fasta_path"] + ".gz") #fetch the fasta gz
-                httpGetFile(assembly_stat_url, file_paths["reference_genome_stat_path"]) # fetch the genome stat
+                response = urllib.request.urlopen(fasta_url)
+                with gzip.GzipFile(fileobj=response) as remote_ref:
+                    with open(file_paths["reference_genome_fasta_path"], 'wb') as local_ref:
+                        shutil.copyfileobj(remote_ref, local_ref)
+                urllib.request.urlretrieve(assembly_stat_url, file_paths["reference_genome_stat_path"])
                 
-                #unzip the files
-                gunzip(file_paths["reference_genome_fasta_path"] + ".gz")
-
+        
     else: #throw an error if it contains contaminations
         print("Contaminated Genome assembly...resequencing required")
         raise Exception("contamination and mislabeling...crashing")
@@ -265,63 +335,47 @@ def main():
     elif (len(reference_genomes) == 0):
         raise Exception ("no reference genome identified")
     
-    #now we estimate our coverage using total reads and expected genome size
-    expected_genome_size = result_parsers.parse_reference_genome_stats(file_paths["reference_genome_stat_path"])     #find expected genome size
-    total_bp = result_parsers.parse_total_bp(file_paths["totalbp_path"])    #find total base count
+    # now we estimate our coverage using total reads and expected genome size
+    expected_genome_size = result_parsers.parse_reference_genome_stats(file_paths["reference_genome_stat_path"])
+    total_bp = result_parsers.parse_total_bp(file_paths["totalbp_path"])
     
-    #calculate coverage
     coverage = total_bp / expected_genome_size
             
-    if (coverage >= int(qc_cutoffs["coverage_cutoff"])):
+    if (coverage >= int(qc_thresholds["coverage_cutoff"])):
         qc_verdicts["acceptable_coverage"] = True
 
-    #time to assemble the reads then QC the assemblies
+    
     print("step 2: genome assembly and QC")
 
+    
     print("running shovill assembler")
     cmd = [script_path + "/job_scripts/shovill.sh",
            "--R1", R1, "--R2", R2,
            "--mincov", "3", "--minlen", "500", 
-           "--output_dir", "/".join([outputDir, "assembly", ID])]
+           "--output_dir", "/".join([outputDir, ID, "assembly"])]
     _ = execute(cmd, curDir)
-
+    
     print("running busco")
     cmd = [script_path + "/job_scripts/busco.sh",
-           "--input", "/".join([outputDir, ID, "contigs.fa"]),
-           "--mincov", "3", "--minlen", "500", 
+           "--input", "/".join([outputDir, ID, "assembly", "contigs.fa"]),
+           "--database", buscodb, 
            "--output_dir", file_paths['busco_path']]
     _ = execute(cmd, curDir)
 
     print("running quast")
     cmd = [script_path + "/job_scripts/quast.sh",
-           "--input", "/".join([outputDir, ID, "contigs.fa"]),
+           "--input", "/".join([outputDir, ID, "assembly", "contigs.fa"]),
            "--reference_genome", reference_genomes[0], 
            "--output_dir", file_paths['quast_path']]
     _ = execute(cmd, curDir)
     
     
     print("Parsing assembly results")
-    #populate the busco and quast result object
-    buscoResults = result_parsers.parse_busco_result(file_paths["busco_path"] + "/short_summary_" + ID + ".busco.txt")
-    quastResults = result_parsers.parse_quast_result(file_paths["quast_path"] + "/report.txt")
-    
-    #assembly QC logic    
-    '''
-    BUSCO PASS CRITERIA:
-    1. complete singles > 90% of total genes
-    2. complte duplicates < 90% of total genes
-    '''
-    if (float(buscoResults["complete_single"]) / float(buscoResults["total"]) >= float(qc_cutoffs["busco_complete_single_cutoff"]) and float(buscoResults["complete_duplicate"]) / float(buscoResults["total"]) <= float(qc_cutoffs["busco_complete_duplicate_cutoff"])):
-        qc_verdicts["acceptable_busco_assembly_metrics"] = True
+    busco_results = result_parsers.parse_busco_result(file_paths["busco_path"] + "/run_busco/short_summary_busco.txt")
+    quast_results = result_parsers.parse_quast_result(file_paths["quast_path"] + "/report.txt")
 
-    '''
-    QUAST PASS CRITERIA:
-    1. total length vs reference length +-10%
-    2. percent gc versus reference percent gc +- 5%
-    3. genome fraction percent > 90
-    '''   
-    if ((float(quastResults["total_length"]) <= float(quastResults["reference_length"]) * (1 + float(qc_cutoffs["quast_assembly_length_cutoff"])) and float(quastResults["total_length"]) >= float(quastResults["reference_length"]) * (1 - float(qc_cutoffs["quast_assembly_length_cutoff"]))) and (float(quastResults["percent_GC"]) <= float(quastResults["reference_percent_GC"]) * (1+ float(qc_cutoffs["quast_percent_gc_cutoff"])) and float(quastResults["percent_GC"]) >= float(quastResults["reference_percent_GC"]) * (1 - float(qc_cutoffs["quast_percent_gc_cutoff"]))) and (float(quastResults["genome_fraction_percent"]) >= int(qc_cutoffs["genome_fraction_percent_cutoff"]))): 
-        qc_verdicts["acceptable_quast_assembly_metrics"] = True
+    qc_verdicts["acceptable_busco_assembly_metrics"] = busco_qc_check(busco_results, qc_thresholds)
+    qc_verdicts["acceptable_quast_assembly_metrics"] = quast_qc_check(quast_results, qc_thresholds)
 
     #print QC results to screen
     print("total bases: " + str(total_bp))
@@ -329,61 +383,8 @@ def main():
     print("coverage: " + str(coverage))
     print("")
     for key,value in qc_verdicts.items():
-        print (str(key) + ": " + str(value))
-        
-    '''
-    #print QC results into a txt
-    print("Formatting the QC results")
+        print (str(key) + ": " + str(value))        
 
-    output.append("\n\n~~~~~~~QC summary~~~~~~~")
-    output.append("Expected genome size: " + str(expected_genome_size))
-    output.append("Estimated coverage: " + str(coverage))
-    output.append("Expected isolate species: " + expectedSpecies)
-
-    output.append("\nFastQC summary:")
-    output.append("\nforward read qc:")
-    for key, value in fastqcR1.items():
-        output.append(key + ": " + value)
-        if (value == "WARN" or value == "FAIL"):
-            notes.append("FastQC: Forward read, " + key + " " + value)
-
-    output.append("\nreverse read qc:")
-    for key, value in fastqcR2.items():
-        output.append(key + ": " + value)
-        if (value == "WARN" or value == "FAIL"):
-            notes.append("FastQC: Reverse read, " + key + " " + value)
-
-    output.append("\nmash predicted genomes")
-    for mash_hit in filtered_mash_hits:
-        output.append(mash_hit['query_comment'])
-
-    output.append("\nmash predicted plasmids")
-    for mash_plasmid_hit in mash_plasmid_hits:
-        output.append(mash_plasmid_hit['query_comment'])
-    
-
-    output.append("\nDetailed mash genome hits: ")
-    for mash_hit in mash_hits:
-        output.append(
-            str(mash_hit['identity']) + '\t' +
-            mash_hit['shared_hashes'] + '\t' +
-            str(mash_hit['median_multiplicity']) + '\t' +
-            str(mash_hit['p_value']) + '\t' +
-            mash_hit['query_id'] + '\t' +
-            mash_hit['query_comment']
-        )
-    
-    output.append("\nDetailed mash plasmid hits: ")
-    for mash_plasmid_hit in mash_plasmid_hits:
-        output.append(
-            str(mash_plasmid_hit['identity']) + '\t' +
-            mash_plasmid_hit['shared_hashes'] + '\t' +
-            str(mash_plasmid_hit['median_multiplicity']) + '\t' +
-            str(mash_plasmid_hit['p_value']) + '\t' +
-            mash_plasmid_hit['query_id'] + '\t' +
-            mash_plasmid_hit['query_comment']
-        )
-    '''
     
 if __name__ == "__main__":
     start = time.time()

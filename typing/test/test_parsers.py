@@ -28,7 +28,7 @@ class SchemeSpeciesMapParserTest(unittest.TestCase):
             
 class MlstResultParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/typing/SAMPLE-ID/SAMPLE-ID.mlst/SAMPLE-ID.mlst')
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/typing/mlst/mlst.tsv')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mlst_report.json')) as mlst_report_json:
             self.parsed_mlst_report_json = json.load(mlst_report_json)
             mlst_report_json.close()
@@ -41,7 +41,7 @@ class MlstResultParserTest(unittest.TestCase):
 
 class MobReconContigReportParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/typing/SAMPLE-ID/SAMPLE-ID.recon/contig_report.txt')
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/typing/mob_recon/contig_report.txt')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mob_recon_contig_report.json')) as mob_recon_contig_report_json_file:
             self.parsed_mob_recon_contig_report_json = json.load(mob_recon_contig_report_json_file)
             mob_recon_contig_report_json_file.close()
@@ -54,7 +54,7 @@ class MobReconContigReportParserTest(unittest.TestCase):
 
 class MobReconMobTyperAggregateReportParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/typing/SAMPLE-ID/SAMPLE-ID.recon/mobtyper_aggregate_report.txt')
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/typing/mob_recon/mobtyper_aggregate_report.txt')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mob_recon_mobtyper_aggregate_report.json')) as mob_recon_mobtyper_aggregate_report_json_file:
             self.parsed_mob_recon_mobtyper_aggregate_report_json = json.load(mob_recon_mobtyper_aggregate_report_json_file, object_pairs_hook=OrderedDict)
             mob_recon_mobtyper_aggregate_report_json_file.close()
@@ -67,7 +67,7 @@ class MobReconMobTyperAggregateReportParserTest(unittest.TestCase):
 
 class AbricateResultParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/resistance/SAMPLE-ID/SAMPLE-ID.cp')
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/resistance/abricate/abricate.tsv')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_abricate_report.json')) as abricate_report_json_file:
             self.parsed_abricate_report_json = json.load(abricate_report_json_file)
             abricate_report_json_file.close()
@@ -80,7 +80,7 @@ class AbricateResultParserTest(unittest.TestCase):
 
 class RgiTxtReportParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/resistance/SAMPLE-ID/SAMPLE-ID.rgi.txt')
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/resistance/rgi/rgi.txt')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_rgi_txt_report.json')) as rgi_txt_report_json_file:
             self.parsed_rgi_txt_report_json = json.load(rgi_txt_report_json_file, object_pairs_hook=OrderedDict)
             rgi_txt_report_json_file.close()
