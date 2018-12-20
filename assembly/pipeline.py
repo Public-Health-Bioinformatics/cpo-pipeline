@@ -32,26 +32,6 @@ import glob
 
 from parsers import result_parsers
 
-def execute(command, curDir):
-    process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-    # Poll process for new output until finished
-    while True:
-        nextline = process.stdout.readline()
-        if nextline == '' and process.poll() is not None:
-            break
-        sys.stdout.write(nextline)
-        sys.stdout.flush()
-
-    output = process.communicate()[0]
-    exitCode = process.returncode
-
-    if (exitCode == 0):
-        return output
-    else:
-        raise subprocess.CalledProcessError(exitCode, command)
-
-
 def busco_qc_check(busco_results, qc_thresholds):
     """
     BUSCO PASS CRITERIA:
@@ -116,22 +96,6 @@ def fastqc_qc_check(fastqc_results):
         return True
     else:
         return False
-    
-def mash_query_id_to_ncbi_ftp_path(query_id):
-    """
-    Args:
-        query_id (str): Mash query ID (column 5 of mash screen report)
-    Returns:
-        list: Directory names used to locate reference genome 
-              on ftp://ftp.ncbi.nlm.nih.gov/genomes/all/
-        For example:
-            "GCF/001/022/155"
-    """
-    prefix = query_id.split('_')[0]
-    digits = query_id.split('_')[1].split('.')[0]
-    path_list = [prefix] + [digits[i:i+3] for i in range(0, len(digits), 3)]
-    
-    return "/".join(path_list)
 
 def download_mash_hit(mash_hit, download_path):
         """
@@ -143,6 +107,23 @@ def download_mash_hit(mash_hit, download_path):
         Returns:
             (void)
         """
+
+        def mash_query_id_to_ncbi_ftp_path(query_id):
+            """
+            Args:
+                query_id (str): Mash query ID (column 5 of mash screen report)
+            Returns:
+                list: Directory names used to locate reference genome 
+                      on ftp://ftp.ncbi.nlm.nih.gov/genomes/all/
+            For example:
+                "GCF/001/022/155"
+            """
+            prefix = query_id.split('_')[0]
+            digits = query_id.split('_')[1].split('.')[0]
+            path_list = [prefix] + [digits[i:i+3] for i in range(0, len(digits), 3)]
+    
+            return "/".join(path_list)
+        
         query_id = mash_hit['query_id']
         ncbi_ftp_path = mash_query_id_to_ncbi_ftp_path(query_id)
         assembly = query_id[:query_id.find("_genomic.fna.gz")]
@@ -162,9 +143,27 @@ def download_mash_hit(mash_hit, download_path):
         ])
 
         #fetch the files
-        urllib.request.urlretrieve(fasta_url, "/".join([file_paths['reference_genome_path'], query_id]))
-        urllib.request.urlretrieve(assembly_stat_url, "/".join([file_paths["reference_genome_path"], assembly + "_assembly_stats.txt"]))
-    
+        urllib.request.urlretrieve(fasta_url, "/".join([download_path, query_id]))
+        urllib.request.urlretrieve(assembly_stat_url, "/".join([download_path, assembly + "_assembly_stats.txt"]))
+
+def submit_job(job, session):
+    jt = session.createJobTemplate()
+    jt.jobName = job['job_name']
+    jt.nativeSpecification = job['native_specification']
+    jt.jobEnvironment = os.environ
+    jt.workingDirectory = os.getcwd()
+    jt.remoteCommand = job['remote_command']
+    jt.args = job['args']
+    jt.joinFiles = True
+    jobid = session.runJob(jt)
+    print('Your job has been submitted with ID %s' % jobid)
+            
+    retval = session.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
+    print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
+
+    print('Cleaning up')
+    session.deleteJobTemplate(jt)
+        
 def main():
     
     config = configparser.ConfigParser()
@@ -187,8 +186,8 @@ def main():
 
     curDir = os.getcwd()
     outputDir = options.output
-    mashdb = options.mashGenomeRefDB
-    mashplasmiddb=options.mashPlasmidRefDB
+    mash_genome_db = options.mashGenomeRefDB
+    mash_plasmid_db=options.mashPlasmidRefDB
     script_path = options.script_path
     buscodb = options.buscodb
     ID = options.id
@@ -242,97 +241,55 @@ def main():
     print("step 1: preassembly QC")
 
     job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
+
+    pre_assembly_qc_jobs = [
+        {
+            'job_name': 'mash_screen',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'mash_screen.sh'),
+            'args': [
+                "--R1", R1,
+                "--R2", R2,
+                "--queries", mash_genome_db,
+                "--output_file", file_paths['mash_genome_path']
+            ],
+        },
+        {
+            'job_name': 'mash_screen',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'mash_screen.sh'),
+            'args': [
+                "--R1", R1,
+                "--R2", R2,
+                "--queries", mash_plasmid_db,
+                "--output_file", file_paths['mash_plasmid_path']
+            ],
+        },
+        {
+            'job_name': 'fastqc',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'fastqc.sh'),
+            'args': [
+                "--R1", R1,
+                "--R2", R2,
+                "--output_dir", file_paths['fastqc_output_path']
+            ],
+        },
+        {
+            'job_name': 'seqtk_totalbp',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'seqtk_totalbp.sh'),
+            'args': [
+                "--R1", R1,
+                "--R2", R2,
+                "--output_file", file_paths['totalbp_path']
+            ],
+        }
+    ]
     
-    with drmaa.Session() as s:
-        jt = s.createJobTemplate()
-        jt.jobName = "mash_screen"
-        jt.nativeSpecification = "-pe smp 8"
-        jt.jobEnvironment = os.environ
-        jt.workingDirectory = os.getcwd()
-        jt.remoteCommand = os.path.join(job_script_path, 'mash_screen.sh')
-        jt.args = [
-            "--R1", R1,
-            "--R2", R2,
-            "--queries", mashdb,
-            "--output_file", file_paths['mash_genome_path']
-        ]
-        jt.joinFiles = True
-        jobid = s.runJob(jt)
-        print('Your job has been submitted with ID %s' % jobid)
-
-        retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-        print('Cleaning up')
-        s.deleteJobTemplate(jt)
-
-
-        jt = s.createJobTemplate()
-        jt.jobName = "mash_screen"
-        jt.nativeSpecification = "-pe smp 8"
-        jt.jobEnvironment = os.environ
-        jt.workingDirectory = os.getcwd()
-        jt.remoteCommand = os.path.join(job_script_path, 'mash_screen.sh')
-        jt.args = [
-            "--R1", R1,
-            "--R2", R2,
-            "--queries", mashdb,
-            "--output_file", file_paths['mash_plasmid_path']
-        ]
-        jt.joinFiles = True
-        jobid = s.runJob(jt)
-        print('Your job has been submitted with ID %s' % jobid)
-
-        retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-        print('Cleaning up')
-        s.deleteJobTemplate(jt)
-    
-
-        jt = s.createJobTemplate()
-        jt.jobName = "fastqc"
-        jt.nativeSpecification = "-pe smp 8"
-        jt.jobEnvironment = os.environ
-        jt.workingDirectory = os.getcwd()
-        jt.remoteCommand = os.path.join(job_script_path, 'fastqc.sh')
-        jt.args = [
-            "--R1", R1,
-            "--R2", R2,
-            "--output_dir", file_paths['fastqc_output_path']
-        ]
-        jt.joinFiles = True
-        jobid = s.runJob(jt)
-        print('Your job has been submitted with ID %s' % jobid)
-
-        retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-        print('Cleaning up')
-        s.deleteJobTemplate(jt)
-
-    
-        jt = s.createJobTemplate()
-        jt.jobName = "seqtk_totalbp"
-        jt.nativeSpecification = "-pe smp 8"
-        jt.jobEnvironment = os.environ
-        jt.workingDirectory = os.getcwd()
-        jt.remoteCommand = os.path.join(job_script_path, 'seqtk_totalbp.sh')
-        jt.args = [
-            "--R1", R1,
-            "--R2", R2,
-            "--output_file", file_paths['totalbp_path']
-        ]
-        jt.joinFiles = True
-        jobid = s.runJob(jt)
-        print('Your job has been submitted with ID %s' % jobid)
-
-        retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-        print('Cleaning up')
-        s.deleteJobTemplate(jt)
-
+    with drmaa.Session() as session:
+        for job in pre_assembly_qc_jobs:
+            submit_job(job, session)
 
     print("Parsing the QC results")
     #parse genome mash results
@@ -423,75 +380,51 @@ def main():
     
     print("step 2: genome assembly and QC")
 
+    assembly_jobs = [
+        {
+            'job_name': 'shovill',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'shovill.sh'),
+            'args': [
+                "--R1", R1,
+                "--R2", R2,
+                "--mincov", "3",
+                "--minlen", "500",
+                "--output_dir", file_paths['assembly_path']
+            ],
+        }
+    ]
 
-    with drmaa.Session() as s:
-        jt = s.createJobTemplate()
-        jt.jobName = "shovill"
-        jt.nativeSpecification = "-pe smp 8"
-        jt.jobEnvironment = os.environ
-        jt.workingDirectory = os.getcwd()
-        jt.remoteCommand = os.path.join(job_script_path, 'shovill.sh')
-        jt.args = [
-            "--R1", R1,
-            "--R2", R2,
-            "--mincov", "3",
-            "--minlen", "500",
-            "--output_dir", file_paths['assembly_path']
-        ]
-        jt.joinFiles = True
-        jobid = s.runJob(jt)
-        print('Your job has been submitted with ID %s' % jobid)
+    with drmaa.Session() as session:
+        for job in assembly_jobs:
+            submit_job(job, session)
+            
+    post_assembly_qc_jobs = [
+        {
+            'job_name': 'busco',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'busco.sh'),
+            'args': [
+                "--input", "/".join([file_paths['assembly_path'], "contigs.fa"]),
+                "--database", buscodb,
+                "--output_dir", file_paths['busco_path']
+            ]
+        },
+        {
+            'job_name': 'quast',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'quast.sh'),
+            'args': [
+                "--input", "/".join([file_paths['assembly_path'], "contigs.fa"]),
+                "--reference_genome", "/".join([file_paths['reference_genome_path'], reference_genomes[0]]),
+                "--output_dir", file_paths['quast_path']
+            ]
+        },
+    ]
 
-        retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-        print('Cleaning up')
-        s.deleteJobTemplate(jt)
-    
-
-        jt = s.createJobTemplate()
-        jt.jobName = "busco"
-        jt.nativeSpecification = "-pe smp 8"
-        jt.jobEnvironment = os.environ
-        jt.workingDirectory = os.getcwd()
-        jt.remoteCommand = os.path.join(job_script_path, 'busco.sh')
-        jt.args = [
-            "--input", "/".join([file_paths['assembly_path'], "contigs.fa"]),
-            "--database", buscodb,
-            "--output_dir", file_paths['busco_path']
-        ]
-        jt.joinFiles = True
-        jobid = s.runJob(jt)
-        print('Your job has been submitted with ID %s' % jobid)
-
-        retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-        print('Cleaning up')
-        s.deleteJobTemplate(jt)
-
-
-        jt = s.createJobTemplate()
-        jt.jobName = "quast"
-        jt.nativeSpecification = "-pe smp 8"
-        jt.jobEnvironment = os.environ
-        jt.workingDirectory = os.getcwd()
-        jt.remoteCommand = os.path.join(job_script_path, 'quast.sh')
-        jt.args = [
-            "--input", "/".join([file_paths['assembly_path'], "contigs.fa"]),
-            "--reference_genome", "/".join([file_paths['reference_genome_path'], reference_genomes[0]]),
-            "--output_dir", file_paths['quast_path']
-        ]
-        jt.joinFiles = True
-        jobid = s.runJob(jt)
-        print('Your job has been submitted with ID %s' % jobid)
-
-        retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-        print('Cleaning up')
-        s.deleteJobTemplate(jt)
-    
+    with drmaa.Session() as session:
+        for job in assembly_jobs:
+            submit_job(job, session)
     
     print("Parsing assembly results")
     busco_results = result_parsers.parse_busco_result(file_paths["busco_path"] + "/run_busco/short_summary_busco.txt")
