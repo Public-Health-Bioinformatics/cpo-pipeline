@@ -146,23 +146,18 @@ def download_mash_hit(mash_hit, download_path):
         urllib.request.urlretrieve(fasta_url, "/".join([download_path, query_id]))
         urllib.request.urlretrieve(assembly_stat_url, "/".join([download_path, assembly + "_assembly_stats.txt"]))
 
-def submit_job(job, session):
-    jt = session.createJobTemplate()
-    jt.jobName = job['job_name']
-    jt.nativeSpecification = job['native_specification']
-    jt.jobEnvironment = os.environ
-    jt.workingDirectory = os.getcwd()
-    jt.remoteCommand = job['remote_command']
-    jt.args = job['args']
-    jt.joinFiles = True
-    jobid = session.runJob(jt)
-    print('Your job has been submitted with ID %s' % jobid)
-            
-    retval = session.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-    print('Job: {0} finished with status {1}'.format(retval.jobId, retval.hasExited))
-
-    print('Cleaning up')
-    session.deleteJobTemplate(jt)
+def prepare_job(job, session):
+    job_template = session.createJobTemplate()
+    job_template.jobName = job['job_name']
+    job_template.nativeSpecification = job['native_specification']
+    job_template.jobEnvironment = os.environ
+    job_template.workingDirectory = os.getcwd()
+    job_template.remoteCommand = job['remote_command']
+    job_template.args = job['args']
+    job_template.joinFiles = True
+    
+    return job_template
+    
         
 def main():
     
@@ -288,8 +283,11 @@ def main():
     ]
     
     with drmaa.Session() as session:
-        for job in pre_assembly_qc_jobs:
-            submit_job(job, session)
+        prepared_jobs = [prepare_job(job, session) for job in pre_assembly_qc_jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
 
     print("Parsing the QC results")
     #parse genome mash results
@@ -383,7 +381,7 @@ def main():
     assembly_jobs = [
         {
             'job_name': 'shovill',
-            'native_specification': '-pe smp 8',
+            'native_specification': '-pe smp 16 -l h_vmem=4G',
             'remote_command': os.path.join(job_script_path, 'shovill.sh'),
             'args': [
                 "--R1", R1,
@@ -394,10 +392,13 @@ def main():
             ],
         }
     ]
-
+    
     with drmaa.Session() as session:
-        for job in assembly_jobs:
-            submit_job(job, session)
+        prepared_jobs = [prepare_job(job, session) for job in assembly_jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
             
     post_assembly_qc_jobs = [
         {
@@ -423,8 +424,11 @@ def main():
     ]
 
     with drmaa.Session() as session:
-        for job in assembly_jobs:
-            submit_job(job, session)
+        prepared_jobs = [prepare_job(job, session) for job in post_assembly_qc_jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
     
     print("Parsing assembly results")
     busco_results = result_parsers.parse_busco_result(file_paths["busco_path"] + "/run_busco/short_summary_busco.txt")
