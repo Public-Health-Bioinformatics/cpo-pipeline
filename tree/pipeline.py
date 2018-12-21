@@ -1,27 +1,7 @@
 #!/usr/bin/env python
 
-#$ -S /usr/bin/env python
-#$ -V             # Pass environment variables to the job
-#$ -N cpo_pipeline
-#$ -cwd           # Use the current working dir
-#$ -pe smp 1      # Parallel Environment (how many cores)
-#$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
-#$ -e ./logs/$JOB_ID.err
-#$ -o ./logs/$JOB_ID.log
-
-
 # This script is a wrapper for CPO Pipeline Phase 3: tree rendering.
 # It uses snippy for core genome SNV calling and alignment, clustalw to generate a NJ tree and ete3 to render the dendrogram
-
-#   >python cpo_galaxy_tree.py -t /path/to/tree.ph -d /path/to/distance/matrix -m /path/to/metadata
-
-#	<requirements>
-#		<requirement type="package" version="0.23.4">pandas</requirement>
-#		<requirement type="package" version="3.6">python</requirement>
-#       <requirement type="package" version="3.1.1">ete3</requirement>
-#		<requirement type="package" version="5.6.0">pyqt</requirement>
-#		<requirement type="package" version="5.6.2">qt</requirement>
-#  </requirements>
 
 import subprocess
 import optparse
@@ -32,31 +12,13 @@ import time
 import urllib.request
 import gzip
 import ete3 as e
+import drmaa
 
 from parsers import result_parsers
 
 
 def read(path): #read in a text file to a list
     return [line.rstrip('\n') for line in open(path)]
-
-def execute(command): #subprocess.popen call bash command
-    process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-    # Poll process for new output until finished
-    while True:
-        nextline = process.stdout.readline()
-        if nextline == '' and process.poll() is not None:
-            break
-        sys.stdout.write(nextline)
-        sys.stdout.flush()
-
-    output = process.communicate()[0]
-    exitCode = process.returncode
-
-    if (exitCode == 0):
-        return output
-    else:
-        raise subprocess.CalledProcessError(exitCode, command)
 
 
 def addFace(name): #function to add a facet to a tree
@@ -67,6 +29,17 @@ def addFace(name): #function to add a facet to a tree
     face.margin_left = 5
     return face
 
+def prepare_job(job, session):
+    job_template = session.createJobTemplate()
+    job_template.jobName = job['job_name']
+    job_template.nativeSpecification = job['native_specification']
+    job_template.jobEnvironment = os.environ
+    job_template.workingDirectory = os.getcwd()
+    job_template.remoteCommand = job['remote_command']
+    job_template.args = job['args']
+    job_template.joinFiles = True
+    
+    return job_template
 
 def main():
     
@@ -94,38 +67,85 @@ def main():
     treeFile = "".join(read(treePath))
 
     os.environ['QT_QPA_PLATFORM']='offscreen'
+
+    file_paths = {
+        'snippy_path': "/".join([outputDir, "snippy"]),
+    }
+
+    job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
     
-    print("running snippy on assembly")
-    for ID in IDs:
-        cmd = [script_path + "/job_scripts/snippy.sh",
-               "--reference", reference_path,
-               "--contigs", " ".join(contigs),
-               "--output_dir", "/".join([outputDir, ID, "tree", "snippy"])]
-        _ = execute(cmd, curDir)
-
-    print("running snippy-core on assemblies")
-    cmd = [script_path + "/job_scripts/snippy-core.sh",
-           "--reference", reference_path,
-           snippy_dirs]
-    _ = execute(cmd, curDir)
-
-    print("running snp-dists on assemblies")
-    cmd = [script_path + "/job_scripts/snp-dists.sh",
-           "--alignment", alignment,
-           "--output_file", "/".join([outputDir, ID, "tree", tree_name + ".tsv"])]
-    _ = execute(cmd, curDir)
-
-    print("running snp-dists on assemblies")
-    cmd = [script_path + "/job_scripts/snp-dists.sh",
-           "--alignment", alignment,
-           "--output_file", "/".join([outputDir, ID, "tree", tree_name + ".tsv"])]
-    _ = execute(cmd, curDir)
-
-    print("running clustalw on alignment")
-    cmd = [script_path + "/job_scripts/clustalw_tree.sh",
-           "--alignment", alignment]
-    _ = execute(cmd, curDir)
+    snippy_jobs = [
+        {
+            'job_name': 'snippy',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'snippy.sh'),
+            'args': [
+                "--reference", reference_path,
+                "--contigs", " ".join(contigs),
+                "--output_dir", "/".join([file_paths['snippy_path'], ID])
+            ]
+        }
+        for ID in IDs
+    ]
     
+    with drmaa.Session() as session:
+        prepared_jobs = [prepare_job(job, session) for job in snippy_jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+        
+    snippy_core_job = {
+        'job_name': 'snippy-core',
+        'native_specification': '-pe smp 8',
+        'remote_command': os.path.join(job_script_path, 'snippy-core.sh'),
+        'args': [
+            "--reference", reference_path,
+            snippy_dirs
+        ]
+    }
+
+    with drmaa.Session() as session:
+        prepared_jobs = prepare_job(snippy_core_job, session)
+        running_jobs = [session.runJob(prepared_job)]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+
+    snp_dists_jobs = [
+        {
+            'job_name': 'snp-dists',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'snp-dists.sh'),
+            'args': [
+                "--alignment", alignment,
+                "--output_file", file_paths['snp_dists_path']
+            ]
+        }
+    ]
+
+    with drmaa.Session() as session:
+        prepared_jobs = [prepare_job(job, session) for job in snp_dists_jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+
+    clustalw_tree_job = {
+        'job_name': 'clustalw_tree',
+        'native_specification': '-pe smp 8',
+        'remote_command': os.path.join(job_script_path, 'clustalw_tree.sh'),
+        'args': [
+            "--alignment", alignment
+        ]
+    }
+
+    with drmaa.Session() as session:
+        prepared_jobs = prepare_job(clustalw_tree_job, session)
+        running_jobs = [session.runJob(prepared_job)]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)    
     
     distanceDict = {} #store the distance matrix as rowname:list<string>
     
