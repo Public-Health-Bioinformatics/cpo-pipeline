@@ -23,30 +23,23 @@ import urllib.request
 import gzip
 import collections
 import configparser
+import drmaa
 
 from parsers import result_parsers
 from parsers import input_parsers
 
 
-def execute(command, curDir):
-    process = subprocess.Popen(command, shell=False, cwd=curDir, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-    # Poll process for new output until finished
-    while True:
-        nextline = process.stdout.readline()
-        if nextline == '' and process.poll() is not None:
-            break
-        sys.stdout.write(nextline)
-        sys.stdout.flush()
-
-    output = process.communicate()[0]
-    exitCode = process.returncode
-
-    if (exitCode == 0):
-        return output
-    else:
-        raise subprocess.CalledProcessError(exitCode, command)
-
+def prepare_job(job, session):
+    job_template = session.createJobTemplate()
+    job_template.jobName = job['job_name']
+    job_template.nativeSpecification = job['native_specification']
+    job_template.jobEnvironment = os.environ
+    job_template.workingDirectory = os.getcwd()
+    job_template.remoteCommand = job['remote_command']
+    job_template.args = job['args']
+    job_template.joinFiles = True
+    
+    return job_template
 
 def main():
 
@@ -80,32 +73,73 @@ def main():
 
     print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
 
-    print("running mlst on assembly")
-    cmd = [script_path + "/job_scripts/mlst.sh",
-           "--input", assembly,
-           "--output_file", "/".join([outputDir, ID, "typing", "mlst", "mlst.tsv"])]
-    _ = execute(cmd, curDir)
+    file_paths = {
+        'mlst_path': '/'.join([outputDir, ID, 'typing', 'mlst', 'mlst.tsv']),
+        'mob_recon_path': '/'.join([outputDir, ID, 'typing', 'mob_recon']),
+        'abricate_path': '/'.join([outputDir, ID, 'resistance', 'abricate', 'abricate.tsv']),
+        'rgi_path': "/".join([outputDir, ID, 'resistance', 'rgi', 'rgi'])
+    }
     
-    print("running mob_recon on assembly")
-    cmd = [script_path + "/job_scripts/mob_recon.sh",
-           "--input", assembly,
-           "--output_dir", "/".join([outputDir, ID, "typing", "mob_recon"])]
-    _ = execute(cmd, curDir)
+    job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
     
-    print("running abricate on assembly against CPO plasmid DB")
-    cmd = [script_path + "/job_scripts/abricate.sh",
-           "--input", assembly,
-           "--datadir", abricate_datadir,
-           "--database", abricate_cpo_plasmid_db,
-           "--output_file", "/".join([outputDir, ID, "resistance", "abricate", "abricate.tsv"])]
-    _ = execute(cmd, curDir)
-     
-    print("running rgi on assembly")
-    cmd = [script_path + "/job_scripts/rgi.sh",
-           "--input", assembly,
-           "--card_json", card_path,
-           "--output_file", "/".join([outputDir, ID, "resistance", "rgi", "rgi"])]
-    _ = execute(cmd, curDir)
+    typing_jobs = [
+        {
+            'job_name': 'mlst',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'mlst.sh'),
+            'args': [
+                "--input", assembly,
+                "--output_file", file_paths['mlst_path']
+            ]
+        },
+        {
+            'job_name': 'mob_recon',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'mob_recon.sh'),
+            'args': [
+                "--input", assembly,
+                "--output_dir", file_paths['mob_recon_path']
+            ]
+        }
+    ]
+
+    with drmaa.Session() as session:
+        prepared_jobs = [prepare_job(job, session) for job in typing_jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    
+    resistance_jobs = [
+        {
+            'job_name': 'abricate',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'abricate.sh'),
+            'args': [
+                "--input", assembly,
+                "--datadir", abricate_datadir,
+                "--database", abricate_cpo_plasmid_db,
+                "--output_file", file_paths['abricate_path']
+            ]
+        },
+        {
+            'job_name': 'rgi',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'rgi.sh'),
+            'args': [
+                "--input", assembly,
+                "--card_json", card_path,
+                "--output_file", file_paths['rgi_path']
+            ]
+        }
+    ]
+    
+    with drmaa.Session() as session:
+        prepared_jobs = [prepare_job(job, session) for job in resistance_jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
     
     
     print("step 3: parsing mlst, plasmid, and amr results")
