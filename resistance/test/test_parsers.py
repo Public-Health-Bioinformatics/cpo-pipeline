@@ -9,7 +9,6 @@ TEST_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(TEST_DIR_PATH))
 
 from parsers import result_parsers
-from parsers import input_parsers
 
 class AbricateResultParserTest(unittest.TestCase):
     def setUp(self):
