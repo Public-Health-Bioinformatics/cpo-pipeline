@@ -25,7 +25,6 @@ import configparser
 import drmaa
 
 from parsers import result_parsers
-from parsers import input_parsers
 
 
 def prepare_job(job, session):
