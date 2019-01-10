@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+
+import argparse
+import sys
+from os import path
+
+from cpo_pipeline import __version__
+
+def main():
+    script_name = path.basename(path.realpath(sys.argv[0]))
+    parser = argparse.ArgumentParser(prog=script_name, description='')
+    parser.add_argument('--verbose', action='store_true', dest='verbose',
+                        help='Turn on verbose logging [False].', required=False)
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s {}'.format(__version__))
+
+if __name__ == '__main__':
+   main()
