@@ -14,11 +14,11 @@ def main():
     config.read(config_file)
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
     parser = argparse.ArgumentParser(prog=script_name, description='')
-    parser.add_argument('-i', '--ID',  dest='ID',
+    parser.add_argument('-i', '--ID',  dest='sample_id',
                         help='Sample ID', required=False)
-    parser.add_argument('-1', '--R1', dest='R1',
+    parser.add_argument('-1', '--R1', dest='reads1_fastq',
                         help='Read 1 fastq(.gz) file', required=False)
-    parser.add_argument('-2', '--R2', dest='R2',
+    parser.add_argument('-2', '--R2', dest='reads2_fastq',
                         help='Read 2 fastq(.gz) file', required=False)
     parser.add_argument('-o', '--output', dest='output',
                         help='Output Directory', required=False)
