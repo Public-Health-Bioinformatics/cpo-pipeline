@@ -221,7 +221,7 @@ def main(parser, config):
     busco_db = args.busco_db
     sample_id = args.sample_id
     reads1_fastq = args.reads1_fastq
-    reads2_fastq = args.reads1_fastq
+    reads2_fastq = args.reads2_fastq
 
     prepare_output_directories(output_dir, sample_id)
 
