@@ -13,7 +13,7 @@ Requires pipeline_qc.sh, pipeline_assembly.sh, pipeline_assembly_contaminant.sh.
 '''
 
 import subprocess
-import optparse
+import argparse
 import os
 import datetime
 import sys
@@ -29,8 +29,9 @@ import errno
 import re
 import drmaa
 import glob
+from pkg_resources import resource_filename
 
-from parsers import result_parsers
+from .parsers import result_parsers
 
 def busco_qc_check(busco_results, qc_thresholds):
     """
@@ -146,6 +147,24 @@ def download_mash_hit(mash_hit, download_path):
         urllib.request.urlretrieve(fasta_url, "/".join([download_path, query_id]))
         urllib.request.urlretrieve(assembly_stat_url, "/".join([download_path, assembly + "_assembly_stats.txt"]))
 
+def prepare_output_directories(outputDir, ID):
+    output_subdirs = [
+        "/".join([outputDir, ID, subdir])
+        for subdir in [
+                'pre-assembly_qc',
+                'assembly',
+                'post-assembly_qc',
+                'reference'
+        ]
+    ] 
+    for dir in output_subdirs:
+        try:
+            os.makedirs(dir)
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise
+            pass
+        
 def prepare_job(job, session):
     job_template = session.createJobTemplate()
     job_template.jobName = job['job_name']
@@ -159,36 +178,48 @@ def prepare_job(job, session):
     return job_template
     
         
-def main():
-    
-    config = configparser.ConfigParser()
-    config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
-    
-    #parses some parameters
-    parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
-    parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")    
-    parser.add_option("-1", "--R1", dest="R1", type="string", help="absolute file path forward read (R1)")
-    parser.add_option("-2", "--R2", dest="R2", type="string", help="absolute file path to reverse read (R2)")
-    parser.add_option("-g", "--mash-genomedb", dest="mashGenomeRefDB", default = config['databases']['mash-genomedb'], type="string", help="absolute path to mash reference database")
-    parser.add_option("-p", "--mash-plasmiddb", dest="mashPlasmidRefDB", default = config['databases']['mash-plasmiddb'], type="string", help="absolute path to mash reference database")
-    parser.add_option("-b", "--busco-db", dest="buscodb", default = config['databases']['busco-db'], type="string", help="absolute path to busco reference database")
+def main(parser, config):
+    print(config.sections())
+    if not config.sections():
+        config = configparser.ConfigParser()
+        config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
+    if not parser:
+        script_name = path.basename(path.realpath(sys.argv[0]))
+        parser = argparse.ArgumentParser(prog=script_name)
+        parser.add_argument("-i", "--ID", dest="ID",
+                            help="identifier of the isolate")    
+        parser.add_argument("-1", "--R1", dest="R1",
+                            help="absolute file path forward read (R1)")
+        parser.add_argument("-2", "--R2", dest="R2",
+                            help="absolute file path to reverse read (R2)")
+        parser.add_argument("-o", "--output", dest="output", default='./',
+                            help="absolute path to output folder")
+    parser.add_argument("-g", "--mash-genomedb", dest="mashGenomeRefDB",
+                        default = config['databases']['mash-genomedb'],
+                        help="absolute path to mash reference database")
+    parser.add_argument("-p", "--mash-plasmiddb", dest="mashPlasmidRefDB",
+                        default = config['databases']['mash-plasmiddb'],
+                        help="absolute path to mash reference database")
+    parser.add_argument("-b", "--busco-db", dest="buscodb",
+                        default = config['databases']['busco-db'],
+                        help="absolute path to busco reference database")
+    parser.add_argument("-s", "--script-path", dest="script_path",
+                        default=config['scripts']['script-path'],
+                        help="absolute file path to this script folder")
 
-    parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")
-    parser.add_option("-s", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
-    
-
-    (options,args) = parser.parse_args()
+    args = parser.parse_args()
 
     curDir = os.getcwd()
-    outputDir = options.output
-    mash_genome_db = options.mashGenomeRefDB
-    mash_plasmid_db=options.mashPlasmidRefDB
-    script_path = options.script_path
-    buscodb = options.buscodb
-    ID = options.id
-    R1 = options.R1
-    R2 = options.R2
+    outputDir = args.output
+    mash_genome_db = args.mashGenomeRefDB
+    mash_plasmid_db = args.mashPlasmidRefDB
+    script_path = args.script_path
+    buscodb = args.buscodb
+    ID = args.ID
+    R1 = args.R1
+    R2 = args.R2
 
+    prepare_output_directories(outputDir, ID)
     
     notes = []
     #init the output list
@@ -206,14 +237,22 @@ def main():
     }
     
     qc_thresholds = {
-        "mash_hits_genome_score_cutoff":300, #genome mash will include all hits with scores (top hit score - $thisvalue)
-        "mash_hits_plasmid_score_cutoff":100, #plasmid mash will include all hits with scores (top hit score - $thisvalue)
-        "coverage_cutoff":30, #sequencing coverage greater than ($thisvalue) will pass the QC
-        "quast_assembly_length_cutoff":0.10, #QUAST QC: assembly length within +-($thisvalue) percent in reference to reference length will pass the QC 
-        "quast_percent_gc_cutoff":0.05, #QUAST QC: percent GC within +-($thisvalue) percent in reference to reference percent GC will pass the QC 
-        "quast_genome_fraction_percent_cutoff":0.90, #QUAST QC: genome_fraction_percent greater than ($thisvalue) will pass the QC
-        "busco_complete_single_cutoff":0.90, #BUSCO QC: complete single genes greater than ($thisvalue) percent will pass the QC
-        "busco_complete_duplicate_cutoff":0.10 #BUSCO QC: complete duplicate genes less than ($thisvalue) percent will pass the QC
+        # genome mash will include all hits with scores (top hit score - $thisvalue)
+        "mash_hits_genome_score_cutoff": 300,
+        # plasmid mash will include all hits with scores (top hit score - $thisvalue)
+        "mash_hits_plasmid_score_cutoff": 100,
+        # sequencing coverage greater than ($thisvalue) will pass the QC
+        "coverage_cutoff": 30,
+        # QUAST QC: assembly length within +-($thisvalue) percent in reference to reference length will pass the QC 
+        "quast_assembly_length_cutoff": 0.10,
+        # QUAST QC: percent GC within +-($thisvalue) percent in reference to reference percent GC will pass the QC 
+        "quast_percent_gc_cutoff":0.05,
+        # QUAST QC: genome_fraction_percent greater than ($thisvalue) will pass the QC
+        "quast_genome_fraction_percent_cutoff":0.90,
+        # BUSCO QC: complete single genes greater than ($thisvalue) percent will pass the QC
+        "busco_complete_single_cutoff":0.90,
+        # BUSCO QC: complete duplicate genes less than ($thisvalue) percent will pass the QC
+        "busco_complete_duplicate_cutoff":0.10 
     }
     
     file_paths = {
@@ -227,7 +266,6 @@ def main():
         "quast_path": "/".join([outputDir, ID, "post-assembly_qc", "quast"]),
     }
     
-    
     print(str(datetime.datetime.now()))
     print("ID: " + ID)
     print("R1: " + R1)
@@ -235,7 +273,7 @@ def main():
     
     print("step 1: preassembly QC")
 
-    job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
+    job_script_path = resource_filename('data', 'job_scripts')
 
     pre_assembly_qc_jobs = [
         {
