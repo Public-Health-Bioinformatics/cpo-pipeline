@@ -26,9 +26,10 @@ def main():
                         version='%(prog)s {}'.format(cpo_pipeline.__version__))
     args = parser.parse_args()
 
-    cpo_pipeline.assembly.pipeline.main(parser, config)
-    # cpo_pipeline.typing.pipeline.main(parser)
-    # cpo_pipeline.resistance.pipeline.main(parser)
+    # cpo_pipeline.pipeline.main(parser, config)
+    assembly = cpo_pipeline.assembly.pipeline.main(parser, config)
+    cpo_pipeline.typing.pipeline.main(parser, config, assembly)
+    # cpo_pipeline.resistance.pipeline.main(parser, config, assembly)
 
 if __name__ == '__main__':
    main()

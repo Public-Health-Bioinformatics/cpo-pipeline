@@ -27,7 +27,8 @@ import drmaa
 
 from pkg_resources import resource_filename
 
-from .parsers import result_parsers
+from cpo_pipeline.pipeline import prepare_job
+from cpo_pipeline.assembly.parsers import result_parsers
 
 def busco_qc_check(busco_results, qc_thresholds):
     """
@@ -164,22 +165,6 @@ def prepare_output_directories(output_dir, sample_id):
             if exc.errno != errno.EEXIST:
                 raise
 
-def prepare_job(job, session):
-    """
-    Prepare a DRMAA job
-    """
-    job_template = session.createJobTemplate()
-    job_template.jobName = job['job_name']
-    job_template.nativeSpecification = job['native_specification']
-    job_template.jobEnvironment = os.environ
-    job_template.workingDirectory = os.getcwd()
-    job_template.remoteCommand = job['remote_command']
-    job_template.args = job['args']
-    job_template.joinFiles = True
-
-    return job_template
-
-
 def main(parser, config):
     """
     main entrypoint
@@ -189,9 +174,6 @@ def main(parser, config):
     Returns:
         (void)
     """
-    if not config.sections():
-        config = configparser.ConfigParser()
-        config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
     if not parser:
         script_name = os.path.basename(os.path.realpath(sys.argv[0]))
         parser = argparse.ArgumentParser(prog=script_name)
@@ -204,25 +186,36 @@ def main(parser, config):
         parser.add_argument("-o", "--output", dest="output", default='./',
                             help="absolute path to output folder")
     parser.add_argument("-g", "--mash-genomedb", dest="mash_genome_db",
-                        default=config['databases']['mash_genome_db'],
                         help="absolute path to mash reference database")
     parser.add_argument("-p", "--mash-plasmiddb", dest="mash_plasmid_db",
-                        default=config['databases']['mash_plasmid_db'],
                         help="absolute path to mash reference database")
     parser.add_argument("-b", "--busco-db", dest="busco_db",
-                        default=config['databases']['busco_db'],
                         help="absolute path to busco reference database")
 
     args = parser.parse_args()
 
-    output_dir = args.output
-    mash_genome_db = args.mash_genome_db
-    mash_plasmid_db = args.mash_plasmid_db
-    busco_db = args.busco_db
+    if not config:
+        config = configparser.ConfigParser()
+        config_file = resource_filename('data', 'config.ini')
+        config.read(config_file)
+    
+    if args.mash_genome_db and not config['databases']['mash_genome_db']:
+        mash_genome_db = args.mash_genome_db
+    else:
+        mash_genome_db = config['databases']['mash_genome_db']
+    if args.mash_plasmid_db and not config['databases']['mash_plasmid_db']:
+        mash_plasmid_db = args.mash_plasmid_db
+    else:
+        mash_plasmid_db = config['databases']['mash_plasmid_db']
+    if args.busco_db and not config['databases']['busco_db']:
+        busco_db = args.busco_db
+    else:
+        busco_db = config['databases']['busco_db']
     sample_id = args.sample_id
     reads1_fastq = args.reads1_fastq
     reads2_fastq = args.reads2_fastq
-
+    output_dir = args.output
+    
     prepare_output_directories(output_dir, sample_id)
 
     #dictionary to store QC PASS/FAIL flags
@@ -496,6 +489,7 @@ def main(parser, config):
     for key, value in qc_verdicts.items():
         print(str(key) + ": " + str(value))
 
+    return "/".join([file_paths['assembly_path'], "contigs.fa"])
 
 if __name__ == "__main__":
     START = time.time()

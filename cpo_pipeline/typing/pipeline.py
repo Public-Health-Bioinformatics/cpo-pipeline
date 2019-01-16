@@ -1,78 +1,80 @@
 #!/usr/bin/env python
 
 '''
-This script is a wrapper for module two, part 1: typing from assemblies. 
+This script is a wrapper for module two, part 1: typing from assemblies.
 
-It uses mlst, mobsuite for sequence typing. 
+It uses mlst, mobsuite for sequence typing.
 
 Example usage:
 
-  pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --output output --expected-species "Klebsiella"
+pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --output output
 
-Requires the pipeline_prediction.sh script. the directory of where it's store can be specified using -k.
 '''
 
-import subprocess
-import optparse
-import os
+import argparse
+import configparser
 import datetime
+import os
 import sys
 import time
-import urllib.request
-import gzip
-import collections
-import configparser
+
+from pkg_resources import resource_filename
+
 import drmaa
 
-from parsers import result_parsers
-from parsers import input_parsers
+from cpo_pipeline.pipeline import prepare_job
+from cpo_pipeline.typing.parsers import result_parsers
+from cpo_pipeline.typing.parsers import input_parsers
 
 
-def prepare_job(job, session):
-    job_template = session.createJobTemplate()
-    job_template.jobName = job['job_name']
-    job_template.nativeSpecification = job['native_specification']
-    job_template.jobEnvironment = os.environ
-    job_template.workingDirectory = os.getcwd()
-    job_template.remoteCommand = job['remote_command']
-    job_template.args = job['args']
-    job_template.joinFiles = True
-    
-    return job_template
+def main(parser, config, assembly):
+    """
+    main entrypoint
+    Args:
+        parser():
+        config():
+    Returns:
+        (void)
+    """
+    if not parser:
+        script_name = os.path.basename(os.path.realpath(sys.argv[0]))
+        parser = argparse.ArgumentParser(prog=script_name)
+        parser.add_argument("-i", "--ID", dest="sample_id",
+                            help="identifier of the isolate")
+        parser.add_argument("-o", "--output", dest="output", default='./',
+                            help="absolute path to output folder")
+    parser.add_argument("-a", "--assembly", dest="assembly",
+                        help="Path to assembly file.")
+    parser.add_argument("-s", "--mlst-scheme-map", dest="mlst_scheme_map_file",
+                        help="absolute file path to mlst scheme")
+    parser.add_argument("-c", "--config", dest="config_file")
 
-def main():
+    args = parser.parse_args()
 
-    config = configparser.ConfigParser()
-    config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
+    if not config:
+        config = configparser.ConfigParser()
+        config_file = resource_filename('data', 'config.ini')
+        config.read(config_file)
 
-    parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
-    #required
-    parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")
-    parser.add_option("-a", "--assembly", dest="assembly", type="string", help="Path to assembly file.")
-    parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")    
-
-    parser.add_option("-s", "--mlst-scheme-map", dest="mlst_scheme_map_file", default=config['databases']['mlst-scheme-map'], type="string", help="absolute file path to mlst scheme")
-    parser.add_option("-k", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
-    
-    
-    (options, args) = parser.parse_args()
-    curDir = os.getcwd()
-    ID = str(options.id).lstrip().rstrip()
-    assembly = options.assembly
-    script_path = options.script_path
-    mlst_scheme_map_file = options.mlst_scheme_map_file
-    outputDir = options.output
+    sample_id = args.sample_id
+    if not assembly:
+        assembly = args.assembly
+    if not args.mlst_scheme_map_file:
+        mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
+    else:
+        mlst_scheme_map_file = args.mlst_scheme_map_file
+    output_dir = args.output
 
 
-    print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
+    print(str(datetime.datetime.now()) + "\n\nsample_id: " + sample_id + "\nAssembly: " + assembly)
 
     file_paths = {
-        'mlst_path': '/'.join([outputDir, ID, 'typing', 'mlst', 'mlst.tsv']),
-        'mob_recon_path': '/'.join([outputDir, ID, 'typing', 'mob_recon']),
+        'mlst_path': '/'.join([output_dir, sample_id, 'typing', 'mlst', 'mlst.tsv']),
+        'mob_recon_path': '/'.join([output_dir, sample_id, 'typing', 'mob_recon']),
     }
-    
-    job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
-    
+
+    job_script_path = resource_filename('data', 'job_scripts')
+
     typing_jobs = [
         {
             'job_name': 'mlst',
@@ -99,14 +101,14 @@ def main():
         running_jobs = [session.runJob(job) for job in prepared_jobs]
         for job_id in running_jobs:
             print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)    
-    
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+
     print("identifying MLST")
-    mlst_report = "/".join([outputDir, ID, "typing", "mlst", "mlst.tsv"]) 
-    mlstHits = result_parsers.parse_mlst_result(mlst_report)
+    mlst_report = "/".join([output_dir, sample_id, "typing", "mlst", "mlst.tsv"])
+    mlst_hits = result_parsers.parse_mlst_result(mlst_report)
     # TODO: Check that there is only one MLST result in the report, and handle
     #       cases where the report is malformed.
-    mlstHit = mlstHits[0]
+    mlst_hit = mlst_hits[0]
     mlst_scheme_map = input_parsers.parse_scheme_species_map(mlst_scheme_map_file)
     mlst_species = "Undefined"
     for scheme in mlst_scheme_map:
@@ -115,12 +117,30 @@ def main():
 
     print("identifying plasmid contigs and amr genes")
 
-    mob_recon_contig_report_path = "/".join([outputDir, ID, "typing", "mob_recon", "contig_report.txt"])
-    mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(mob_recon_contig_report_path)
+    mob_recon_contig_report_path = "/".join([
+        output_dir,
+        sample_id,
+        "typing",
+        "mob_recon",
+        "contig_report.txt"
+    ])
 
-    mob_recon_aggregate_report_path = "/".join([outputDir, ID, "typing", "mob_recon", "mobtyper_aggregate_report.txt"])
-    mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(mob_recon_aggregate_report_path)
-    
+    mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(
+        mob_recon_contig_report_path
+    )
+
+    mob_recon_aggregate_report_path = "/".join([
+        output_dir,
+        sample_id,
+        "typing",
+        "mob_recon",
+        "mobtyper_aggregate_report.txt"
+    ])
+
+    mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(
+        mob_recon_aggregate_report_path
+    )
+
 
     def extract_contig_num(contig_id):
         """
@@ -141,7 +161,7 @@ def main():
 
     def get_plasmid_contigs(mob_recon_contig_report):
         """
-        Given a list of dicts generated by parsing a mob_recon contig_report.txt file, 
+        Given a list of dicts generated by parsing a mob_recon contig_report.txt file,
         return a list of plasmid contigs.
         Args:
             mob_recon_contig_report (list of dict):
@@ -156,9 +176,9 @@ def main():
                 plasmid_contigs.append(contig_num)
         return plasmid_contigs
 
-    def get_likely_plasmid_contigs(mob_recon_report):
+    def get_likely_plasmid_contigs(mob_recon_contig_report):
         """
-        Given a list of dicts generated by parsing a mob_recon contig_report.txt file, 
+        Given a list of dicts generated by parsing a mob_recon contig_report.txt file,
         return a list of likely plasmid contigs.
         Args:
             mob_recon_contig_report (list of dict):
@@ -172,17 +192,17 @@ def main():
             if contig_num not in likely_plasmid_contigs and not contig_report_record['rep_type']:
                 likely_plasmid_contigs.append(contig_num)
         return likely_plasmid_contigs
-    
+
     def get_plasmid_origins(mob_recon_contig_report):
         """
-        Given a list of dicts generated by parsing a mob_recon contig_report.txt file, 
+        Given a list of dicts generated by parsing a mob_recon contig_report.txt file,
         return a list of plasmid origins.
         Args:
             mob_recon_contig_report (list of dict):
         Returns:
             list: plasmid origins
             For example: ['rep_cluster_1254', 'IncL/M', 'IncN', ...]
-        """        
+        """
         origins = []
         for contig_report_record in mob_recon_contig_report:
             if contig_report_record['rep_type']:
@@ -196,8 +216,8 @@ def main():
 
 
 if __name__ == "__main__":
-    start = time.time()
+    START = time.time()
     print("Starting workflow...")
-    main()
-    end = time.time()
-    print("Finished!\nThe analysis used: " + str(end - start) + " seconds")
+    main(None, None, None)
+    END = time.time()
+    print("Finished!\nThe analysis used: " + str(END - START) + " seconds")
