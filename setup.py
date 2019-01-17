@@ -14,6 +14,7 @@ setup(
     include_package_data=True,
     scripts=[
         'bin/cpo-pipeline',
+        'bin/cpo-multi',
     ],
     zip_safe=False,
 )
