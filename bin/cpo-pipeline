@@ -14,9 +14,13 @@ def main():
     config.read(config_file)
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
     parser = argparse.ArgumentParser(prog=script_name, description='')
-    parser.add_argument('-i', '--input',  dest='input_file',
+    parser.add_argument('-i', '--ID',  dest='sample_id',
                         help='Sample ID', required=False)
-    parser.add_argument('-o', '--outdir', dest='outdir',
+    parser.add_argument('-1', '--R1', dest='reads1_fastq',
+                        help='Read 1 fastq(.gz) file', required=False)
+    parser.add_argument('-2', '--R2', dest='reads2_fastq',
+                        help='Read 2 fastq(.gz) file', required=False)
+    parser.add_argument('-o', '--output', dest='output',
                         help='Output Directory', required=False)
     parser.add_argument('-v', '--version', action='version',
                         version='%(prog)s {}'.format(cpo_pipeline.__version__))
