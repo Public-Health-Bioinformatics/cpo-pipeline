@@ -45,9 +45,8 @@ def main(parser, config, assembly):
                             help="absolute path to output folder")
     parser.add_argument("-a", "--assembly", dest="assembly",
                         help="Path to assembly file.")
-    parser.add_argument("-s", "--mlst-scheme-map", dest="mlst_scheme_map_file",
+    parser.add_argument("--mlst-scheme-map", dest="mlst_scheme_map_file",
                         help="absolute file path to mlst scheme")
-    parser.add_argument("-c", "--config", dest="config_file")
 
     args = parser.parse_args()
 

@@ -42,13 +42,13 @@ def main(parser, config, assembly):
                             help="identifier of the isolate")
         parser.add_argument("-o", "--output", dest="output", default='./',
                             help="absolute path to output folder")
-    parser.add_argument("-a", "--assembly", dest="assembly",
-                        help="Path to assembly file.")
-    parser.add_argument("-c", "--card-json", dest="card_json",
+        parser.add_argument("-a", "--assembly", dest="assembly",
+                            help="Path to assembly file.")
+    parser.add_argument("--card-json", dest="card_json",
                         help="absolute path to card database (json format)")
-    parser.add_argument("-p", "--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
+    parser.add_argument("--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
                         help="absolute path to card database (json format)")
-    parser.add_argument("-d", "--abricate-datadir", dest="abricate_datadir",
+    parser.add_argument("--abricate-datadir", dest="abricate_datadir",
                         help="absolute path to card database (json format)")
 
     args = parser.parse_args()

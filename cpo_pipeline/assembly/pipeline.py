@@ -185,11 +185,11 @@ def main(parser, config):
                             help="absolute file path to reverse read (R2)")
         parser.add_argument("-o", "--output", dest="output", default='./',
                             help="absolute path to output folder")
-    parser.add_argument("-g", "--mash-genomedb", dest="mash_genome_db",
+    parser.add_argument("--mash-genomedb", dest="mash_genome_db",
                         help="absolute path to mash reference database")
-    parser.add_argument("-p", "--mash-plasmiddb", dest="mash_plasmid_db",
+    parser.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
                         help="absolute path to mash reference database")
-    parser.add_argument("-b", "--busco-db", dest="busco_db",
+    parser.add_argument("--busco-db", dest="busco_db",
                         help="absolute path to busco reference database")
 
     args = parser.parse_args()
