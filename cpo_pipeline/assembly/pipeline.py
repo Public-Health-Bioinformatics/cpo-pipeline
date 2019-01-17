@@ -353,10 +353,22 @@ def main(parser, config):
 
     # parse fastqc
     fastqc_r1_result = result_parsers.parse_fastqc_result(
-        file_paths['fastqc_output_path'] + "/" + sample_id + "_R1_fastqc/summary.txt"
+        glob.glob(
+            "/".join([
+                file_paths['fastqc_output_path'],
+                sample_id + "*_R1_*" + "fastqc",
+                "summary.txt"
+            ])
+        )[0]
     )
     fastqc_r2_result = result_parsers.parse_fastqc_result(
-        file_paths['fastqc_output_path'] + "/" + sample_id + "_R2_fastqc/summary.txt"
+        glob.glob(
+            "/".join([
+                file_paths['fastqc_output_path'],
+                sample_id + "*_R2_*" + "fastqc",
+                "/summary.txt"
+            ])
+        )[0]
     )
 
     #all the qC result are parsed now, lets do some QC logic

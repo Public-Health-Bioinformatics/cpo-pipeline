@@ -1,80 +1,94 @@
 #!/usr/bin/env python
 
 '''
-This script is a wrapper for resistance gene idenfification from assemblies. 
+This script is a wrapper for resistance gene idenfification from assemblies.
 
-It uses abricate and rgi for AMR profile prediction and plasmid predictions. 
+It uses abricate and rgi for AMR profile prediction and plasmid predictions.
 
 Example usage:
 
-  pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --output output --expected-species "Klebsiella"
-
-Requires the pipeline_prediction.sh script. the directory of where it's store can be specified using -k.
+  pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --output output
 '''
 
-import subprocess
-import optparse
+import argparse
 import os
 import datetime
 import sys
 import time
-import urllib.request
-import gzip
-import collections
 import configparser
+import re
+
 import drmaa
 
-from parsers import result_parsers
+from pkg_resources import resource_filename
+
+from cpo_pipeline.pipeline import prepare_job
+from cpo_pipeline.resistance.parsers import result_parsers
+
+def main(parser, config, assembly):
+    """
+    main entrypoint
+    Args:
+        parser():
+        config():
+        assembly():
+    Returns:
+        (void)
+    """
+    if not parser:
+        script_name = os.path.basename(os.path.realpath(sys.argv[0]))
+        parser = argparse.ArgumentParser(prog=script_name)
+        parser.add_argument("-i", "--ID", dest="sample_id",
+                            help="identifier of the isolate")
+        parser.add_argument("-o", "--output", dest="output", default='./',
+                            help="absolute path to output folder")
+    parser.add_argument("-a", "--assembly", dest="assembly",
+                        help="Path to assembly file.")
+    parser.add_argument("-c", "--card-json", dest="card_json",
+                        help="absolute path to card database (json format)")
+    parser.add_argument("-p", "--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
+                        help="absolute path to card database (json format)")
+    parser.add_argument("-d", "--abricate-datadir", dest="abricate_datadir",
+                        help="absolute path to card database (json format)")
+
+    args = parser.parse_args()
+
+    if not config:
+        config = configparser.ConfigParser()
+        config_file = resource_filename('data', 'config.ini')
+        config.read(config_file)
+
+    if not assembly:
+        assembly = args.assembly
+
+    if args.card_json and not config['databases']['card_json']:
+        card_path = args.card_json
+    else:
+        card_path = config['databases']['card_json']
+
+    if args.abricate_datadir and not config['databases']['abricate_datadir']:
+        abricate_datadir = args.abricate_datadir
+    else:
+        abricate_datadir = config['databases']['abricate_datadir']
+
+    if args.abricate_cpo_plasmid_db and not config['databases']['abricate_cpo_plasmid_db']:
+        abricate_cpo_plasmid_db = args.abricate_cpo_plasmid_db
+    else:
+        abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
+
+    sample_id = args.sample_id
+    output_dir = args.output
 
 
-def prepare_job(job, session):
-    job_template = session.createJobTemplate()
-    job_template.jobName = job['job_name']
-    job_template.nativeSpecification = job['native_specification']
-    job_template.jobEnvironment = os.environ
-    job_template.workingDirectory = os.getcwd()
-    job_template.remoteCommand = job['remote_command']
-    job_template.args = job['args']
-    job_template.joinFiles = True
-    
-    return job_template
-
-def main():
-
-    config = configparser.ConfigParser()
-    config.read(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config.ini')
-
-    parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
-    #required
-    parser.add_option("-i", "--id", dest="id", type="string", help="identifier of the isolate")
-    parser.add_option("-a", "--assembly", dest="assembly", type="string", help="Path to assembly file.")
-    parser.add_option("-o", "--output", dest="output", default='./', type="string", help="absolute path to output folder")    
-    parser.add_option("-k", "--script-path", dest="script_path", default=config['scripts']['script-path'], type="string", help="absolute file path to this script folder")
-    parser.add_option("-c", "--card-path", dest="card_path", default=config['databases']['card'], type="string", help="absolute file path to card.json db")
-    parser.add_option("-d", "--abricate-datadir", dest="abricate_datadir", default=config['databases']['abricate-datadir'], type="string", help="absolute file path to directory where abricate dbs are stored")
-    parser.add_option("-p", "--abricate-cpo-plasmid-db", dest="abricate_cpo_plasmid_db", default=config['databases']['abricate-cpo-plasmid-db'], type="string", help="name of abricate cpo plasmid db to use")
-    
-    
-    (options, args) = parser.parse_args()
-    curDir = os.getcwd()
-    ID = str(options.id).lstrip().rstrip()
-    assembly = options.assembly
-    script_path = options.script_path
-    card_path = options.card_path
-    abricate_datadir = options.abricate_datadir
-    abricate_cpo_plasmid_db = options.abricate_cpo_plasmid_db
-    outputDir = options.output
-
-
-    print(str(datetime.datetime.now()) + "\n\nID: " + ID + "\nAssembly: " + assembly)
+    print(str(datetime.datetime.now()) + "\n\nsample_id " + sample_id + "\nAssembly: " + assembly)
 
     file_paths = {
-        'abricate_path': '/'.join([outputDir, ID, 'resistance', 'abricate', 'abricate.tsv']),
-        'rgi_path': "/".join([outputDir, ID, 'resistance', 'rgi', 'rgi'])
+        'abricate_path': '/'.join([output_dir, sample_id, 'resistance', 'abricate', 'abricate.tsv']),
+        'rgi_path': "/".join([output_dir, sample_id, 'resistance', 'rgi', 'rgi'])
     }
-    
-    job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
-    
+
+    job_script_path = resource_filename('data', 'job_scripts')
+
     resistance_jobs = [
         {
             'job_name': 'abricate',
@@ -98,7 +112,7 @@ def main():
             ]
         }
     ]
-    
+
     with drmaa.Session() as session:
         prepared_jobs = [prepare_job(job, session) for job in resistance_jobs]
         running_jobs = [session.runJob(job) for job in prepared_jobs]
@@ -106,16 +120,16 @@ def main():
             print('Your job has been submitted with ID %s' % job_id)
         session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
 
-    
-    abricate_report_path = "/".join([outputDir, ID, "resistance", "abricate", "abricate.tsv"])
+
+    abricate_report_path = "/".join([output_dir, sample_id, "resistance", "abricate", "abricate.tsv"])
     abricate_report = result_parsers.parse_abricate_result(abricate_report_path)
-    
-    rgi_report_path = "/".join([outputDir, ID, "resistance", "rgi", "rgi.txt"])
+
+    rgi_report_path = "/".join([output_dir, sample_id, "resistance", "rgi", "rgi.txt"])
     rgi_report = result_parsers.parse_rgi_result_txt(rgi_report_path)
 
     def get_abricate_carbapenemases(abricate_report):
         """
-        Given a list of dicts generated by parsing an abricate report file, 
+        Given a list of dicts generated by parsing an abricate report file,
         return a list of carbapenemases.
         Args:
             abricate_report (list of dict):
@@ -127,10 +141,10 @@ def main():
         for abricate_report_record in abricate_report:
             abricate_carbapenemases.append(abricate_report_record['gene'])
         return abricate_carbapenemases
-    
+
     def get_rgi_carbapenemases(rgi_report):
         """
-        Given a list of dicts generated by parsing an rgi report file, 
+        Given a list of dicts generated by parsing an rgi report file,
         return a list of carbapenemases.
         Args:
             rgi_report (list of dict):
@@ -145,8 +159,8 @@ def main():
         return rgi_carbapenemases
 
 if __name__ == "__main__":
-    start = time.time()
+    START = time.time()
     print("Starting workflow...")
-    main()
-    end = time.time()
-    print("Finished!\nThe analysis used: " + str(end - start) + " seconds")
+    main(None, None, None)
+    END = time.time()
+    print("Finished!\nThe analysis used: " + str(END - START) + " seconds")

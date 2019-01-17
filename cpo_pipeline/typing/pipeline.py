@@ -112,7 +112,7 @@ def main(parser, config, assembly):
     mlst_scheme_map = input_parsers.parse_scheme_species_map(mlst_scheme_map_file)
     mlst_species = "Undefined"
     for scheme in mlst_scheme_map:
-        if 'species' in scheme and scheme['scheme_id'] == mlstHit['scheme_id']:
+        if 'species' in scheme and scheme['scheme_id'] == mlst_hit['scheme_id']:
             mlst_species = scheme['species']
 
     print("identifying plasmid contigs and amr genes")
