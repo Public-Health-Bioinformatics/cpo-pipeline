@@ -84,7 +84,7 @@ def main(parser, config, assembly):
 
     file_paths = {
         'abricate_path': '/'.join([output_dir, sample_id, 'resistance', 'abricate', 'abricate.tsv']),
-        'rgi_path': "/".join([output_dir, sample_id, 'resistance', 'rgi', 'rgi'])
+        'rgi_path': "/".join([output_dir, sample_id, 'resistance', 'rgi'])
     }
 
     job_script_path = resource_filename('data', 'job_scripts')
@@ -108,7 +108,7 @@ def main(parser, config, assembly):
             'args': [
                 "--input", assembly,
                 "--card_json", card_path,
-                "--output_file", file_paths['rgi_path']
+                "--output_dir", file_paths['rgi_path']
             ]
         }
     ]
