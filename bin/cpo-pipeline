@@ -14,6 +14,8 @@ def main():
     
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
     parser = argparse.ArgumentParser(prog=script_name, description='')
+    parser.add_argument('-v', '--version', action='version',
+                        version='%(prog)s {}'.format(cpo_pipeline.__version__))
     subparsers = parser.add_subparsers()
 
     full_group = subparsers.add_parser('full')
@@ -27,19 +29,19 @@ def main():
     full_group.add_argument('-o', '--outdir', dest='outdir',
                             help='Output Directory', required=True)
     full_group.add_argument('-c', '--config', dest='config_file',
+                            default=resource_filename('data', 'config.ini'),
                             help='Config File', required=False)
-    full_group.add_argument('-v', '--version', action='version',
-                            version='%(prog)s {}'.format(cpo_pipeline.__version__))
+    full_group.set_defaults(func=cpo_pipeline.pipeline.main)
 
     
     assembly_group.add_argument("-i", "--ID", dest="sample_id",
                                 help="identifier of the isolate")
     assembly_group.add_argument("-1", "--R1", dest="reads1_fastq",
-                                help="absolute file path forward read (R1)")
+                                help="absolute file path forward read (R1)", required=True)
     assembly_group.add_argument("-2", "--R2", dest="reads2_fastq",
-                                help="absolute file path to reverse read (R2)")
-    assembly_group.add_argument("-o", "--output", dest="output", default='./',
-                                help="absolute path to output folder")
+                                help="absolute file path to reverse read (R2)", required=True)
+    assembly_group.add_argument("-o", "--outdir", dest="outdir",
+                                help="absolute path to output folder", required=True)
     assembly_group.add_argument("--mash-genomedb", dest="mash_genome_db",
                                 help="absolute path to mash reference database")
     assembly_group.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
@@ -53,11 +55,11 @@ def main():
 
 
     resistance_group.add_argument("-i", "--ID", dest="sample_id",
-                                  help="identifier of the isolate")
+                                  help="identifier of the isolate", required=True)
     resistance_group.add_argument("-o", "--output", dest="outdir",
                                   help="absolute path to output folder", required=True)
     resistance_group.add_argument("-a", "--assembly", dest="assembly",
-                                  help="Path to assembly file.")
+                                  help="Path to assembly file.", required=True)
     resistance_group.add_argument("--card-json", dest="card_json",
                                   help="absolute path to card database (json format)")
     resistance_group.add_argument("--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
@@ -71,16 +73,16 @@ def main():
 
     
     typing_group.add_argument("-i", "--ID", dest="sample_id",
-                        help="identifier of the isolate")
-    typing_group.add_argument("-o", "--output", dest="output", default='./',
-                        help="absolute path to output folder")
+                              help="identifier of the isolate", required=True)
+    typing_group.add_argument("-o", "--output", dest="output",
+                              help="absolute path to output folder", required=True)
     typing_group.add_argument("-a", "--assembly", dest="assembly",
-                        help="Path to assembly file.")
+                              help="Path to assembly file.")
     typing_group.add_argument("--mlst-scheme-map", dest="mlst_scheme_map_file",
-                        help="absolute file path to mlst scheme")
+                              help="absolute file path to mlst scheme")
     typing_group.add_argument('-c', '--config', dest='config_file',
-                        default=resource_filename('data', 'config.ini'),
-                        help='Config File', required=False)
+                              default=resource_filename('data', 'config.ini'),
+                              help='Config File', required=False)
     typing_group.set_defaults(func=cpo_pipeline.typing.pipeline.main)
 
     
