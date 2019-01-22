@@ -37,7 +37,7 @@ do
     ;;
     -2|--R2)
     # input_R2.fastq.gz file
-    input_r1_fastq="$2"
+    input_r2_fastq="$2"
     shift # past argument
     shift # past value
     ;;
