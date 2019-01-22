@@ -27,37 +27,20 @@ from cpo_pipeline.typing.parsers import result_parsers
 from cpo_pipeline.typing.parsers import input_parsers
 
 
-def main(parser, config, assembly):
+def main(args):
     """
     main entrypoint
     Args:
-        parser():
-        config():
+        args():
     Returns:
         (void)
     """
-    if not parser:
-        script_name = os.path.basename(os.path.realpath(sys.argv[0]))
-        parser = argparse.ArgumentParser(prog=script_name)
-        parser.add_argument("-i", "--ID", dest="sample_id",
-                            help="identifier of the isolate")
-        parser.add_argument("-o", "--output", dest="output", default='./',
-                            help="absolute path to output folder")
-    parser.add_argument("-a", "--assembly", dest="assembly",
-                        help="Path to assembly file.")
-    parser.add_argument("--mlst-scheme-map", dest="mlst_scheme_map_file",
-                        help="absolute file path to mlst scheme")
 
-    args = parser.parse_args()
-
-    if not config:
-        config = configparser.ConfigParser()
-        config_file = resource_filename('data', 'config.ini')
-        config.read(config_file)
+    config = configparser.ConfigParser()
+    config.read(args.config_file)
 
     sample_id = args.sample_id
-    if not assembly:
-        assembly = args.assembly
+    assembly = args.assembly
     if not args.mlst_scheme_map_file:
         mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
     else:
@@ -215,8 +198,18 @@ def main(parser, config, assembly):
 
 
 if __name__ == "__main__":
-    START = time.time()
-    print("Starting workflow...")
-    main(None, None, None)
-    END = time.time()
-    print("Finished!\nThe analysis used: " + str(END - START) + " seconds")
+    script_name = os.path.basename(os.path.realpath(sys.argv[0]))
+    parser = argparse.ArgumentParser(prog=script_name)
+    parser.add_argument("-i", "--ID", dest="sample_id",
+                        help="identifier of the isolate")
+    parser.add_argument("-o", "--output", dest="output", default='./',
+                        help="absolute path to output folder")
+    parser.add_argument("-a", "--assembly", dest="assembly",
+                        help="Path to assembly file.")
+    parser.add_argument("--mlst-scheme-map", dest="mlst_scheme_map_file",
+                        help="absolute file path to mlst scheme")
+    parser.add_argument('-c', '--config', dest='config_file',
+                        default=resource_filename('data', 'config.ini'),
+                        help='Config File', required=False)
+    args = parser.parse_args()
+    main(args)

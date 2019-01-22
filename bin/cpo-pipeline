@@ -9,27 +9,84 @@ from pkg_resources import resource_filename
 import cpo_pipeline
 
 def main():
-    config = configparser.ConfigParser()
-    config_file = resource_filename('data', 'config.ini')
-    config.read(config_file)
+    """
+    """
+    
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
     parser = argparse.ArgumentParser(prog=script_name, description='')
-    parser.add_argument('-i', '--ID',  dest='sample_id',
-                        help='Sample ID', required=False)
-    parser.add_argument('-1', '--R1', dest='reads1_fastq',
-                        help='Read 1 fastq(.gz) file', required=False)
-    parser.add_argument('-2', '--R2', dest='reads2_fastq',
-                        help='Read 2 fastq(.gz) file', required=False)
-    parser.add_argument('-o', '--output', dest='output',
-                        help='Output Directory', required=False)
-    parser.add_argument('-v', '--version', action='version',
-                        version='%(prog)s {}'.format(cpo_pipeline.__version__))
+    subparsers = parser.add_subparsers()
+
+    full_group = subparsers.add_parser('full')
+    assembly_group = subparsers.add_parser('assembly')
+    typing_group = subparsers.add_parser('typing')
+    resistance_group = subparsers.add_parser('resistance')
+    tree_group = subparsers.add_parser('tree')
+    
+    full_group.add_argument('-i', '--input',  dest='input_file',
+                            help='Multi-Sample Input File', required=True)
+    full_group.add_argument('-o', '--outdir', dest='outdir',
+                            help='Output Directory', required=True)
+    full_group.add_argument('-c', '--config', dest='config_file',
+                            help='Config File', required=False)
+    full_group.add_argument('-v', '--version', action='version',
+                            version='%(prog)s {}'.format(cpo_pipeline.__version__))
+
+    
+    assembly_group.add_argument("-i", "--ID", dest="sample_id",
+                                help="identifier of the isolate")
+    assembly_group.add_argument("-1", "--R1", dest="reads1_fastq",
+                                help="absolute file path forward read (R1)")
+    assembly_group.add_argument("-2", "--R2", dest="reads2_fastq",
+                                help="absolute file path to reverse read (R2)")
+    assembly_group.add_argument("-o", "--output", dest="output", default='./',
+                                help="absolute path to output folder")
+    assembly_group.add_argument("--mash-genomedb", dest="mash_genome_db",
+                                help="absolute path to mash reference database")
+    assembly_group.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
+                                help="absolute path to mash reference database")
+    assembly_group.add_argument("--busco-db", dest="busco_db",
+                                help="absolute path to busco reference database")
+    assembly_group.add_argument('-c', '--config', dest='config_file',
+                                default=resource_filename('data', 'config.ini'),
+                                help='Config File', required=False)
+    assembly_group.set_defaults(func=cpo_pipeline.assembly.pipeline.main)
+
+
+    resistance_group.add_argument("-i", "--ID", dest="sample_id",
+                                  help="identifier of the isolate")
+    resistance_group.add_argument("-o", "--output", dest="outdir",
+                                  help="absolute path to output folder", required=True)
+    resistance_group.add_argument("-a", "--assembly", dest="assembly",
+                                  help="Path to assembly file.")
+    resistance_group.add_argument("--card-json", dest="card_json",
+                                  help="absolute path to card database (json format)")
+    resistance_group.add_argument("--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
+                                  help="absolute path to abricate cpo plasmid db")
+    resistance_group.add_argument("--abricate-datadir", dest="abricate_datadir",
+                                  help="name of abricate database directory")
+    resistance_group.add_argument('-c', '--config', dest='config_file',
+                                  default=resource_filename('data', 'config.ini'),
+                                  help='Config File', required=False)
+    resistance_group.set_defaults(func=cpo_pipeline.resistance.pipeline.main)
+
+    
+    typing_group.add_argument("-i", "--ID", dest="sample_id",
+                        help="identifier of the isolate")
+    typing_group.add_argument("-o", "--output", dest="output", default='./',
+                        help="absolute path to output folder")
+    typing_group.add_argument("-a", "--assembly", dest="assembly",
+                        help="Path to assembly file.")
+    typing_group.add_argument("--mlst-scheme-map", dest="mlst_scheme_map_file",
+                        help="absolute file path to mlst scheme")
+    typing_group.add_argument('-c', '--config', dest='config_file',
+                        default=resource_filename('data', 'config.ini'),
+                        help='Config File', required=False)
+    typing_group.set_defaults(func=cpo_pipeline.typing.pipeline.main)
+
+    
     args = parser.parse_args()
 
-    # cpo_pipeline.pipeline.main(parser, config)
-    assembly = cpo_pipeline.assembly.pipeline.main(parser, config)
-    cpo_pipeline.typing.pipeline.main(parser, config, assembly)
-    cpo_pipeline.resistance.pipeline.main(parser, config, assembly)
+    args.func(args)
 
 if __name__ == '__main__':
    main()

@@ -165,39 +165,17 @@ def prepare_output_directories(output_dir, sample_id):
             if exc.errno != errno.EEXIST:
                 raise
 
-def main(parser, config):
+def main(args):
     """
     main entrypoint
     Args:
-        parser():
-        config():
+        args():
     Returns:
         (void)
     """
-    if not parser:
-        script_name = os.path.basename(os.path.realpath(sys.argv[0]))
-        parser = argparse.ArgumentParser(prog=script_name)
-        parser.add_argument("-i", "--ID", dest="sample_id",
-                            help="identifier of the isolate")
-        parser.add_argument("-1", "--R1", dest="reads1_fastq",
-                            help="absolute file path forward read (R1)")
-        parser.add_argument("-2", "--R2", dest="reads2_fastq",
-                            help="absolute file path to reverse read (R2)")
-        parser.add_argument("-o", "--output", dest="output", default='./',
-                            help="absolute path to output folder")
-    parser.add_argument("--mash-genomedb", dest="mash_genome_db",
-                        help="absolute path to mash reference database")
-    parser.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
-                        help="absolute path to mash reference database")
-    parser.add_argument("--busco-db", dest="busco_db",
-                        help="absolute path to busco reference database")
 
-    args = parser.parse_args()
-
-    if not config:
-        config = configparser.ConfigParser()
-        config_file = resource_filename('data', 'config.ini')
-        config.read(config_file)
+    config = configparser.ConfigParser()
+    config.read(args.config_file)
     
     if args.mash_genome_db and not config['databases']['mash_genome_db']:
         mash_genome_db = args.mash_genome_db
@@ -214,7 +192,7 @@ def main(parser, config):
     sample_id = args.sample_id
     reads1_fastq = args.reads1_fastq
     reads2_fastq = args.reads2_fastq
-    output_dir = args.output
+    output_dir = args.outdir
     
     prepare_output_directories(output_dir, sample_id)
 
@@ -504,8 +482,24 @@ def main(parser, config):
     return "/".join([file_paths['assembly_path'], "contigs.fa"])
 
 if __name__ == "__main__":
-    START = time.time()
-    print("Starting workflow...")
-    main(None, None)
-    END = time.time()
-    print("Finished!\nThe analysis used: " + str(END - START) + " seconds")
+    script_name = os.path.basename(os.path.realpath(sys.argv[0]))
+    parser = argparse.ArgumentParser(prog=script_name, description='')
+    parser.add_argument("-i", "--ID", dest="sample_id",
+                        help="identifier of the isolate")
+    parser.add_argument("-1", "--R1", dest="reads1_fastq",
+                        help="absolute file path forward read (R1)")
+    parser.add_argument("-2", "--R2", dest="reads2_fastq",
+                        help="absolute file path to reverse read (R2)")
+    parser.add_argument("-o", "--outdir", dest="output", default='./',
+                        help="absolute path to output folder")
+    parser.add_argument("--mash-genomedb", dest="mash_genome_db",
+                        help="absolute path to mash reference database")
+    parser.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
+                        help="absolute path to mash reference database")
+    parser.add_argument("--busco-db", dest="busco_db",
+                        help="absolute path to busco reference database")
+    parser.add_argument('-c', '--config', dest='config_file',
+                        default=resource_filename('data', 'config.ini'),
+                        help='Config File', required=False)
+    args = parser.parse_args()
+    main(args)

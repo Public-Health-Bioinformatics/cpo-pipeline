@@ -25,41 +25,19 @@ from pkg_resources import resource_filename
 from cpo_pipeline.pipeline import prepare_job
 from cpo_pipeline.resistance.parsers import result_parsers
 
-def main(parser, config, assembly):
+def main(args):
     """
     main entrypoint
     Args:
-        parser():
-        config():
-        assembly():
+        args():
     Returns:
         (void)
     """
-    if not parser:
-        script_name = os.path.basename(os.path.realpath(sys.argv[0]))
-        parser = argparse.ArgumentParser(prog=script_name)
-        parser.add_argument("-i", "--ID", dest="sample_id",
-                            help="identifier of the isolate")
-        parser.add_argument("-o", "--output", dest="output", default='./',
-                            help="absolute path to output folder")
-        parser.add_argument("-a", "--assembly", dest="assembly",
-                            help="Path to assembly file.")
-    parser.add_argument("--card-json", dest="card_json",
-                        help="absolute path to card database (json format)")
-    parser.add_argument("--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
-                        help="absolute path to card database (json format)")
-    parser.add_argument("--abricate-datadir", dest="abricate_datadir",
-                        help="absolute path to card database (json format)")
 
-    args = parser.parse_args()
+    config = configparser.ConfigParser()
+    config.read(args.config_file)
 
-    if not config:
-        config = configparser.ConfigParser()
-        config_file = resource_filename('data', 'config.ini')
-        config.read(config_file)
-
-    if not assembly:
-        assembly = args.assembly
+    assembly = args.assembly
 
     if args.card_json and not config['databases']['card_json']:
         card_path = args.card_json
@@ -77,7 +55,7 @@ def main(parser, config, assembly):
         abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
 
     sample_id = args.sample_id
-    output_dir = args.output
+    output_dir = args.outdir
 
 
     print(str(datetime.datetime.now()) + "\n\nsample_id " + sample_id + "\nAssembly: " + assembly)
@@ -159,8 +137,22 @@ def main(parser, config, assembly):
         return rgi_carbapenemases
 
 if __name__ == "__main__":
-    START = time.time()
-    print("Starting workflow...")
-    main(None, None, None)
-    END = time.time()
-    print("Finished!\nThe analysis used: " + str(END - START) + " seconds")
+    script_name = os.path.basename(os.path.realpath(sys.argv[0]))
+    parser = argparse.ArgumentParser(prog=script_name)
+    parser.add_argument("-i", "--ID", dest="sample_id",
+                        help="identifier of the isolate")
+    parser.add_argument("-o", "--output", dest="outdir",
+                        help="absolute path to output folder", required=True)
+    parser.add_argument("-a", "--assembly", dest="assembly",
+                        help="Path to assembly file.")
+    parser.add_argument("--card-json", dest="card_json",
+                        help="absolute path to card database (json format)")
+    parser.add_argument("--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
+                        help="absolute path to card database (json format)")
+    parser.add_argument("--abricate-datadir", dest="abricate_datadir",
+                        help="absolute path to card database (json format)")
+    parser.add_argument('-c', '--config', dest='config_file',
+                        default=resource_filename('data', 'config.ini'),
+                        help='Config File', required=False)
+    args = parser.parse_args()
+    main(args)

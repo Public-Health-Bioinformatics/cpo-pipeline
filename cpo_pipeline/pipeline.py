@@ -3,6 +3,9 @@
 import os
 import argparse
 import configparser
+import csv
+import subprocess
+
 import cpo_pipeline
 
 def prepare_job(job, session):
@@ -17,7 +20,26 @@ def prepare_job(job, session):
     
     return job_template
 
-def main():
+def main(args, config):
+    with open(args.input_file) as input_file:
+        fieldnames = ['sample_id', 'reads1_fastq', 'reads2_fastq']
+        reader = csv.DictReader(
+            (row for row in input_file if not row.startswith('#')),
+            delimiter='\t',
+            fieldnames=fieldnames
+        )
+        for row in reader:
+            command_line = [
+                'cpo-pipeline',
+                'assembly',
+                '--ID', row['sample_id'],
+                '--R1', row['reads1_fastq'],
+                '--R2', row['reads1_fastq'],
+                '--outdir', args.outdir,
+            ]
+            subprocess.run(command_line)
+
+if __name__ == '__main__':
     config = configparser.ConfigParser()
     config_file = resource_filename('data', 'config.ini')
     config.read(config_file)
@@ -34,6 +56,4 @@ def main():
     parser.add_argument('-v', '--version', action='version',
                         version='%(prog)s {}'.format(cpo_pipeline.__version__))
     args = parser.parse_args()
-
-if __name__ == '__main__':
     main()
