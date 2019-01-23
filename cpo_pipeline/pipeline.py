@@ -46,7 +46,7 @@ def main(args):
         'cpo-pipeline',
         'typing',
         '--ID', args.sample_id,
-        '--assembly', "/".join(args.outdir, args.sample_id, 'assembly', 'contigs.fa'),
+        '--assembly', "/".join([args.outdir, args.sample_id, 'assembly', 'contigs.fa']),
         '--outdir', args.outdir,
     ]
 
@@ -56,7 +56,7 @@ def main(args):
         'cpo-pipeline',
         'resistance',
         '--ID', args.sample_id,
-        '--assembly', "/".join(args.outdir, args.sample_id, 'assembly', 'contigs.fa'),
+        '--assembly', "/".join([args.outdir, args.sample_id, 'assembly', 'contigs.fa']),
         '--outdir', args.outdir,
     ]
 
