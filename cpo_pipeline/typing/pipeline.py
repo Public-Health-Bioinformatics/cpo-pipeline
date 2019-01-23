@@ -7,7 +7,7 @@ It uses mlst, mobsuite for sequence typing.
 
 Example usage:
 
-pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --output output
+pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --outdir outdir
 
 '''
 
@@ -45,7 +45,7 @@ def main(args):
         mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
     else:
         mlst_scheme_map_file = args.mlst_scheme_map_file
-    output_dir = args.output
+    output_dir = args.outdir
 
 
     print(str(datetime.datetime.now()) + "\n\nsample_id: " + sample_id + "\nAssembly: " + assembly)
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog=script_name)
     parser.add_argument("-i", "--ID", dest="sample_id",
                         help="identifier of the isolate")
-    parser.add_argument("-o", "--output", dest="output", default='./',
+    parser.add_argument("-o", "--outdir", dest="outdir", default='./',
                         help="absolute path to output folder")
     parser.add_argument("-a", "--assembly", dest="assembly",
                         help="Path to assembly file.")

@@ -7,7 +7,7 @@ It uses abricate and rgi for AMR profile prediction and plasmid predictions.
 
 Example usage:
 
-  pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --output output
+  pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --outdir outdir
 '''
 
 import argparse
@@ -140,11 +140,11 @@ if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
     parser = argparse.ArgumentParser(prog=script_name)
     parser.add_argument("-i", "--ID", dest="sample_id",
-                        help="identifier of the isolate")
-    parser.add_argument("-o", "--output", dest="outdir",
+                        help="identifier of the isolate", required=True)
+    parser.add_argument("-o", "--outdir", dest="outdir",
                         help="absolute path to output folder", required=True)
     parser.add_argument("-a", "--assembly", dest="assembly",
-                        help="Path to assembly file.")
+                        help="Path to assembly file.", required=True)
     parser.add_argument("--card-json", dest="card_json",
                         help="absolute path to card database (json format)")
     parser.add_argument("--abricate-cpo-plamid-db", dest="abricate_cpo_plasmid_db",
