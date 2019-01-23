@@ -72,7 +72,7 @@ def main():
 
     resistance_group.add_argument("-i", "--ID", dest="sample_id",
                                   help="identifier of the isolate", required=True)
-    resistance_group.add_argument("-o", "--output", dest="outdir",
+    resistance_group.add_argument("-o", "--outdir", dest="outdir",
                                   help="absolute path to output folder", required=True)
     resistance_group.add_argument("-a", "--assembly", dest="assembly",
                                   help="Path to assembly file.", required=True)
@@ -90,7 +90,7 @@ def main():
     
     typing_group.add_argument("-i", "--ID", dest="sample_id",
                               help="identifier of the isolate", required=True)
-    typing_group.add_argument("-o", "--output", dest="output",
+    typing_group.add_argument("-o", "--outdir", dest="outdir",
                               help="absolute path to output folder", required=True)
     typing_group.add_argument("-a", "--assembly", dest="assembly",
                               help="Path to assembly file.", required=True)
