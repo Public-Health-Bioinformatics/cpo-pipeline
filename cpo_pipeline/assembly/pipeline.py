@@ -344,7 +344,7 @@ def main(args):
             "/".join([
                 file_paths['fastqc_output_path'],
                 sample_id + "*_R2_*" + "fastqc",
-                "/summary.txt"
+                "summary.txt"
             ])
         )[0]
     )
