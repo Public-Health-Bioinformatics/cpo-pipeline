@@ -12,9 +12,31 @@ setup(
     license='MIT',
     packages=['cpo_pipeline'],
     include_package_data=True,
+    python_requires = '>=3.4',
+    keywords = "molecular epidemiology",
+    url = "https://github.com/Public-Health-Bioinformatics/cpo-pipeline",
+    project_urls = {
+        "Bug Reports": "https://github.com/Public-Health-Bioinformatics/cpo-pipeline/issues",
+        "Change Log":  "https://github.com/Public-Health-Bioinformatics/cpo-pipeline/CHANGES.md",
+        "Source":      "https://github.com/Public-Health-Bioinformatics/cpo-pipeline",
+    },
     scripts=[
         'bin/cpo-pipeline',
         'bin/cpo-multi',
     ],
     zip_safe=False,
+    python_requires = '>=3.4',
+    install_requires = [
+        "drmaa >=0.7.9, ==0.7.*",
+    ],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
+        "License :: OSI Approved :: MIT License",  
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        
+    ],
 )
