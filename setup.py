@@ -12,7 +12,6 @@ setup(
     license='MIT',
     packages=['cpo_pipeline'],
     include_package_data=True,
-    python_requires = '>=3.4',
     keywords = "molecular epidemiology",
     project_urls = {
         "Bug Reports": "https://github.com/Public-Health-Bioinformatics/cpo-pipeline/issues",
