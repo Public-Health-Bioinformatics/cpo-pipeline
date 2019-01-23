@@ -14,7 +14,6 @@ setup(
     include_package_data=True,
     python_requires = '>=3.4',
     keywords = "molecular epidemiology",
-    url = "https://github.com/Public-Health-Bioinformatics/cpo-pipeline",
     project_urls = {
         "Bug Reports": "https://github.com/Public-Health-Bioinformatics/cpo-pipeline/issues",
         "Change Log":  "https://github.com/Public-Health-Bioinformatics/cpo-pipeline/CHANGES.md",
