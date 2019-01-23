@@ -38,5 +38,5 @@ script:
   - python cpo_pipeline/assembly/test/test_parsers.py
   - python cpo_pipeline/typing/test/test_parsers.py
   - python cpo_pipeline/resistance/test/test_parsers.py
-  - python cpo_pipelinetree/test/test_parsers.py
+  - python cpo_pipeline/tree/test/test_parsers.py
 
