@@ -40,6 +40,6 @@ while IFS=$'\t' read -a sample; do
     if [[ "${sample[0]}" =~ $COMMENT_REGEX ]]; then
 	continue
     else
-	cpo-pipeline -i "${sample[0]}" -1 "${sample[1]}" -2 "${sample[2]}" -o "${outdir}" &
+	cpo-pipeline full -i "${sample[0]}" -1 "${sample[1]}" -2 "${sample[2]}" -o "${outdir}" &
     fi
 done < "${input}"
