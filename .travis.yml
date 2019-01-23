@@ -35,7 +35,8 @@ before_install:
   - conda install -y -q drmaa
 
 script:
-  - python assembly/test/test_parsers.py
-  - python typing/test/test_parsers.py
-  - python tree/test/test_parsers.py
+  - python cpo_pipeline/assembly/test/test_parsers.py
+  - python cpo_pipeline/typing/test/test_parsers.py
+  - python cpo_pipeline/resistance/test/test_parsers.py
+  - python cpo_pipelinetree/test/test_parsers.py
 
