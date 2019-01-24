@@ -1,14 +1,14 @@
 #!/bin/bash -e
 
 #$ -V             # Pass environment variables to the job
-#$ -N mlst
+#$ -N mash_screen
 #$ -cwd           # Use the current working dir
 #$ -pe smp 8      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -o|--output_file OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -1|--R1 INPUT_R1_FASTQ -2|--R2 INPUT_R2_FASTQ -q|--queries QUERIES_MSH -o|--output_file OUTPUT_FILE\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -19,7 +19,9 @@ then
   exit 0
 fi
 
-input=""
+input_r1_fastq=""
+input_r2_fastq=""
+queries=""
 output_file=""
 
 while [[ $# -gt 0 ]]
@@ -27,9 +29,21 @@ do
   key="$1"
   
   case $key in
-    -i|--input)
+    -1|--R1)
     # input_R1.fastq.gz file
-    assembly="$2"
+    input_r1_fastq="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -2|--R2)
+    # input_R2.fastq.gz file
+    input_r2_fastq="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -q|--queries)
+    # mash sketch file <queries>.msh
+    queries="$2"
     shift # past argument
     shift # past value
     ;;
@@ -44,8 +58,8 @@ done
 
 mkdir -p $(dirname "${output_file}")
 
-source activate mlst-2.15.1
+source activate mash-2.0
 
-mlst "${assembly}" > "${output_file}"
+mash screen -p 8 -w "${queries}" "${input_r1_fastq}" "${input_r2_fastq}" > "${output_file}"
 
 source deactivate

@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -c|--card_json CARD_JSON_FILE -o|--output_file OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -c|--card_json CARD_JSON_FILE -o|--output_dir OUTPUT_DIR\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -21,7 +21,7 @@ fi
 
 assembly=""
 card_json=""
-output_file=""
+output_dir=""
 
 while [[ $# -gt 0 ]]
 do
@@ -40,9 +40,9 @@ do
     shift # past argument
     shift # past value
     ;;
-    -o|--output_file)
-    # Output file
-    output_file="$2"
+    -o|--output_dir)
+    # Output directory
+    output_dir="$2"
     shift # past argument
     shift # past value
     ;;
@@ -51,11 +51,13 @@ done
 
 echo "${card_json}"
 
-mkdir -p $(dirname "${output_file}")
+assembly_realpath=$( realpath "${assembly}" )
 
-echo "going to cd into " $(dirname "${output_file}") "..."
+mkdir -p "${output_dir}"
 
-cd $(dirname "${output_file}")
+echo "going to cd into " "${output_dir}" "..."
+
+cd "${output_dir}"
 
 pwd
 
@@ -66,8 +68,8 @@ rgi load \
     --local
 
 rgi main \
-    -i "${assembly}" \
-    -o $(basename "${output_file}") \
+    -i "${assembly_realpath}" \
+    -o rgi \
     -t contig \
     -a BLAST \
     -n 12 \

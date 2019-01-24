@@ -50,7 +50,7 @@ done
 
 mkdir -p "${output_dir}"
 
-source activate fastqc-0.11.7
+source activate fastqc-0.11.8
 
 fastqc -t 4 -o "${output_dir}" --extract "${input_r1_fastq}" "${input_r2_fastq}"
 
