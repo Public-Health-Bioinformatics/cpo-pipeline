@@ -1,0 +1,11 @@
+pipeline_version	tool_name	tool_version
+0.1.0	mash	2.0
+0.1.0	seqtk	1.3
+0.1.0	fastqc	0.11.8
+0.1.0	shovill	1.0.1
+0.1.0	quast	4.6.3
+0.1.0	busco	3.0.2
+0.1.0	mlst	2.15.1
+0.1.0	mob_suite	1.4.5
+0.1.0	rgi	4.0.3
+0.1.0	abricate	0.8.7
