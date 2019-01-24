@@ -44,6 +44,9 @@ def main():
                              help="Multi-sample input file", required=True)
     multi_group.add_argument("-o", "--outdir", dest="outdir", default='./',
                              help="absolute path to output folder")
+    multi_group.add_argument('-p', '--parallel', dest='parallel',
+                             default=8,
+                             help='Number of samples to process in parallel', required=False)
     multi_group.add_argument('-c', '--config', dest='config_file',
                              default=resource_filename('data', 'config.ini'),
                              help='Config File', required=False)

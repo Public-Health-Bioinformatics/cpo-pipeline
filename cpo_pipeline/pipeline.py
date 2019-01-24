@@ -69,7 +69,7 @@ def multi(args):
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
-    pool = multiprocessing.Pool(8)
+    pool = multiprocessing.Pool(args.parallel)
 
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
 
