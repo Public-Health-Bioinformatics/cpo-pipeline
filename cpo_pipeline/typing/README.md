@@ -12,7 +12,7 @@ Note: An abricate database containing carbapenemase gene sequences must be prepa
 
 ### Setup
 
-This module uses outputs from [Module 1 (Assembly & QC)](https://github.com/Public-Health-Bioinformatics/cpo-pipeline/tree/master/assembly). That module must be run first before running this one.
+This module uses outputs from [Module 1 (Assembly & QC)](https://github.com/Public-Health-Bioinformatics/cpo-pipeline/tree/master/cpo_pipeline/assembly). That module must be run first before running this one.
 
 ### Submit Analysis
 
