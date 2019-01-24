@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -o|--output_file OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -l|--label LABEL -i|--input INPUT_CONTIGS_FASTA -o|--output_file OUTPUT_FILE\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -33,6 +33,12 @@ do
     shift # past argument
     shift # past value
     ;;
+    -l|--label)
+    # Sample ID
+    label="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -o|--output_file)
     # Output file
     output_file="$2"
@@ -46,6 +52,6 @@ mkdir -p $(dirname "${output_file}")
 
 source activate mlst-2.15.1
 
-mlst "${assembly}" > "${output_file}"
+mlst --label "${label}" "${assembly}" > "${output_file}"
 
 source deactivate

@@ -64,6 +64,7 @@ def main(args):
             'remote_command': os.path.join(job_script_path, 'mlst.sh'),
             'args': [
                 "--input", assembly,
+                "--label", sample_id,
                 "--output_file", file_paths['mlst_path']
             ]
         },
