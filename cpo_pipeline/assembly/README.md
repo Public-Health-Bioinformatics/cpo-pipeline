@@ -8,8 +8,7 @@ The `assembly/pipeline.py` script requires the following conda environments:
  - `fastqc-0.11.7`
  - `seqtk-1.3`
  - `shovill-1.0.1`
- - `quast-4.6.3`
- - `busco-3.0.2`
+ - `quast-5.0.2`
 
 ## Running the Pipeline
 

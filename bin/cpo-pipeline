@@ -28,6 +28,9 @@ def main():
 
     full_group.add_argument("-i", "--ID", dest="sample_id",
                             help="identifier of the isolate", required=True)
+    full_group.add_argument("-e", "--expected-organism-taxid",
+                            dest="expected_organism_ncbi_taxid",
+                            help="Expected organism NCBI Taxonomy ID")
     full_group.add_argument("-1", "--R1", dest="reads1_fastq",
                             help="absolute file path forward read (R1)", required=True)
     full_group.add_argument("-2", "--R2", dest="reads2_fastq",
@@ -55,6 +58,9 @@ def main():
 
     assembly_group.add_argument("-i", "--ID", dest="sample_id",
                                 help="identifier of the isolate", required=True)
+    assembly_group.add_argument("-e", "--expected-organism-taxid",
+                                dest="expected_organism_ncbi_taxid",
+                                help="Expected organism NCBI Taxonomy ID")
     assembly_group.add_argument("-1", "--R1", dest="reads1_fastq",
                                 help="absolute file path forward read (R1)", required=True)
     assembly_group.add_argument("-2", "--R2", dest="reads2_fastq",
@@ -65,8 +71,6 @@ def main():
                                 help="absolute path to mash reference database")
     assembly_group.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
                                 help="absolute path to mash reference database")
-    assembly_group.add_argument("--busco-db", dest="busco_db",
-                                help="absolute path to busco reference database")
     assembly_group.add_argument('-c', '--config', dest='config_file',
                                 default=resource_filename('data', 'config.ini'),
                                 help='Config File', required=False)

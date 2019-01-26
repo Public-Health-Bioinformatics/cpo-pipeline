@@ -1,0 +1,26 @@
+All statistics are based on contigs of size >= 500 bp, unless otherwise noted (e.g., "# contigs (>= 0 bp)" and "Total length (>= 0 bp)" include all contigs).
+
+Assembly                     SAMPLE-ID
+# contigs (>= 0 bp)          72         
+# contigs (>= 1000 bp)       65         
+# contigs (>= 5000 bp)       42         
+# contigs (>= 10000 bp)      35         
+# contigs (>= 25000 bp)      28         
+# contigs (>= 50000 bp)      21         
+Total length (>= 0 bp)       5182695    
+Total length (>= 1000 bp)    5177045    
+Total length (>= 5000 bp)    5115285    
+Total length (>= 10000 bp)   5070721    
+Total length (>= 25000 bp)   4971839    
+Total length (>= 50000 bp)   4753758    
+# contigs                    72         
+Largest contig               692871     
+Total length                 5182695    
+GC (%)                       51.75      
+N50                          299446     
+N75                          123167     
+L50                          6          
+L75                          12         
+# N's per 100 kbp            0.00       
+Complete BUSCO (%)          100.0   
+Partial BUSCO (%)           100.0   

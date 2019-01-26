@@ -1,0 +1,12 @@
+{
+    "num_contigs": 72,
+    "largest_contig": 692871,
+    "N50": 299446,
+    "L50": 6,
+    "N75": 123167,
+    "L75": 12,
+    "total_length": 5182695,
+    "percent_GC": 51.75,
+    "complete_busco_percent": 100.0,
+    "partial_busco_percent": 100.0
+}

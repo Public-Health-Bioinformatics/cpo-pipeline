@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -R|--reference_genome REFERENCE_GENOME_FASTA -o|--output_dir OUTPUT_DIR\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] [-r|--reference REFERENCE_FASTA] -i|--input INPUT_CONTIGS_FASTA -o|--outdir OUTPUT_DIR\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -20,8 +20,8 @@ then
 fi
 
 contigs=""
-reference_genome=""
-output_dir=""
+outdir=""
+reference=""
 
 while [[ $# -gt 0 ]]
 do
@@ -34,29 +34,32 @@ do
     shift # past argument
     shift # past value
     ;;
-    -R|--reference_genome)
-    # Reference genome
-    reference_genome="$2"
+    -r|--reference)
+    # reference fasta file
+    reference="$2"
     shift # past argument
     shift # past value
     ;;
-    -o|--output_dir)
+    -o|--outdir)
     # Output directory
-    output_dir="$2"
+    outdir="$2"
     shift # past argument
     shift # past value
     ;;
   esac
 done
 
-mkdir -p "${output_dir}"
+mkdir -p "${outdir}"
 
-source activate quast-4.6.3
+source activate quast-5.0.2
 
 quast \
-    -R "${reference_genome}" \
-    --output-dir "${output_dir}" \
+    --output-dir "${outdir}" \
     --threads 8 \
+    --fast \
+    --silent \
+    --conserved-genes-finding \
+    $( if [ "${reference}" != "" ]; then echo "-r" "${reference}"; fi ) \
     "${contigs}" \
 
 source deactivate

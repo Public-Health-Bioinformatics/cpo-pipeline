@@ -79,10 +79,21 @@ class BuscoResultParserTest(unittest.TestCase):
         parsed_result = result_parsers.parse_busco_result(self.test_data_path)
         self.assertDictEqual(parsed_result, self.parsed_busco_summary_json)
 
-class QuastResultParserTest(unittest.TestCase):
+class QuastResultNoRefParserTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/post-assembly_qc/quast/report.txt')
-        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_quast_report.json')) as quast_report_json:
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/post-assembly_qc/quast/report_no_ref.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_quast_report_no_ref.json')) as quast_report_json:
+            self.parsed_quast_report_json = json.load(quast_report_json)
+            quast_report_json.close()
+    
+    def test_parse_quast_result(self):
+        parsed_result = result_parsers.parse_quast_result(self.test_data_path)
+        self.assertDictEqual(parsed_result, self.parsed_quast_report_json)
+
+class QuastResultWithRefParserTest(unittest.TestCase):
+    def setUp(self):
+        self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/post-assembly_qc/quast/report_with_ref.txt')
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_quast_report_with_ref.json')) as quast_report_json:
             self.parsed_quast_report_json = json.load(quast_report_json)
             quast_report_json.close()
     

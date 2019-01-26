@@ -41,8 +41,7 @@ mash-2.0
 seqtk-1.3
 fastqc-0.11.8
 shovill-1.0.1
-quast-4.6.3
-busco-3.0.2
+quast-5.0.2
 mlst-2.15.1
 mob_suite-1.4.5
 rgi-4.0.3

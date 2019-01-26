@@ -230,19 +230,13 @@ def parse_quast_result(path_to_quast_result):
             "contigs_count": 72,
             "largest_contig": 692871,
             "N50": 299446,
-            "NG50": 299446,
             "L50": 6,
-            "LG50": 6,
             "N75": 123167,
-            "NG75": 110534,
             "L75": 12,
-            "LG75": 14,
             "total_length": 5182695,
-            "reference_length": 5489397,
             "percent_GC": 51.75,
-            "reference_percent_GC": 51.59,
-            "genome_fraction_percent": 91.202,
-            "duplication_ratio": 1.002
+            "complete_busco_percent": 100.0,
+            "partial_busco_percent": 100.0
         }
     """
     quast_output = []
@@ -267,7 +261,7 @@ def parse_quast_result(path_to_quast_result):
     # Associate a regex that can be used to identify the line of interest in the quast report
     # with a string to use as a key in the output dict.
     quast_report_parsing_regexes = {
-        '^# contigs {2,}\d+': 'contigs_count',
+        '^# contigs {2,}\d+': 'num_contigs',
         '^Largest contig {1,}\d+': 'largest_contig',
         '^N50 +\d+': 'N50',
         '^NG50 +\d+': 'NG50',
@@ -283,6 +277,8 @@ def parse_quast_result(path_to_quast_result):
         '^Reference GC \(%\) +\d+\.\d+': 'reference_percent_GC',
         '^Genome fraction \(%\) +\d+\.\d+': 'genome_fraction_percent',
         '^Duplication ratio +\d+\.\d+': 'duplication_ratio',
+        '^Complete BUSCO \(\%\) +\d+\.\d+': 'complete_busco_percent',
+        '^Partial BUSCO \(\%\) +\d+\.\d+': 'partial_busco_percent',
     }
     
     quast_result = {}

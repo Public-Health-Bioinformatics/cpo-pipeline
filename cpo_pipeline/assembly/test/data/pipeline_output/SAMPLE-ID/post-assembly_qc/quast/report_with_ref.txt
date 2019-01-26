@@ -15,17 +15,17 @@ Total length (>= 25000 bp)   4971839
 Total length (>= 50000 bp)   4753758    
 # contigs                    72         
 Largest contig               692871     
-Total length                 5182695    
+Total length                 5182695
 Reference length             5489397    
-GC (%)                       51.75      
+GC (%)                       51.75
 Reference GC (%)             51.59      
-N50                          299446     
+N50                          299446
 NG50                         299446     
-N75                          123167     
+N75                          123167
 NG75                         110534     
-L50                          6          
+L50                          6
 LG50                         6          
-L75                          12         
+L75                          12
 LG75                         14         
 # misassemblies              27         
 # misassembled contigs       15         
@@ -36,7 +36,7 @@ Misassembled contigs length  3009305
 Unaligned length             165611     
 Genome fraction (%)          91.202     
 Duplication ratio            1.002      
-# N's per 100 kbp            0.00       
+# N's per 100 kbp            0.00
 # mismatches per 100 kbp     50.91      
 # indels per 100 kbp         1.50       
 Largest alignment            490280     
@@ -49,3 +49,5 @@ LA50                         9
 LGA50                        10         
 LA75                         18         
 LGA75                        21         
+Complete BUSCO (%)          100.0   
+Partial BUSCO (%)           100.0   
