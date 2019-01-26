@@ -48,3 +48,23 @@ rgi-4.0.3
 abricate-0.8.7
 ```
 
+## Running the Pipeline
+
+The pipeline can be run on a single sample as follows:
+
+```
+cpo-pipeline full --ID <SAMPLE_ID> --R1 <READ_1_FASTQ> --R2 <READ_2_FASTQ> --outdir <OUTPUT_DIRECTORY>
+```
+
+Pipeline output will be written to `OUTPUT_DIRECTORY/SAMPLE_ID` with the following sub-directories:
+
+```
+pre-assembly_qc
+assembly
+post-assembly_qc
+reference
+resistance
+typing
+```
+
+
