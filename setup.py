@@ -20,7 +20,6 @@ setup(
     },
     scripts=[
         'bin/cpo-pipeline',
-        'bin/cpo-multi',
     ],
     zip_safe=False,
     python_requires = '>=3.4',
