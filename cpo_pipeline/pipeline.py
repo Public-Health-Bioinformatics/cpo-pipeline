@@ -8,7 +8,7 @@ import subprocess
 import sys
 import multiprocessing
 from pkg_resources import resource_filename
-
+from pprint import pprint
 import cpo_pipeline
 
 def prepare_job(job, session):
@@ -23,6 +23,36 @@ def prepare_job(job, session):
     
     return job_template
 
+def collect_final_outputs(outdir, sample_id):
+    final_outputs = {}
+    final_outputs['sample_id'] = sample_id
+    total_bp = cpo_pipeline.assembly.parsers.result_parsers.parse_total_bp(
+        "/".join([
+            outdir,
+            sample_id,
+            'pre-assembly_qc',
+            'totalbp'
+        ])
+    )
+    final_outputs['bp'] = total_bp
+
+    [mlst_result] = cpo_pipeline.typing.parsers.result_parsers.parse_mlst_result(
+        "/".join([
+            outdir,
+            sample_id,
+            'typing',
+            'mlst',
+            'mlst.tsv'
+        ])
+    )
+    final_outputs['MLST_SCHEME'] = mlst_result['scheme_id']
+    final_outputs['MLST'] = mlst_result['sequence_type']
+    allele_number = 1
+    for key, value in mlst_result['multi_locus_alleles'].items():
+        final_outputs['MLST_ALLELE_' + str(allele_number)] = key + "(" + value + ")"
+        allele_number += 1
+
+    return [final_outputs]
 
 def main(args):
     """
@@ -61,6 +91,35 @@ def main(args):
     ]
 
     subprocess.run(resistance_command_line)
+
+    final_outputs = collect_final_outputs(args.outdir, args.sample_id)
+    pprint(final_outputs)
+    final_output_csv_path = "/".join([
+        args.outdir,
+        args.sample_id,
+        'final_output.csv'
+    ])
+
+    final_outputs_headers = [
+        'sample_id',
+        'bp',
+        'MLST_SCHEME',
+        'MLST',
+        'MLST_ALLELE_1',
+        'MLST_ALLELE_2',
+        'MLST_ALLELE_3',
+        'MLST_ALLELE_4',
+        'MLST_ALLELE_5',
+        'MLST_ALLELE_6',
+        'MLST_ALLELE_7',
+    ]
+
+    with open(final_output_csv_path, 'w+') as f:
+        writer = csv.DictWriter(f, fieldnames=final_outputs_headers, delimiter='\t')
+        writer.writeheader()
+        for row in final_outputs:
+            writer.writerow(row)
+
 
 def multi(args):
     """

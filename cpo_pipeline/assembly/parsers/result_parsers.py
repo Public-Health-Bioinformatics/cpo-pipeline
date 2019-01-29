@@ -167,7 +167,7 @@ def parse_total_bp(path_to_total_bp):
           5185840
     """
     with open(path_to_total_bp, 'r') as totalbp_file:
-        total_bp = float(totalbp_file.readline())
+        total_bp = int(totalbp_file.readline())
 
     return total_bp
     
