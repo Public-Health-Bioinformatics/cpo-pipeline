@@ -61,6 +61,17 @@ def main(args):
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
+    plasmids_command_line = [
+        'cpo-pipeline',
+        'plasmids',
+        '--ID', args.sample_id,
+        '--R1', args.reads1_fastq,
+        '--R2', args.reads2_fastq,
+        '--outdir', args.outdir,
+    ]
+
+    subprocess.run(assembly_command_line)
+
     assembly_command_line = [
         'cpo-pipeline',
         'assembly',

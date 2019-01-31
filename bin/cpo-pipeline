@@ -22,6 +22,7 @@ def main():
     full_group = subparsers.add_parser('full')
     multi_group = subparsers.add_parser('multi')
     assembly_group = subparsers.add_parser('assembly')
+    plasmids_group = subparsers.add_parser('plasmids')
     typing_group = subparsers.add_parser('typing')
     resistance_group = subparsers.add_parser('resistance')
     tree_group = subparsers.add_parser('tree')
@@ -78,6 +79,24 @@ def main():
                                 default=resource_filename('data', 'config.ini'),
                                 help='Config File', required=False)
     assembly_group.set_defaults(func=cpo_pipeline.assembly.pipeline.main)
+
+
+    plasmids_group.add_argument("-i", "--ID", dest="sample_id",
+                                help="identifier of the isolate", required=True)
+    plasmids_group.add_argument("-1", "--R1", dest="reads1_fastq",
+                                help="absolute file path forward read (R1)", required=True)
+    plasmids_group.add_argument("-2", "--R2", dest="reads2_fastq",
+                                help="absolute file path to reverse read (R2)", required=True)
+    plasmids_group.add_argument("-o", "--outdir", dest="outdir", default='./',
+                            help="absolute path to output folder")
+    plasmids_group.add_argument("--mash-refseq-plasmid-db", dest="mash_refseq_plasmid_db",
+                                help="absolute path to refseq mash reference database")
+    plasmids_group.add_argument("--mash-custom-plasmid-db", dest="mash_custom_plasmid_db",
+                              help="absolute file path to directory of custom plasmid mash sketches")
+    plasmids_group.add_argument('-c', '--config', dest='config_file',
+                                default=resource_filename('data', 'config.ini'),
+                                help='Config File', required=False)
+    plasmids_group.set_defaults(func=cpo_pipeline.plasmids.pipeline.main)
 
 
     resistance_group.add_argument("-i", "--ID", dest="sample_id",

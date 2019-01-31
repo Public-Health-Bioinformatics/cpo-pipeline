@@ -235,8 +235,6 @@ def main(args):
 
     file_paths = {
         "mash_genome_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "mashscreen.genome.tsv"]),
-        "mash_plasmid_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "mashscreen.plasmid.tsv"]),
-        "mash_custom_plasmid_path": "/".join([output_dir, sample_id, "typing", "mashscreen.plasmid.tsv"]),
         "fastqc_output_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "fastqc"]),
         "totalbp_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "totalbp"]),
         "reference_genome_path": "/".join([output_dir, sample_id, "reference"]),
@@ -266,28 +264,6 @@ def main(args):
                 "--R2", reads2_fastq,
                 "--queries", mash_genome_db,
                 "--output_file", file_paths['mash_genome_path']
-            ],
-        },
-        {
-            'job_name': 'mash_screen',
-            'native_specification': '-pe smp 8',
-            'remote_command': os.path.join(job_script_path, 'mash_screen.sh'),
-            'args': [
-                "--R1", reads1_fastq,
-                "--R2", reads2_fastq,
-                "--queries", mash_plasmid_db,
-                "--output_file", file_paths['mash_plasmid_path']
-            ],
-        },
-        {
-            'job_name': 'custom',
-            'native_specification': '-pe smp 8',
-            'remote_command': os.path.join(job_script_path, 'mash_screen_custom_db.sh'),
-            'args': [
-                "--R1", reads1_fastq,
-                "--R2", reads2_fastq,
-                "--plasmid-db-dir", mash_custom_plasmid_db,
-                "--output_file", file_paths['mash_custom_plasmid_path']
             ],
         },
         {
@@ -338,17 +314,6 @@ def main(args):
         lambda x: score_above_threshold(x, mash_hits_score_threshold),
         mash_hits))
 
-    # parse plasmid mash
-    mash_plasmid_hits = result_parsers.parse_mash_result(file_paths["mash_plasmid_path"])
-    mash_plasmid_hits = sorted(mash_plasmid_hits, key=lambda k: k['identity'], reverse=True)
-    # 'shared_hashes' field is string in format '935/1000'
-    # Threshold is 100 below highest numerator (ie. '935/100' -> 835)
-    mash_plasmid_hits_score_threshold = int(mash_plasmid_hits[0]['shared_hashes'].split("/")[0]) - \
-        int(qc_thresholds["mash_hits_plasmid_score_cutoff"])
-    filtered_mash_plasmid_hits = list(filter(
-        lambda x: score_above_threshold(x, mash_plasmid_hits_score_threshold),
-        mash_plasmid_hits))
-
     # parse fastqc
     fastqc_r1_result = result_parsers.parse_fastqc_result(
         glob.glob(
@@ -376,11 +341,6 @@ def main(args):
     else:
         qc_verdicts["multiple_species_contamination"] = False
 
-
-    if filtered_mash_plasmid_hits:
-        qc_verdicts["fastq_contains_plasmids"] = True
-    else:
-        qc_verdicts["fastq_contains_plasmids"] = False
 
     #look at fastqc results
     qc_verdicts["acceptable_fastqc_forward"] = fastqc_qc_check(fastqc_r1_result)
@@ -508,10 +468,6 @@ if __name__ == "__main__":
                         help="absolute path to output folder")
     parser.add_argument("--mash-genomedb", dest="mash_genome_db",
                         help="absolute path to mash reference database")
-    parser.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
-                        help="absolute path to mash reference database")
-    parser.add_argument("--mash-custom-plasmiddb", dest="mash_custom_plasmid_db",
-                        help="absolute file path to directory of custom plasmid mash sketches")
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)
