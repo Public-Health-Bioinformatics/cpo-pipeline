@@ -147,7 +147,7 @@ def prepare_output_directories(output_dir, sample_id):
             'pre-assembly_qc',
             'assembly',
             'post-assembly_qc',
-            'reference'
+            'reference',
         ]
     ]
     for output_subdir in output_subdirs:
@@ -194,6 +194,11 @@ def main(args):
         mash_plasmid_db = args.mash_plasmid_db
     else:
         mash_plasmid_db = config['databases']['mash_plasmid_db']
+    if args.mash_custom_plasmid_db and not config['databases']['mash_custom_plasmid_db']:
+        mash_custom_plasmid_db = args.mash_custom_plasmid_db
+    else:
+        mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
+
     sample_id = args.sample_id
     reads1_fastq = args.reads1_fastq
     reads2_fastq = args.reads2_fastq
@@ -231,6 +236,7 @@ def main(args):
     file_paths = {
         "mash_genome_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "mashscreen.genome.tsv"]),
         "mash_plasmid_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "mashscreen.plasmid.tsv"]),
+        "mash_custom_plasmid_path": "/".join([output_dir, sample_id, "typing", "mashscreen.plasmid.tsv"]),
         "fastqc_output_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "fastqc"]),
         "totalbp_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "totalbp"]),
         "reference_genome_path": "/".join([output_dir, sample_id, "reference"]),
@@ -271,6 +277,17 @@ def main(args):
                 "--R2", reads2_fastq,
                 "--queries", mash_plasmid_db,
                 "--output_file", file_paths['mash_plasmid_path']
+            ],
+        },
+        {
+            'job_name': 'custom',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'mash_screen_custom_db.sh'),
+            'args': [
+                "--R1", reads1_fastq,
+                "--R2", reads2_fastq,
+                "--plasmid-db-dir", mash_custom_plasmid_db,
+                "--output_file", file_paths['mash_custom_plasmid_path']
             ],
         },
         {
@@ -493,6 +510,8 @@ if __name__ == "__main__":
                         help="absolute path to mash reference database")
     parser.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
                         help="absolute path to mash reference database")
+    parser.add_argument("--mash-custom-plasmiddb", dest="mash_custom_plasmid_db",
+                        help="absolute file path to directory of custom plasmid mash sketches")
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)

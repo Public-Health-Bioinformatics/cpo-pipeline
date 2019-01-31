@@ -71,6 +71,9 @@ def main():
                                 help="absolute path to mash reference database")
     assembly_group.add_argument("--mash-plasmiddb", dest="mash_plasmid_db",
                                 help="absolute path to mash reference database")
+    assembly_group.add_argument("--mash-custom-plasmiddb", dest="mash_custom_plasmid_db",
+                              help="absolute file path to directory of custom plasmid mash sketches",
+                              required=False)
     assembly_group.add_argument('-c', '--config', dest='config_file',
                                 default=resource_filename('data', 'config.ini'),
                                 help='Config File', required=False)
