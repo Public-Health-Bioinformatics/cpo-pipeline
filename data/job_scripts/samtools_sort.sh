@@ -1,14 +1,14 @@
 #!/bin/bash -e
 
 #$ -V             # Pass environment variables to the job
-#$ -N samtools_view
+#$ -N samtools_sort
 #$ -cwd           # Use the current working dir
 #$ -pe smp 4      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] [-F|--flags FLAGS] -i|--input SAM_BAM -o|--output SAM_BAMn\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input SAM_BAM -o|--output SAM_BAM\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -20,8 +20,8 @@ then
 fi
 
 input=""
-flags=0
 output=""
+name_order=false
 
 while [[ $# -gt 0 ]]
 do
@@ -34,11 +34,10 @@ do
     shift # past argument
     shift # past value
     ;;
-    -F|--flags)
-    # only include reads with none of the FLAGS in this integer present
-    flags="$2"
+    -n|--name-order)
+    # sort by readname
+    name_order=true
     shift # past argument
-    shift # past value
     ;;
     -o|--output)
     # only include reads with none of the FLAGS in this integer present
@@ -51,13 +50,12 @@ done
 
 source activate samtools-1.9
 
-samtools view \
-	 -@ 3 \
-	 -h \
-	 -F "${flags}" \
+samtools sort \
+	 --threads 3 \
+	 $( if [ "$name_order" = true ]; then printf "%s" "-n"; fi ) \
+	 -l 0 \
 	 "${input}" \
 	 -o "${output}"
-	 
 
 source deactivate
 

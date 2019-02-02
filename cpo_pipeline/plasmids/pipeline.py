@@ -92,10 +92,10 @@ def main(args):
     run_jobs(mash_jobs)
 
     # TODO:
-    # determine which mash hits are 'candidates'
-    # copy the candidate plasmid match fasta files over to working directory
-    # index plasmid reference with samtools & bwa
-    # align reads to referece with bwa
+    # DONE determine which mash hits are 'candidates'
+    # DONE copy the candidate plasmid match fasta files over to working directory
+    # DONE index plasmid reference with samtools & bwa
+    # DONE align reads to referece with bwa
     # determine depth of alignment with samtools
     # call snps with freebayes
 
@@ -196,6 +196,84 @@ def main(args):
 
     run_jobs(bwa_mem_jobs)
 
+    samtools_view_jobs = []
+
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".sam",
+        ])
+        samtools_view_job = {
+            'job_name': 'samtools_view',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_view.sh'),
+            'args': [
+                "--input", alignment,
+                "--flags", 1540,
+                "--output", re.sub("\.sam$", ".mapped.dedup.sam", alignment),
+            ]
+        }
+        samtools_view_jobs.append(samtools_view_job)
+
+    run_jobs(samtools_view_jobs)
+
+    samtools_sort_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.sam",
+        ])
+        samtools_sort_job = {
+            'job_name': 'samtools_sort',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
+            'args': [
+                "--input", alignment,
+                "--name-order",
+                "--output", re.sub("\.sam$", ".namesort.sam", alignment),
+            ]
+        }
+        samtools_sort_jobs.append(samtools_sort_job)
+
+    run_jobs(samtools_sort_jobs)
+
+    samtools_fixmate_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.namesort.sam",
+        ])
+        samtools_fixmate_job = {
+            'job_name': 'samtools_fixmate',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_fixmate.sh'),
+            'args': [
+                "--input", alignment,
+                "--output", re.sub("\.sam$", ".fixmate.sam", alignment),
+            ]
+        }
+        samtools_fixmate_jobs.append(samtools_fixmate_job)
+
+    run_jobs(samtools_fixmate_jobs)
+
+    samtools_sort_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.namesort.fixmate.sam",
+        ])
+        samtools_sort_job = {
+            'job_name': 'samtools_sort',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
+            'args': [
+                "--input", alignment,
+                "--output", re.sub("\.sam$", ".coordsort.sam", alignment),
+            ]
+        }
+        samtools_sort_jobs.append(samtools_sort_job)
+
+    run_jobs(samtools_sort_jobs)
 
 if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
