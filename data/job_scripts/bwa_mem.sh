@@ -1,14 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 #$ -V             # Pass environment variables to the job
-#$ -N mash_screen
+#$ -N bwa_index
 #$ -cwd           # Use the current working dir
 #$ -pe smp 8      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -1|--R1 INPUT_R1_FASTQ -2|--R2 INPUT_R2_FASTQ -q|--queries QUERIES_MSH -o|--output_file OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -f|--fasta\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -19,10 +19,7 @@ then
   exit 0
 fi
 
-input_r1_fastq=""
-input_r2_fastq=""
-queries=""
-output_file=""
+fasta=""
 
 while [[ $# -gt 0 ]]
 do
@@ -41,25 +38,32 @@ do
     shift # past argument
     shift # past value
     ;;
-    -q|--queries)
-    # mash sketch file <queries>.msh
-    queries="$2"
+    -r|--reference)
+    # reference fasta file
+    reference="$2"
     shift # past argument
     shift # past value
     ;;
-    -o|--output_file)
-    # Output file
-    output_file="$2"
+    -o|--output)
+    # output sam file
+    output="$2"
     shift # past argument
     shift # past value
     ;;
   esac
 done
 
-mkdir -p $(dirname "${output_file}")
+source activate bwa-0.7.17
 
-source activate mash-2.0
-
-mash screen -p 8 -w "${queries}" "${input_r1_fastq}" "${input_r2_fastq}" > "${output_file}"
+bwa mem \
+    -t 8 \
+    -a \
+    -Y \
+    -M \
+    "${reference}" \
+    "${input_r1_fastq}" \
+    "${input_r2_fastq}" \
+    -o "${output}"
 
 source deactivate
+

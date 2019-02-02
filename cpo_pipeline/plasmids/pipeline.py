@@ -10,20 +10,24 @@ pipeline.py -i BC11-Kpn005_S2 --R1 BC11-Kpn005_S2_L001_R1_001.fastq.gz \
 
 import argparse
 import configparser
+import csv
 import datetime
 import errno
 import glob
 import os
+import operator
 import re
+import shutil
 import sys
 import urllib.request
-
+from pprint import pprint
 import drmaa
 
 from pkg_resources import resource_filename
 
-from cpo_pipeline.pipeline import prepare_job
-
+from cpo_pipeline.pipeline import prepare_job, run_jobs
+from cpo_pipeline.assembly.parsers import result_parsers
+from cpo_pipeline.plasmids import parsers
 
 def main(args):
     """
@@ -54,8 +58,10 @@ def main(args):
     job_script_path = resource_filename('data', 'job_scripts')
 
     file_paths = {
+        "plasmid_output_path": "/".join([output_dir, sample_id, "plasmids"]),
         "mash_refseq_plasmid_path": "/".join([output_dir, sample_id, "plasmids", "mashscreen.refseq.plasmid.tsv"]),
         "mash_custom_plasmid_path": "/".join([output_dir, sample_id, "plasmids", "mashscreen.custom.plasmid.tsv"]),
+        "mash_custom_plasmid_candidates_path": "/".join([output_dir, sample_id, "plasmids", "candidates.tsv"]),
     }
     
     mash_jobs = [
@@ -72,23 +78,18 @@ def main(args):
         },
         {
             'job_name': 'mash_screen_custom_plasmid',
-            'native_specification': '-pe smp 8',
+            'native_specification': '-pe smp 8 -shell y',
             'remote_command': os.path.join(job_script_path, 'mash_screen_custom_db.sh'),
             'args': [
                 "--R1", reads1_fastq,
                 "--R2", reads2_fastq,
-                "--plasmid-db-dir", mash_custom_plasmid_db,
+                "--plasmid-db-dir", "/".join([mash_custom_plasmid_db, "mash"]),
                 "--output_file", file_paths['mash_custom_plasmid_path']
             ],
         },
     ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in mash_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(mash_jobs)
 
     # TODO:
     # determine which mash hits are 'candidates'
@@ -97,18 +98,105 @@ def main(args):
     # align reads to referece with bwa
     # determine depth of alignment with samtools
     # call snps with freebayes
-    
-    bwa_jobs = [
-        {
+
+    mash_screen_results = result_parsers.parse_mash_result(file_paths['mash_custom_plasmid_path'])
+    # pprint(mash_screen_results)
+
+    custom_plasmid_db_data = {}
+    for dat_file in glob.glob("/".join([mash_custom_plasmid_db, "data", "*.dat"])):
+        [dat] = parsers.custom_plasmid_db_dat_parser(dat_file)
+        custom_plasmid_db_data[dat['accession']] = dat
+
+    # pprint(custom_plasmid_db_data)
+    for mash_screen_result in mash_screen_results:
+        accession = re.sub('\.fna$', '', mash_screen_result['query_id'])
+        mash_screen_result['accession'] = accession
+        mash_screen_result['allele'] = custom_plasmid_db_data[accession]['allele']
+        mash_screen_result['circularity'] = custom_plasmid_db_data[accession]['circularity']
+        mash_screen_result['plasmid_length'] = custom_plasmid_db_data[accession]['plasmid_length']
+        mash_screen_result['incompatibility_group'] = custom_plasmid_db_data[accession]['incompatibility_group']
+
+    mash_screen_results.sort(key=operator.itemgetter('accession'))
+    mash_screen_results.sort(key=operator.itemgetter('plasmid_length'), reverse=True)
+    mash_screen_results.sort(key=operator.itemgetter('identity'), reverse=True)
+    mash_screen_results.sort(key=operator.itemgetter('circularity'))
+    mash_screen_results.sort(key=operator.itemgetter('incompatibility_group'))
+
+    # print("mash_identity\taccession\tcircularity\tplasmid_length\tincompatibility_group")
+    candidates_keys = [
+        'identity',
+        'accession',
+        'circularity',
+        'plasmid_length',
+        'incompatibility_group',
+    ]
+    with open(file_paths['mash_custom_plasmid_candidates_path'], 'w+') as candidates_file:
+        writer = csv.DictWriter(candidates_file, candidates_keys, delimiter='\t', extrasaction='ignore')
+        writer.writerows(mash_screen_results)
+
+
+    candidates = []
+    with open(file_paths['mash_custom_plasmid_candidates_path'], 'r') as candidates_file:
+        reader = csv.DictReader(candidates_file, fieldnames=candidates_keys, delimiter='\t')
+        for row in reader:
+            candidates.append(row)
+
+    samtools_faidx_jobs = []
+    bwa_index_jobs = []
+    for candidate in candidates:
+        candidate_fasta_db_path = "/".join([
+            mash_custom_plasmid_db,
+            candidate['accession'] + ".fna"
+        ])
+        candidate_fasta_output_path = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".fna",
+        ])
+        shutil.copyfile(candidate_fasta_db_path, candidate_fasta_output_path)
+        samtools_faidx_job = {
             'job_name': 'samtools_faidx',
-            'native_specification': '-pe smp 8',
+            'native_specification': '-pe smp 2',
             'remote_command': os.path.join(job_script_path, 'samtools_faidx.sh'),
             'args': [
-                "--fasta", plasmid_fasta,
-            ],
-        },
-    ]
-        
+                "--fasta", candidate_fasta_output_path,
+            ]
+        }
+        bwa_index_job = {
+            'job_name': 'bwa_index',
+            'native_specification': '-pe smp 2',
+            'remote_command': os.path.join(job_script_path, 'bwa_index.sh'),
+            'args': [
+                "--fasta", candidate_fasta_output_path,
+            ]
+        }
+        samtools_faidx_jobs.append(samtools_faidx_job)
+        bwa_index_jobs.append(bwa_index_job)
+
+    run_jobs(samtools_faidx_jobs + bwa_index_jobs)
+
+    bwa_mem_jobs = []
+    for candidate in candidates:
+        reference_fasta = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".fna",
+        ])
+
+        bwa_mem_job = {
+            'job_name': 'bwa_mem',
+            'native_specification': '-pe smp 8 -shell y',
+            'remote_command': os.path.join(job_script_path, 'bwa_mem.sh'),
+            'args': [
+                "--reference", reference_fasta,
+                "--R1", reads1_fastq,
+                "--R2", reads2_fastq,
+                "--output", re.sub("\.fna$", "", reference_fasta) + ".sam"
+            ]
+        }
+        bwa_mem_jobs.append(bwa_mem_job)
+
+    run_jobs(bwa_mem_jobs)
+
+
 if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
     parser = argparse.ArgumentParser(prog=script_name, description='')

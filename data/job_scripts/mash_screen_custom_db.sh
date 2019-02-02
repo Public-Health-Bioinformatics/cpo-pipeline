@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 
 #$ -V             # Pass environment variables to the job
 #$ -N mash_screen
@@ -65,7 +65,6 @@ do
 done
 
 outdir=$(dirname "${output_file}")
-echo "outdir: " "${outdir}"
 mkdir -p "${outdir}"
 
 source activate mash-2.0
@@ -77,5 +76,6 @@ mash screen -p 8 \
      "${outdir}"/plasmid_db.msh \
      "${input_r1_fastq}" "${input_r2_fastq}" \
      > "${output_file}"
+rm "${outdir}/"plasmid_db.msh
 
 source deactivate

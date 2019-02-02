@@ -4,6 +4,7 @@ import os
 import argparse
 import configparser
 import csv
+import drmaa
 import subprocess
 import sys
 import multiprocessing
@@ -22,6 +23,14 @@ def prepare_job(job, session):
     job_template.joinFiles = True
     
     return job_template
+
+def run_jobs(jobs):
+    with drmaa.Session() as session:
+        prepared_jobs = [prepare_job(job, session) for job in jobs]
+        running_jobs = [session.runJob(job) for job in prepared_jobs]
+        for job_id in running_jobs:
+            print('Your job has been submitted with ID %s' % job_id)
+        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
 
 def collect_final_outputs(outdir, sample_id):
     final_outputs = {}
