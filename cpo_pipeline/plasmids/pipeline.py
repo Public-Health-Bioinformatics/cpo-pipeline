@@ -210,7 +210,7 @@ def main(args):
             'args': [
                 "--input", alignment,
                 "--flags", 1540,
-                "--output", re.sub("\.sam$", ".mapped.dedup.sam", alignment),
+                "--output", re.sub("\.sam$", ".mapped.dedup.bam", alignment),
             ]
         }
         samtools_view_jobs.append(samtools_view_job)
@@ -221,7 +221,7 @@ def main(args):
     for candidate in candidates:
         alignment = "/".join([
             file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.sam",
+            candidate['accession'] + ".mapped.dedup.bam",
         ])
         samtools_sort_job = {
             'job_name': 'samtools_sort',
@@ -230,7 +230,7 @@ def main(args):
             'args': [
                 "--input", alignment,
                 "--name-order",
-                "--output", re.sub("\.sam$", ".namesort.sam", alignment),
+                "--output", re.sub("\.bam$", ".namesort.bam", alignment),
             ]
         }
         samtools_sort_jobs.append(samtools_sort_job)
@@ -241,7 +241,7 @@ def main(args):
     for candidate in candidates:
         alignment = "/".join([
             file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.sam",
+            candidate['accession'] + ".mapped.dedup.namesort.bam",
         ])
         samtools_fixmate_job = {
             'job_name': 'samtools_fixmate',
@@ -249,7 +249,7 @@ def main(args):
             'remote_command': os.path.join(job_script_path, 'samtools_fixmate.sh'),
             'args': [
                 "--input", alignment,
-                "--output", re.sub("\.sam$", ".fixmate.sam", alignment),
+                "--output", re.sub("\.bam$", ".fixmate.bam", alignment),
             ]
         }
         samtools_fixmate_jobs.append(samtools_fixmate_job)
@@ -260,7 +260,7 @@ def main(args):
     for candidate in candidates:
         alignment = "/".join([
             file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.fixmate.sam",
+            candidate['accession'] + ".mapped.dedup.namesort.fixmate.bam",
         ])
         samtools_sort_job = {
             'job_name': 'samtools_sort',
@@ -268,12 +268,49 @@ def main(args):
             'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
             'args': [
                 "--input", alignment,
-                "--output", re.sub("\.sam$", ".coordsort.sam", alignment),
+                "--output", re.sub("\.bam$", ".coordsort.bam", alignment),
             ]
         }
         samtools_sort_jobs.append(samtools_sort_job)
 
     run_jobs(samtools_sort_jobs)
+
+    samtools_markdup_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.bam",
+        ])
+        samtools_markdup_job = {
+            'job_name': 'samtools_markdup',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_markdup.sh'),
+            'args': [
+                "--input", alignment,
+                "--output", re.sub("\.bam$", ".markdup.bam", alignment),
+            ]
+        }
+        samtools_markdup_jobs.append(samtools_markdup_job)
+
+    run_jobs(samtools_markdup_jobs)
+
+    samtools_index_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.markdup.bam",
+        ])
+        samtools_index_job = {
+            'job_name': 'samtools_index',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_index.sh'),
+            'args': [
+                "--input", alignment,
+            ]
+        }
+        samtools_index_jobs.append(samtools_index_job)
+
+    run_jobs(samtools_index_jobs)
 
 if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))

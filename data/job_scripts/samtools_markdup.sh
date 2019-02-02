@@ -1,14 +1,14 @@
 #!/bin/bash -e
 
 #$ -V             # Pass environment variables to the job
-#$ -N samtools_view
+#$ -N samtools_markdup
 #$ -cwd           # Use the current working dir
 #$ -pe smp 4      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] [-F|--flags FLAGS] -i|--input SAM_BAM -o|--output SAM_BAMn\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input SAM_BAM -o|--output SAM_BAM\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -20,7 +20,6 @@ then
 fi
 
 input=""
-flags=0
 output=""
 
 while [[ $# -gt 0 ]]
@@ -34,14 +33,8 @@ do
     shift # past argument
     shift # past value
     ;;
-    -F|--flags)
-    # only include reads with none of the FLAGS in this integer present
-    flags="$2"
-    shift # past argument
-    shift # past value
-    ;;
     -o|--output)
-    # only include reads with none of the FLAGS in this integer present
+    # output sam (or bam) file
     output="$2"
     shift # past argument
     shift # past value
@@ -51,14 +44,10 @@ done
 
 source activate samtools-1.9
 
-samtools view \
-	 -@ 3 \
-	 -h \
-	 -b \
-	 -F "${flags}" \
+samtools markdup \
+	 --threads 3 \
 	 "${input}" \
-	 -o "${output}"
-	 
+	 "${output}"
 
 source deactivate
 

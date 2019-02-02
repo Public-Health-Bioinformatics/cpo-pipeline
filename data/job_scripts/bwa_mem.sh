@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #$ -V             # Pass environment variables to the job
-#$ -N bwa_index
+#$ -N bwa_mem
 #$ -cwd           # Use the current working dir
 #$ -pe smp 8      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
