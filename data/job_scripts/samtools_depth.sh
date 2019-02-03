@@ -1,14 +1,14 @@
 #!/bin/bash -e
 
 #$ -V             # Pass environment variables to the job
-#$ -N samtools_index
+#$ -N samtools_depth
 #$ -cwd           # Use the current working dir
 #$ -pe smp 4      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input SAM_BAM\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input SAM_BAM -o|--output SAM_BAM \n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -20,6 +20,7 @@ then
 fi
 
 input=""
+output=""
 
 while [[ $# -gt 0 ]]
 do
@@ -32,14 +33,21 @@ do
     shift # past argument
     shift # past value
     ;;
+    -o|--output)
+    # output file
+    output="$2"
+    shift # past argument
+    shift # past value
+    ;;
   esac
 done
 
 source activate samtools-1.9
 
-samtools index \
-	 -@ 3 \
-	 "${input}"
+samtools depth \
+	 -aa \
+	 "${input}" \
+	 > "${output}"
 
 source deactivate
 

@@ -29,6 +29,109 @@ from cpo_pipeline.pipeline import prepare_job, run_jobs
 from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.plasmids import parsers
 
+
+def samtools_discrete_jobs(candidates, file_paths):
+    samtools_view_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".sam",
+        ])
+        samtools_view_job = {
+            'job_name': 'samtools_view',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_view.sh'),
+            # '--f 1540' excludes the following reads:
+            # - read unmapped (0x4)
+            # - read fails platform/vendor quality checks (0x200)
+            # - read is PCR or optical duplicate (0x400)
+            'args': [
+                "--input", alignment,
+                "--flags", 1540,
+                "--output", re.sub("\.sam$", ".mapped.dedup.bam", alignment),
+            ]
+        }
+        samtools_view_jobs.append(samtools_view_job)
+
+    run_jobs(samtools_view_jobs)
+
+    samtools_sort_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.bam",
+        ])
+        samtools_sort_job = {
+            'job_name': 'samtools_sort',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
+            'args': [
+                "--input", alignment,
+                "--name-order",
+                "--output", re.sub("\.bam$", ".namesort.bam", alignment),
+            ]
+        }
+        samtools_sort_jobs.append(samtools_sort_job)
+
+    run_jobs(samtools_sort_jobs)
+
+    samtools_fixmate_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.namesort.bam",
+        ])
+        samtools_fixmate_job = {
+            'job_name': 'samtools_fixmate',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_fixmate.sh'),
+            'args': [
+                "--input", alignment,
+                "--output", re.sub("\.bam$", ".fixmate.bam", alignment),
+            ]
+        }
+        samtools_fixmate_jobs.append(samtools_fixmate_job)
+
+    run_jobs(samtools_fixmate_jobs)
+
+    samtools_sort_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.namesort.fixmate.bam",
+        ])
+        samtools_sort_job = {
+            'job_name': 'samtools_sort',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
+            'args': [
+                "--input", alignment,
+                "--output", re.sub("\.bam$", ".coordsort.bam", alignment),
+            ]
+        }
+        samtools_sort_jobs.append(samtools_sort_job)
+
+    run_jobs(samtools_sort_jobs)
+
+    samtools_markdup_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.bam",
+        ])
+        samtools_markdup_job = {
+            'job_name': 'samtools_markdup',
+            'native_specification': '-pe smp 4',
+            'remote_command': os.path.join(job_script_path, 'samtools_markdup.sh'),
+            'args': [
+                "--input", alignment,
+                "--output", re.sub("\.bam$", ".markdup.bam", alignment),
+            ]
+        }
+        samtools_markdup_jobs.append(samtools_markdup_job)
+
+    run_jobs(samtools_markdup_jobs)
+
 def main(args):
     """
     main entrypoint
@@ -96,7 +199,7 @@ def main(args):
     # DONE copy the candidate plasmid match fasta files over to working directory
     # DONE index plasmid reference with samtools & bwa
     # DONE align reads to referece with bwa
-    # determine depth of alignment with samtools
+    # DONE determine depth of alignment with samtools
     # call snps with freebayes
 
     mash_screen_results = result_parsers.parse_mash_result(file_paths['mash_custom_plasmid_path'])
@@ -196,109 +299,39 @@ def main(args):
 
     run_jobs(bwa_mem_jobs)
 
-    samtools_view_jobs = []
 
+    samtools_filter_fixmate_sort_jobs = []
     for candidate in candidates:
         alignment = "/".join([
             file_paths['plasmid_output_path'],
             candidate['accession'] + ".sam",
         ])
-        samtools_view_job = {
-            'job_name': 'samtools_view',
+        samtools_filter_fixmate_sort_job = {
+            'job_name': 'samtools_filter_fixmate_sort',
             'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_view.sh'),
+            'remote_command': os.path.join(job_script_path, 'samtools_filter_fixmate_sort.sh'),
             'args': [
                 "--input", alignment,
                 "--flags", 1540,
-                "--output", re.sub("\.sam$", ".mapped.dedup.bam", alignment),
+                "--output", re.sub('\.sam$', '.bam', alignment),
             ]
         }
-        samtools_view_jobs.append(samtools_view_job)
+        samtools_filter_fixmate_sort_jobs.append(samtools_filter_fixmate_sort_job)
 
-    run_jobs(samtools_view_jobs)
+    run_jobs(samtools_filter_fixmate_sort_jobs)
 
-    samtools_sort_jobs = []
     for candidate in candidates:
-        alignment = "/".join([
+        sam_alignment = "/".join([
             file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.bam",
+            candidate['accession'] + ".sam",
         ])
-        samtools_sort_job = {
-            'job_name': 'samtools_sort',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
-            'args': [
-                "--input", alignment,
-                "--name-order",
-                "--output", re.sub("\.bam$", ".namesort.bam", alignment),
-            ]
-        }
-        samtools_sort_jobs.append(samtools_sort_job)
-
-    run_jobs(samtools_sort_jobs)
-
-    samtools_fixmate_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.bam",
-        ])
-        samtools_fixmate_job = {
-            'job_name': 'samtools_fixmate',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_fixmate.sh'),
-            'args': [
-                "--input", alignment,
-                "--output", re.sub("\.bam$", ".fixmate.bam", alignment),
-            ]
-        }
-        samtools_fixmate_jobs.append(samtools_fixmate_job)
-
-    run_jobs(samtools_fixmate_jobs)
-
-    samtools_sort_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.fixmate.bam",
-        ])
-        samtools_sort_job = {
-            'job_name': 'samtools_sort',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
-            'args': [
-                "--input", alignment,
-                "--output", re.sub("\.bam$", ".coordsort.bam", alignment),
-            ]
-        }
-        samtools_sort_jobs.append(samtools_sort_job)
-
-    run_jobs(samtools_sort_jobs)
-
-    samtools_markdup_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.bam",
-        ])
-        samtools_markdup_job = {
-            'job_name': 'samtools_markdup',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_markdup.sh'),
-            'args': [
-                "--input", alignment,
-                "--output", re.sub("\.bam$", ".markdup.bam", alignment),
-            ]
-        }
-        samtools_markdup_jobs.append(samtools_markdup_job)
-
-    run_jobs(samtools_markdup_jobs)
+        os.remove(sam_alignment)
 
     samtools_index_jobs = []
     for candidate in candidates:
         alignment = "/".join([
             file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.markdup.bam",
+            candidate['accession'] + ".bam",
         ])
         samtools_index_job = {
             'job_name': 'samtools_index',
@@ -312,6 +345,43 @@ def main(args):
 
     run_jobs(samtools_index_jobs)
 
+    samtools_depth_jobs = []
+    for candidate in candidates:
+        alignment = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".bam",
+        ])
+        samtools_depth_job = {
+            'job_name': 'samtools_depth',
+            'native_specification': '-pe smp 1',
+            'remote_command': os.path.join(job_script_path, 'samtools_depth.sh'),
+            'args': [
+                "--input", alignment,
+                "--output", re.sub('\.bam$', '.depth', alignment),
+            ]
+        }
+        samtools_depth_jobs.append(samtools_depth_job)
+
+    run_jobs(samtools_depth_jobs)
+
+    for candidate in candidates:
+        depth = "/".join([
+            file_paths['plasmid_output_path'],
+            candidate['accession'] + ".depth",
+        ])
+        MINIMUM_DEPTH = 10
+        MINIMUM_COVERAGE_PERCENT = 95.0
+        positions_above_minimum_depth = 0
+        total_length = 0
+        with open(depth) as depth_file:
+            for line in depth_file:
+                [_, position, depth] = line.split()
+                total_length += 1
+                if int(depth) >= MINIMUM_DEPTH:
+                    positions_above_minimum_depth += 1
+        percentage_above_minimum_depth = positions_above_minimum_depth / total_length
+        print("percent good coverage: ", percentage_above_minimum_depth)
+    
 if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
     parser = argparse.ArgumentParser(prog=script_name, description='')
