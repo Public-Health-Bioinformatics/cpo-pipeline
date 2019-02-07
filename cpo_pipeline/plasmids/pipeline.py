@@ -14,6 +14,8 @@ import csv
 import datetime
 import errno
 import glob
+import itertools
+import multiprocessing
 import os
 import operator
 import re
@@ -28,109 +30,7 @@ from pkg_resources import resource_filename
 from cpo_pipeline.pipeline import prepare_job, run_jobs
 from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.plasmids import parsers
-
-
-def samtools_discrete_jobs(candidates, file_paths):
-    samtools_view_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".sam",
-        ])
-        samtools_view_job = {
-            'job_name': 'samtools_view',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_view.sh'),
-            # '--f 1540' excludes the following reads:
-            # - read unmapped (0x4)
-            # - read fails platform/vendor quality checks (0x200)
-            # - read is PCR or optical duplicate (0x400)
-            'args': [
-                "--input", alignment,
-                "--flags", 1540,
-                "--output", re.sub("\.sam$", ".mapped.dedup.bam", alignment),
-            ]
-        }
-        samtools_view_jobs.append(samtools_view_job)
-
-    run_jobs(samtools_view_jobs)
-
-    samtools_sort_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.bam",
-        ])
-        samtools_sort_job = {
-            'job_name': 'samtools_sort',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
-            'args': [
-                "--input", alignment,
-                "--name-order",
-                "--output", re.sub("\.bam$", ".namesort.bam", alignment),
-            ]
-        }
-        samtools_sort_jobs.append(samtools_sort_job)
-
-    run_jobs(samtools_sort_jobs)
-
-    samtools_fixmate_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.bam",
-        ])
-        samtools_fixmate_job = {
-            'job_name': 'samtools_fixmate',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_fixmate.sh'),
-            'args': [
-                "--input", alignment,
-                "--output", re.sub("\.bam$", ".fixmate.bam", alignment),
-            ]
-        }
-        samtools_fixmate_jobs.append(samtools_fixmate_job)
-
-    run_jobs(samtools_fixmate_jobs)
-
-    samtools_sort_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.fixmate.bam",
-        ])
-        samtools_sort_job = {
-            'job_name': 'samtools_sort',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
-            'args': [
-                "--input", alignment,
-                "--output", re.sub("\.bam$", ".coordsort.bam", alignment),
-            ]
-        }
-        samtools_sort_jobs.append(samtools_sort_job)
-
-    run_jobs(samtools_sort_jobs)
-
-    samtools_markdup_jobs = []
-    for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.bam",
-        ])
-        samtools_markdup_job = {
-            'job_name': 'samtools_markdup',
-            'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_markdup.sh'),
-            'args': [
-                "--input", alignment,
-                "--output", re.sub("\.bam$", ".markdup.bam", alignment),
-            ]
-        }
-        samtools_markdup_jobs.append(samtools_markdup_job)
-
-    run_jobs(samtools_markdup_jobs)
+from cpo_pipeline.plasmids import strategies
 
 def main(args):
     """
@@ -154,45 +54,89 @@ def main(args):
         mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
 
     sample_id = args.sample_id
-    reads1_fastq = args.reads1_fastq
-    reads2_fastq = args.reads2_fastq
     output_dir = args.outdir
 
-    job_script_path = resource_filename('data', 'job_scripts')
 
-    file_paths = {
-        "plasmid_output_path": "/".join([output_dir, sample_id, "plasmids"]),
-        "mash_refseq_plasmid_path": "/".join([output_dir, sample_id, "plasmids", "mashscreen.refseq.plasmid.tsv"]),
-        "mash_custom_plasmid_path": "/".join([output_dir, sample_id, "plasmids", "mashscreen.custom.plasmid.tsv"]),
-        "mash_custom_plasmid_candidates_path": "/".join([output_dir, sample_id, "plasmids", "candidates.tsv"]),
+    paths = {
+        'job_scripts': resource_filename('data', 'job_scripts'),
+        'reads1_fastq': args.reads1_fastq,
+        'reads2_fastq': args.reads2_fastq,
+        'mash_custom_plasmid_db': mash_custom_plasmid_db,
+        'mash_refseq_plasmid_db': mash_refseq_plasmid_db,
+        'plasmid_output': os.path.join(
+            output_dir,
+            sample_id,
+            "plasmids",
+        ),
+        "refseq_plasmid_output": os.path.join(
+            output_dir,
+            sample_id,
+            "plasmids",
+            "refseq_plasmids",
+        ),
+        "custom_plasmid_output": os.path.join(
+            output_dir,
+            sample_id,
+            "plasmids",
+            "custom_plasmids",
+        ),
     }
-    
-    mash_jobs = [
+
+    os.makedirs(
+        os.path.join(
+            paths['custom_plasmid_output'],
+            'candidates',
+        ),
+        exist_ok=True
+    )
+
+    os.makedirs(
+        os.path.join(
+            paths['refseq_plasmid_output'],
+            'candidates',
+        ),
+        exist_ok=True
+    )
+
+    # Generate a list of candidate plasmids using two strategies
+    # in parallel, then merge the results.
+    process_details = [
         {
-            'job_name': 'mash_screen_refseq_plasmid',
-            'native_specification': '-pe smp 8',
-            'remote_command': os.path.join(job_script_path, 'mash_screen.sh'),
-            'args': [
-                "--R1", reads1_fastq,
-                "--R2", reads2_fastq,
-                "--queries", mash_refseq_plasmid_db,
-                "--output_file", file_paths['mash_refseq_plasmid_path']
-            ],
+            'target': strategies.refseq_plasmids,
+            'name': 'refseq_plasmids',
         },
         {
-            'job_name': 'mash_screen_custom_plasmid',
-            'native_specification': '-pe smp 8 -shell y',
-            'remote_command': os.path.join(job_script_path, 'mash_screen_custom_db.sh'),
-            'args': [
-                "--R1", reads1_fastq,
-                "--R2", reads2_fastq,
-                "--plasmid-db-dir", "/".join([mash_custom_plasmid_db, "mash"]),
-                "--output_file", file_paths['mash_custom_plasmid_path']
-            ],
+            'target': strategies.custom_plasmids,
+            'name': 'custom_plasmids',
         },
     ]
+    
+    processes = []
+    completed_processes = 0
+    queue = multiprocessing.SimpleQueue()
+    for process_detail in process_details:
+        p = multiprocessing.Process(
+            name=process_detail['name'],
+            target=process_detail['target'],
+            args=(
+                paths, queue
+            )
+        )
+        processes.append(p)
+        p.start()
 
-    run_jobs(mash_jobs)
+    candidates = []
+    while True:
+        candidate = queue.get()
+        if candidate:
+            candidates.append(candidate)
+        else:
+            completed_processes += 1
+        if completed_processes >= len(processes):
+            break
+            
+    for process in processes:
+        process.join()
 
     # TODO:
     # DONE determine which mash hits are 'candidates'
@@ -200,76 +144,27 @@ def main(args):
     # DONE index plasmid reference with samtools & bwa
     # DONE align reads to referece with bwa
     # DONE determine depth of alignment with samtools
-    # call snps with freebayes
-
-    mash_screen_results = result_parsers.parse_mash_result(file_paths['mash_custom_plasmid_path'])
-    # pprint(mash_screen_results)
-
-    custom_plasmid_db_data = {}
-    for dat_file in glob.glob("/".join([mash_custom_plasmid_db, "data", "*.dat"])):
-        [dat] = parsers.custom_plasmid_db_dat_parser(dat_file)
-        custom_plasmid_db_data[dat['accession']] = dat
-
-    # pprint(custom_plasmid_db_data)
-    for mash_screen_result in mash_screen_results:
-        accession = re.sub('\.fna$', '', mash_screen_result['query_id'])
-        mash_screen_result['accession'] = accession
-        mash_screen_result['allele'] = custom_plasmid_db_data[accession]['allele']
-        mash_screen_result['circularity'] = custom_plasmid_db_data[accession]['circularity']
-        mash_screen_result['plasmid_length'] = custom_plasmid_db_data[accession]['plasmid_length']
-        mash_screen_result['incompatibility_group'] = custom_plasmid_db_data[accession]['incompatibility_group']
-
-    mash_screen_results.sort(key=operator.itemgetter('accession'))
-    mash_screen_results.sort(key=operator.itemgetter('plasmid_length'), reverse=True)
-    mash_screen_results.sort(key=operator.itemgetter('identity'), reverse=True)
-    mash_screen_results.sort(key=operator.itemgetter('circularity'))
-    mash_screen_results.sort(key=operator.itemgetter('incompatibility_group'))
-
-    # print("mash_identity\taccession\tcircularity\tplasmid_length\tincompatibility_group")
-    candidates_keys = [
-        'identity',
-        'accession',
-        'circularity',
-        'plasmid_length',
-        'incompatibility_group',
-    ]
-    with open(file_paths['mash_custom_plasmid_candidates_path'], 'w+') as candidates_file:
-        writer = csv.DictWriter(candidates_file, candidates_keys, delimiter='\t', extrasaction='ignore')
-        writer.writerows(mash_screen_results)
+    # DONE call snps with freebayes
 
 
-    candidates = []
-    with open(file_paths['mash_custom_plasmid_candidates_path'], 'r') as candidates_file:
-        reader = csv.DictReader(candidates_file, fieldnames=candidates_keys, delimiter='\t')
-        for row in reader:
-            candidates.append(row)
-
+    
     samtools_faidx_jobs = []
     bwa_index_jobs = []
     for candidate in candidates:
-        candidate_fasta_db_path = "/".join([
-            mash_custom_plasmid_db,
-            candidate['accession'] + ".fna"
-        ])
-        candidate_fasta_output_path = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".fna",
-        ])
-        shutil.copyfile(candidate_fasta_db_path, candidate_fasta_output_path)
         samtools_faidx_job = {
             'job_name': 'samtools_faidx',
             'native_specification': '-pe smp 2',
-            'remote_command': os.path.join(job_script_path, 'samtools_faidx.sh'),
+            'remote_command': os.path.join(paths['job_scripts'], 'samtools_faidx.sh'),
             'args': [
-                "--fasta", candidate_fasta_output_path,
+                "--fasta", candidate['fasta_path'],
             ]
         }
         bwa_index_job = {
             'job_name': 'bwa_index',
             'native_specification': '-pe smp 2',
-            'remote_command': os.path.join(job_script_path, 'bwa_index.sh'),
+            'remote_command': os.path.join(paths['job_scripts'], 'bwa_index.sh'),
             'args': [
-                "--fasta", candidate_fasta_output_path,
+                "--fasta", candidate['fasta_path'],
             ]
         }
         samtools_faidx_jobs.append(samtools_faidx_job)
@@ -279,20 +174,15 @@ def main(args):
 
     bwa_mem_jobs = []
     for candidate in candidates:
-        reference_fasta = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".fna",
-        ])
-
         bwa_mem_job = {
             'job_name': 'bwa_mem',
             'native_specification': '-pe smp 8 -shell y',
-            'remote_command': os.path.join(job_script_path, 'bwa_mem.sh'),
+            'remote_command': os.path.join(paths['job_scripts'], 'bwa_mem.sh'),
             'args': [
-                "--reference", reference_fasta,
-                "--R1", reads1_fastq,
-                "--R2", reads2_fastq,
-                "--output", re.sub("\.fna$", "", reference_fasta) + ".sam"
+                "--reference", candidate['fasta_path'],
+                "--R1", paths['reads1_fastq'],
+                "--R2", paths['reads2_fastq'],
+                "--output", re.sub("\.fna$", ".sam", candidate['fasta_path'])
             ]
         }
         bwa_mem_jobs.append(bwa_mem_job)
@@ -302,14 +192,13 @@ def main(args):
 
     samtools_filter_fixmate_sort_jobs = []
     for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".sam",
-        ])
+        alignment = os.path.join(
+            re.sub("\.fna$", ".sam", candidate['fasta_path'])
+        )
         samtools_filter_fixmate_sort_job = {
             'job_name': 'samtools_filter_fixmate_sort',
             'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_filter_fixmate_sort.sh'),
+            'remote_command': os.path.join(paths['job_scripts'], 'samtools_filter_fixmate_sort.sh'),
             'args': [
                 "--input", alignment,
                 "--flags", 1540,
@@ -322,21 +211,19 @@ def main(args):
 
     for candidate in candidates:
         sam_alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".sam",
+            re.sub('\.fna$', '.sam', candidate['fasta_path']),
         ])
         os.remove(sam_alignment)
 
     samtools_index_jobs = []
     for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".bam",
-        ])
+        alignment = os.path.join(
+            re.sub('\.fna', '.bam', candidate['fasta_path'])
+        )
         samtools_index_job = {
             'job_name': 'samtools_index',
             'native_specification': '-pe smp 4',
-            'remote_command': os.path.join(job_script_path, 'samtools_index.sh'),
+            'remote_command': os.path.join(paths['job_scripts'], 'samtools_index.sh'),
             'args': [
                 "--input", alignment,
             ]
@@ -347,14 +234,13 @@ def main(args):
 
     samtools_depth_jobs = []
     for candidate in candidates:
-        alignment = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".bam",
-        ])
+        alignment = os.path.join(
+            re.sub('\.fna', '.bam', candidate['fasta_path'])
+        )
         samtools_depth_job = {
             'job_name': 'samtools_depth',
             'native_specification': '-pe smp 1',
-            'remote_command': os.path.join(job_script_path, 'samtools_depth.sh'),
+            'remote_command': os.path.join(paths['job_scripts'], 'samtools_depth.sh'),
             'args': [
                 "--input", alignment,
                 "--output", re.sub('\.bam$', '.depth', alignment),
@@ -365,10 +251,9 @@ def main(args):
     run_jobs(samtools_depth_jobs)
 
     for candidate in candidates:
-        depth = "/".join([
-            file_paths['plasmid_output_path'],
-            candidate['accession'] + ".depth",
-        ])
+        depth = os.path.join(
+            re.sub('\.fna$', '.depth', candidate['fasta_path']),
+        )
         MINIMUM_DEPTH = 10
         MINIMUM_COVERAGE_PERCENT = 95.0
         positions_above_minimum_depth = 0
@@ -381,6 +266,52 @@ def main(args):
                     positions_above_minimum_depth += 1
         percentage_above_minimum_depth = positions_above_minimum_depth / total_length
         print("percent good coverage: ", percentage_above_minimum_depth)
+
+
+    freebayes_jobs = []
+    for candidate in candidates:
+        alignment = re.sub(
+            '\.fna$', '.bam', candidate['fasta_path']
+        )
+        reference = candidate['fasta_path']
+        vcf = re.sub(
+            '\.fna$', '.vcf', candidate['fasta_path']
+        )
+        freebayes_job = {
+            'job_name': 'freebayes',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(paths['job_scripts'], 'freebayes.sh'),
+            'args': [
+                "--input", alignment,
+                "--reference", reference,
+                "--output", vcf,
+            ]
+        }
+        freebayes_jobs.append(freebayes_job)
+
+    run_jobs(freebayes_jobs)
+
+
+    bcftools_view_jobs = []
+    for candidate in candidates:
+        vcf = re.sub(
+            '\.fna$', '.vcf', candidate['fasta_path']
+        )
+        bcftools_view_job = {
+            'job_name': 'bcftools_view',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(paths['job_scripts'], 'bcftools_view.sh'),
+            'args': [
+                "--input", vcf,
+                "--output", re.sub('\.vcf$', '.snps.vcf', vcf),
+            ]
+        }
+        bcftools_view_jobs.append(bcftools_view_job)
+
+    run_jobs(bcftools_view_jobs)
+
+    
+    
     
 if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
