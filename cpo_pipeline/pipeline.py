@@ -79,7 +79,7 @@ def main(args):
         '--outdir', args.outdir,
     ]
 
-    subprocess.run(assembly_command_line)
+    subprocess.run(plasmids_command_line)
 
     assembly_command_line = [
         'cpo-pipeline',

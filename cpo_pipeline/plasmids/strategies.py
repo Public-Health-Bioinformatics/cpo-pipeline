@@ -192,6 +192,7 @@ def custom_plasmids(paths, queue):
         'accession',
         'circularity',
         'plasmid_length',
+        'allele',
         'incompatibility_group',
     ]
     
@@ -219,6 +220,7 @@ def custom_plasmids(paths, queue):
         shutil.copyfile(candidate_fasta_db_path, candidate['fasta_path'])
 
     for candidate in candidates:
+        candidate['database'] = 'custom'
         queue.put(candidate)
     queue.put(None)
 
@@ -283,7 +285,6 @@ def refseq_plasmids(paths, queue):
     candidates_groupby_three = [candidates[pos:pos + 3] for pos in range(0, len(candidates), 3)]
     for three_candidates in candidates_groupby_three:
         ncbi_acc_download_jobs = []
-        pprint(three_candidates)
         for candidate in three_candidates:
             candidate_fasta = os.path.join(
                 candidate['fasta_path']
@@ -303,5 +304,6 @@ def refseq_plasmids(paths, queue):
         run_jobs(ncbi_acc_download_jobs)
 
     for candidate in candidates:
+        candidate['database'] = 'refseq'
         queue.put(candidate)
     queue.put(None)

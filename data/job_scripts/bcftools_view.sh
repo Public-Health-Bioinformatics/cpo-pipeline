@@ -3,7 +3,7 @@
 #$ -V             # Pass environment variables to the job
 #$ -N bcftools_view
 #$ -cwd           # Use the current working dir
-#$ -pe smp 8      # Parallel Environment (how many cores)
+#$ -pe smp 2      # Parallel Environment (how many cores)
 #$ -l h_vmem=11G  # Memory (RAM) allocation *per core*
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
@@ -42,14 +42,13 @@ do
   esac
 done
 
-source activate bcftools-1.92
+source activate bcftools-1.9
 
 bcftools view \
-	 "${input}" \
-	 -H \
 	 -Ov \
 	 -v snps,mnps \
-	 -o "${output}"
+	 -o "${output}" \
+	 "${input}"
 
 source deactivate
 

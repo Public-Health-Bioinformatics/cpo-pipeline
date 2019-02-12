@@ -264,8 +264,8 @@ def main(args):
                 total_length += 1
                 if int(depth) >= MINIMUM_DEPTH:
                     positions_above_minimum_depth += 1
-        percentage_above_minimum_depth = positions_above_minimum_depth / total_length
-        print("percent good coverage: ", percentage_above_minimum_depth)
+        candidate['bases_above_minimum_depth'] = positions_above_minimum_depth
+        candidate['percent_above_minimum_depth'] = positions_above_minimum_depth / total_length
 
 
     freebayes_jobs = []
@@ -299,7 +299,7 @@ def main(args):
         )
         bcftools_view_job = {
             'job_name': 'bcftools_view',
-            'native_specification': '-pe smp 8',
+            'native_specification': '-pe smp 2 -shell y',
             'remote_command': os.path.join(paths['job_scripts'], 'bcftools_view.sh'),
             'args': [
                 "--input", vcf,
@@ -310,7 +310,38 @@ def main(args):
 
     run_jobs(bcftools_view_jobs)
 
-    
+    for candidate in candidates:
+        snps_vcf = re.sub(
+            '\.fna$', '.snps.vcf', candidate['fasta_path']
+        )
+        snps = 0
+        with open(snps_vcf, 'r') as f:
+            for line in f:
+                if not line.startswith('#'):
+                    snps += 1
+        candidate['snps'] = snps
+
+    plasmid_output_summary = os.path.join(
+        paths['plasmid_output'],
+        'custom_plasmid.txt'
+    )
+    with open(plasmid_output_summary, 'w+') as f:
+        fieldnames = [
+            'accession',
+            'circularity',
+            'plasmid_length',
+            'bases_above_minimum_depth',
+            'percent_above_minimum_depth',
+            'snps',
+            'allele',
+            'incompatibility_group'
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
+        for candidate in candidates:
+            if candidate['database'] == 'custom':
+                f.write(args.sample_id + '\t')
+                # Truncate floats to 4 digits
+                writer.writerow({k:round(v,4) if isinstance(v,float) else v for k,v in candidate.items()})
     
     
 if __name__ == "__main__":
