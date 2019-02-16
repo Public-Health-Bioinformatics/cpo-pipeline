@@ -22,7 +22,7 @@ from pkg_resources import resource_filename
 
 import drmaa
 
-from cpo_pipeline.pipeline import prepare_job
+from cpo_pipeline.pipeline import prepare_job, run_jobs
 from cpo_pipeline.typing.parsers import result_parsers
 from cpo_pipeline.typing.parsers import input_parsers
 
@@ -48,18 +48,17 @@ def main(args):
     output_dir = args.outdir
 
 
-    print(str(datetime.datetime.now()) + "\n\nsample_id: " + sample_id + "\nAssembly: " + assembly)
-
     file_paths = {
         'mlst_path': '/'.join([output_dir, sample_id, 'typing', 'mlst', 'mlst.tsv']),
         'mob_recon_path': '/'.join([output_dir, sample_id, 'typing', 'mob_recon']),
+        'abricate_plasmidfinder_path': '/'.join([output_dir, sample_id, 'typing', 'abricate', 'abricate_plasmidfinder.tsv']),
     }
 
     job_script_path = resource_filename('data', 'job_scripts')
 
     typing_jobs = [
         {
-            'job_name': 'mlst',
+            'job_name': "_".join(['mlst', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'mlst.sh'),
             'args': [
@@ -69,7 +68,17 @@ def main(args):
             ]
         },
         {
-            'job_name': 'mob_recon',
+            'job_name': "_".join(['abricate', sample_id]),
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'abricate.sh'),
+            'args': [
+                "--input", assembly,
+                "--database", "plasmidfinder",
+                "--output_file", file_paths['abricate_plasmidfinder_path']
+            ]
+        },
+        {
+            'job_name': "_".join(['mob_recon', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'mob_recon.sh'),
             'args': [
@@ -79,26 +88,18 @@ def main(args):
         }
     ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in typing_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(typing_jobs)
 
-    print("identifying MLST")
     mlst_report = "/".join([output_dir, sample_id, "typing", "mlst", "mlst.tsv"])
     mlst_hits = result_parsers.parse_mlst_result(mlst_report)
     # TODO: Check that there is only one MLST result in the report, and handle
     #       cases where the report is malformed.
-    mlst_hit = mlst_hits[0]
+    [mlst_hit] = mlst_hits
     mlst_scheme_map = input_parsers.parse_scheme_species_map(mlst_scheme_map_file)
     mlst_species = "Undefined"
     for scheme in mlst_scheme_map:
         if 'species' in scheme and scheme['scheme_id'] == mlst_hit['scheme_id']:
             mlst_species = scheme['species']
-
-    print("identifying plasmid contigs and amr genes")
 
     mob_recon_contig_report_path = "/".join([
         output_dir,

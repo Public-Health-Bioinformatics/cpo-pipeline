@@ -22,7 +22,7 @@ import drmaa
 
 from pkg_resources import resource_filename
 
-from cpo_pipeline.pipeline import prepare_job
+from cpo_pipeline.pipeline import prepare_job, run_jobs
 from cpo_pipeline.resistance.parsers import result_parsers
 
 def main(args):
@@ -58,8 +58,6 @@ def main(args):
     output_dir = args.outdir
 
 
-    print(str(datetime.datetime.now()) + "\n\nsample_id " + sample_id + "\nAssembly: " + assembly)
-
     file_paths = {
         'abricate_path': '/'.join([output_dir, sample_id, 'resistance', 'abricate', 'abricate.tsv']),
         'rgi_path': "/".join([output_dir, sample_id, 'resistance', 'rgi'])
@@ -69,7 +67,7 @@ def main(args):
 
     resistance_jobs = [
         {
-            'job_name': 'abricate',
+            'job_name': "_".join(['abricate', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'abricate.sh'),
             'args': [
@@ -80,7 +78,7 @@ def main(args):
             ]
         },
         {
-            'job_name': 'rgi',
+            'job_name': "_".join(['rgi', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'rgi.sh'),
             'args': [
@@ -91,13 +89,7 @@ def main(args):
         }
     ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in resistance_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
-
+    run_jobs(resistance_jobs)
 
     abricate_report_path = "/".join([output_dir, sample_id, "resistance", "abricate", "abricate.tsv"])
     abricate_report = result_parsers.parse_abricate_result(abricate_report_path)

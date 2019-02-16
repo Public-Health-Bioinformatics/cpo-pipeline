@@ -26,7 +26,7 @@ import drmaa
 
 from pkg_resources import resource_filename
 
-from cpo_pipeline.pipeline import prepare_job
+from cpo_pipeline.pipeline import prepare_job, run_jobs
 from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.assembly.parsers import input_parsers
 
@@ -190,14 +190,6 @@ def main(args):
         mash_genome_db = args.mash_genome_db
     else:
         mash_genome_db = config['databases']['mash_genome_db']
-    if args.mash_plasmid_db and not config['databases']['mash_plasmid_db']:
-        mash_plasmid_db = args.mash_plasmid_db
-    else:
-        mash_plasmid_db = config['databases']['mash_plasmid_db']
-    if args.mash_custom_plasmid_db and not config['databases']['mash_custom_plasmid_db']:
-        mash_custom_plasmid_db = args.mash_custom_plasmid_db
-    else:
-        mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
 
     sample_id = args.sample_id
     reads1_fastq = args.reads1_fastq
@@ -256,7 +248,7 @@ def main(args):
 
     pre_assembly_qc_jobs = [
         {
-            'job_name': 'mash_screen',
+            'job_name': "_".join(['mash_screen', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'mash_screen.sh'),
             'args': [
@@ -267,7 +259,7 @@ def main(args):
             ],
         },
         {
-            'job_name': 'fastqc',
+            'job_name': "_".join(['fastqc', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'fastqc.sh'),
             'args': [
@@ -277,7 +269,7 @@ def main(args):
             ],
         },
         {
-            'job_name': 'seqtk_totalbp',
+            'job_name': "_".join(['seqtk_totalbp', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'seqtk_totalbp.sh'),
             'args': [
@@ -288,15 +280,8 @@ def main(args):
         }
     ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in pre_assembly_qc_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(pre_assembly_qc_jobs)
 
-
-    print("Parsing the QC results")
     #parse genome mash results
     mash_hits = result_parsers.parse_mash_result(file_paths["mash_genome_path"])
     mash_hits = sorted(mash_hits, key=lambda k: k['identity'], reverse=True)
@@ -346,8 +331,6 @@ def main(args):
     qc_verdicts["acceptable_fastqc_forward"] = fastqc_qc_check(fastqc_r1_result)
     qc_verdicts["acceptable_fastqc_reverse"] = fastqc_qc_check(fastqc_r2_result)
 
-    #download a reference genome
-    print("Downloading reference genomes")
 
     reference_genomes = []
     # build the save paths
@@ -393,7 +376,7 @@ def main(args):
 
     assembly_jobs = [
         {
-            'job_name': 'shovill',
+            'job_name': "_".join(['shovill', sample_id]),
             'native_specification': '-pe smp 16 -l h_vmem=4G',
             'remote_command': os.path.join(job_script_path, 'shovill.sh'),
             'args': [
@@ -406,16 +389,11 @@ def main(args):
         }
     ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in assembly_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(assembly_jobs)
 
     post_assembly_qc_jobs = [
         {
-            'job_name': 'quast',
+            'job_name': "_".join(['quast', sample_id]),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'quast.sh'),
             'args': [
@@ -425,14 +403,8 @@ def main(args):
         },
     ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in post_assembly_qc_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(post_assembly_qc_jobs)
 
-    print("Parsing assembly results")
     busco_results = result_parsers.parse_busco_result(
         file_paths["quast_path"] + "/busco_stats/short_summary_contigs.txt"
     )
@@ -442,14 +414,6 @@ def main(args):
 
     qc_verdicts["acceptable_busco_assembly_metrics"] = busco_qc_check(busco_results, qc_thresholds)
     qc_verdicts["acceptable_quast_assembly_metrics"] = quast_qc_check(quast_results, estimated_genome_size)
-
-    #print QC results to screen
-    print("total bases: " + str(total_bp))
-    print("estimated genome size: " + str(estimated_genome_size))
-    print("coverage: " + str(coverage))
-    print("")
-    for key, value in qc_verdicts.items():
-        print(str(key) + ": " + str(value))
 
     return "/".join([file_paths['assembly_path'], "contigs.fa"])
 
@@ -466,8 +430,6 @@ if __name__ == "__main__":
                         help="absolute file path to reverse read (R2)", required=True)
     parser.add_argument("-o", "--outdir", dest="output", default='./',
                         help="absolute path to output folder")
-    parser.add_argument("--mash-genomedb", dest="mash_genome_db",
-                        help="absolute path to mash reference database")
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)

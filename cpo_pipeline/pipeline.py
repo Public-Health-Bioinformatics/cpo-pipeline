@@ -4,7 +4,9 @@ import os
 import argparse
 import configparser
 import csv
+import datetime
 import drmaa
+import json
 import subprocess
 import sys
 import multiprocessing
@@ -21,15 +23,27 @@ def prepare_job(job, session):
     job_template.remoteCommand = job['remote_command']
     job_template.args = job['args']
     job_template.joinFiles = True
+    try:
+        job_template.outputPath = ':' + job['output_path']
+    except KeyError:
+        pass
     
     return job_template
 
 def run_jobs(jobs):
     with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
+        running_jobs = []
+        for job in jobs:
+            prepared_job = prepare_job(job, session)
+            job_id = session.runJob(prepared_job)
+            log_entry = {
+                "event": "job_submitted",
+                "timestamp": str(datetime.datetime.utcnow().replace(microsecond=0).isoformat()),
+                "job_name": prepared_job.jobName,
+                "job_id": job_id,
+            }
+            print(json.dumps(log_entry))
+            running_jobs.append(job_id)
         session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
 
 def collect_final_outputs(outdir, sample_id):
@@ -113,7 +127,7 @@ def main(args):
     subprocess.run(resistance_command_line)
 
     final_outputs = collect_final_outputs(args.outdir, args.sample_id)
-    pprint(final_outputs)
+
     final_output_csv_path = "/".join([
         args.outdir,
         args.sample_id,
@@ -148,7 +162,7 @@ def multi(args):
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
-    pool = multiprocessing.Pool(args.parallel)
+    pool = multiprocessing.Pool(int(args.parallel))
 
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
 

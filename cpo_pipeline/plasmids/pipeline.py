@@ -84,6 +84,14 @@ def main(args):
 
     os.makedirs(
         os.path.join(
+            paths['plasmid_output'],
+            'logs',
+        ),
+        exist_ok=True
+    )
+
+    os.makedirs(
+        os.path.join(
             paths['custom_plasmid_output'],
             'candidates',
         ),
@@ -119,7 +127,9 @@ def main(args):
             name=process_detail['name'],
             target=process_detail['target'],
             args=(
-                paths, queue
+                sample_id,
+                paths,
+                queue,
             )
         )
         processes.append(p)
@@ -152,7 +162,12 @@ def main(args):
     bwa_index_jobs = []
     for candidate in candidates:
         samtools_faidx_job = {
-            'job_name': 'samtools_faidx',
+            'job_name': "_".join(['samtools_faidx', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_faidx', sample_id]),
+            ),
             'native_specification': '-pe smp 2',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_faidx.sh'),
             'args': [
@@ -160,7 +175,12 @@ def main(args):
             ]
         }
         bwa_index_job = {
-            'job_name': 'bwa_index',
+            'job_name': "_".join(['bwa_index', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['bwa_index', sample_id]),
+            ),
             'native_specification': '-pe smp 2',
             'remote_command': os.path.join(paths['job_scripts'], 'bwa_index.sh'),
             'args': [
@@ -175,7 +195,12 @@ def main(args):
     bwa_mem_jobs = []
     for candidate in candidates:
         bwa_mem_job = {
-            'job_name': 'bwa_mem',
+            'job_name': "_".join(['bwa_mem', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['bwa_mem', sample_id]),
+            ),
             'native_specification': '-pe smp 8 -shell y',
             'remote_command': os.path.join(paths['job_scripts'], 'bwa_mem.sh'),
             'args': [
@@ -196,7 +221,12 @@ def main(args):
             re.sub("\.fna$", ".sam", candidate['fasta_path'])
         )
         samtools_filter_fixmate_sort_job = {
-            'job_name': 'samtools_filter_fixmate_sort',
+            'job_name': "_".join(['samtools_filter_fixmate_sort', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_filter_fixmate_sort', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_filter_fixmate_sort.sh'),
             'args': [
@@ -221,7 +251,12 @@ def main(args):
             re.sub('\.fna', '.bam', candidate['fasta_path'])
         )
         samtools_index_job = {
-            'job_name': 'samtools_index',
+            'job_name': "_".join(['samtools_index', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_index', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_index.sh'),
             'args': [
@@ -238,7 +273,12 @@ def main(args):
             re.sub('\.fna', '.bam', candidate['fasta_path'])
         )
         samtools_depth_job = {
-            'job_name': 'samtools_depth',
+            'job_name': "_".join(['samtools_depth', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_depth', sample_id]),
+            ),
             'native_specification': '-pe smp 1',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_depth.sh'),
             'args': [
@@ -265,8 +305,10 @@ def main(args):
                 if int(depth) >= MINIMUM_DEPTH:
                     positions_above_minimum_depth += 1
         candidate['bases_above_minimum_depth'] = positions_above_minimum_depth
-        candidate['percent_above_minimum_depth'] = positions_above_minimum_depth / total_length
-
+        try:
+            candidate['percent_above_minimum_depth'] = positions_above_minimum_depth / total_length
+        except ZeroDivisionError:
+            candidate['percent_above_minimum_depth'] = 0.0
 
     freebayes_jobs = []
     for candidate in candidates:
@@ -278,7 +320,12 @@ def main(args):
             '\.fna$', '.vcf', candidate['fasta_path']
         )
         freebayes_job = {
-            'job_name': 'freebayes',
+            'job_name': "_".join(['freebayes', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['freebayes', sample_id]),
+            ),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(paths['job_scripts'], 'freebayes.sh'),
             'args': [
@@ -298,7 +345,12 @@ def main(args):
             '\.fna$', '.vcf', candidate['fasta_path']
         )
         bcftools_view_job = {
-            'job_name': 'bcftools_view',
+            'job_name': "_".join(['bcftools_view', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['bcftools_view', sample_id]),
+            ),
             'native_specification': '-pe smp 2 -shell y',
             'remote_command': os.path.join(paths['job_scripts'], 'bcftools_view.sh'),
             'args': [

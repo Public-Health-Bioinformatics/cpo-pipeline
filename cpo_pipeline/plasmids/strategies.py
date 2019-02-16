@@ -11,7 +11,7 @@ from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.pipeline import run_jobs
 from cpo_pipeline.plasmids import parsers
 
-def samtools_filter_fixmate_sort_discrete_jobs(candidates, paths):
+def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
     samtools_view_jobs = []
     for candidate in candidates:
         alignment = "/".join([
@@ -19,7 +19,12 @@ def samtools_filter_fixmate_sort_discrete_jobs(candidates, paths):
             candidate['accession'] + ".sam",
         ])
         samtools_view_job = {
-            'job_name': 'samtools_view',
+            'job_name': "_".join(['samtools_view', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_view', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_view.sh'),
             # '--f 1540' excludes the following reads:
@@ -39,11 +44,16 @@ def samtools_filter_fixmate_sort_discrete_jobs(candidates, paths):
     samtools_sort_jobs = []
     for candidate in candidates:
         alignment = "/".join([
-            paths['plasmid_output_path'],
+            paths['plasmid_output'],
             candidate['accession'] + ".mapped.dedup.bam",
         ])
         samtools_sort_job = {
-            'job_name': 'samtools_sort',
+            'job_name': "_".join(['samtools_sort', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_view', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
             'args': [
@@ -59,11 +69,16 @@ def samtools_filter_fixmate_sort_discrete_jobs(candidates, paths):
     samtools_fixmate_jobs = []
     for candidate in candidates:
         alignment = "/".join([
-            paths['plasmid_output_path'],
+            paths['plasmid_output'],
             candidate['accession'] + ".mapped.dedup.namesort.bam",
         ])
         samtools_fixmate_job = {
-            'job_name': 'samtools_fixmate',
+            'job_name': "_".join(['samtools_fixmate', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_fixmate', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_fixmate.sh'),
             'args': [
@@ -78,11 +93,16 @@ def samtools_filter_fixmate_sort_discrete_jobs(candidates, paths):
     samtools_sort_jobs = []
     for candidate in candidates:
         alignment = "/".join([
-            paths['plasmid_output_path'],
+            paths['plasmid_output'],
             candidate['accession'] + ".mapped.dedup.namesort.fixmate.bam",
         ])
         samtools_sort_job = {
-            'job_name': 'samtools_sort',
+            'job_name': "_".join(['samtools_sort', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_sort', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
             'args': [
@@ -97,11 +117,16 @@ def samtools_filter_fixmate_sort_discrete_jobs(candidates, paths):
     samtools_markdup_jobs = []
     for candidate in candidates:
         alignment = "/".join([
-            paths['plasmid_output_path'],
+            paths['plasmid_output'],
             candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.bam",
         ])
         samtools_markdup_job = {
-            'job_name': 'samtools_markdup',
+            'job_name': "_".join(['samtools_markdup', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_markdup', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_markdup.sh'),
             'args': [
@@ -114,15 +139,20 @@ def samtools_filter_fixmate_sort_discrete_jobs(candidates, paths):
     run_jobs(samtools_markdup_jobs)
 
 
-def samtools_filter_fixmate_sort_single_job(candidates, paths):
+def samtools_filter_fixmate_sort_single_job(sample_id, candidates, paths):
     samtools_filter_fixmate_sort_jobs = []
     for candidate in candidates:
         alignment = "/".join([
-            paths['plasmid_output_path'],
+            paths['plasmid_output'],
             candidate['accession'] + ".sam",
         ])
         samtools_filter_fixmate_sort_job = {
-            'job_name': 'samtools_filter_fixmate_sort',
+            'job_name': "_".join(['samtools_filter_fixmate_sort', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['samtools_filter_fixmate_sort', sample_id]),
+            ),
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_filter_fixmate_sort.sh'),
             'args': [
@@ -136,10 +166,15 @@ def samtools_filter_fixmate_sort_single_job(candidates, paths):
     run_jobs(samtools_filter_fixmate_sort_jobs)
     
 
-def custom_plasmids(paths, queue):
+def custom_plasmids(sample_id, paths, queue):
     mash_jobs = [
         {
-            'job_name': 'mash_screen_custom_plasmid',
+            'job_name': "_".join(['mash_screen_custom_plasmid', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['mash_screen_custom_plasmid', sample_id]),
+            ),
             'native_specification': '-pe smp 8 -shell y',
             'remote_command': os.path.join(paths['job_scripts'], 'mash_screen_custom_db.sh'),
             'args': [
@@ -226,11 +261,16 @@ def custom_plasmids(paths, queue):
 
 
 
-def refseq_plasmids(paths, queue):
+def refseq_plasmids(sample_id, paths, queue):
 
     mash_jobs = [
         {
-            'job_name': 'mash_screen_refseq_plasmid',
+            'job_name': "_".join(['mash_screen_refseq_plasmid', sample_id]),
+            'output_path': os.path.join(
+                paths['plasmid_output'],
+                'logs',
+                "_".join(['mash_screen_refseq_plasmid', sample_id]),
+            ),
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(paths['job_scripts'], 'mash_screen.sh'),
             'args': [
@@ -289,9 +329,14 @@ def refseq_plasmids(paths, queue):
             candidate_fasta = os.path.join(
                 candidate['fasta_path']
             )
-        
+
             ncbi_acc_download_job = {
-                'job_name': 'ncbi_acc_download',
+                'job_name': "_".join(['ncbi_acc_download', sample_id]),
+                'output_path': os.path.join(
+                    paths['plasmid_output'],
+                    'logs',
+                    "_".join(['ncbi_acc_download', sample_id]),
+                ),
                 'native_specification': '-pe smp 1',
                 'remote_command': os.path.join(paths['job_scripts'], 'ncbi-acc-download.sh'),
                 'args': [
