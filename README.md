@@ -46,6 +46,10 @@ mlst-2.15.1
 mob_suite-1.4.5
 rgi-4.0.3
 abricate-0.8.7
+bwa-0.7.17
+samtools-1.9
+bcftools-1.9
+freebayes-1.2
 ```
 
 ## Running the Pipeline
@@ -65,6 +69,7 @@ post-assembly_qc
 reference
 resistance
 typing
+plasmids
 ```
 
 
