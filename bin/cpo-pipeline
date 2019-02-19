@@ -130,6 +130,18 @@ def main():
                               help='Config File', required=False)
     typing_group.set_defaults(func=cpo_pipeline.typing.pipeline.main)
 
+
+    tree_group.add_argument("-i", "--input", dest="input_file",
+                            help="Multi-sample input file", required=True)
+    tree_group.add_argument("-r", "--reference", dest="reference",
+                            help="Reference file (fasta or gbk)", required=True)
+    tree_group.add_argument("-m", "--metadata", dest="metadata",
+                            help="Metadata file", required=False)
+    tree_group.add_argument("-o", "--outdir", dest="outdir",
+                              help="absolute path to output folder", required=True)
+    tree_group.add_argument('-c', '--config', dest='config_file',
+                            default=resource_filename('data', 'config.ini'),
+                            help='Config File', required=False)
     
     args = parser.parse_args()
 

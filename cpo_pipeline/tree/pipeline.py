@@ -4,7 +4,7 @@
 # It uses snippy for core genome SNV calling and alignment, clustalw to generate a NJ tree and ete3 to render the dendrogram
 
 import subprocess
-import optparse
+import argparse
 import os
 import datetime
 import sys
@@ -13,6 +13,8 @@ import urllib.request
 import gzip
 import ete3 as e
 import drmaa
+
+from cpo_pipeline.pipeline import prepare_job, run_jobs
 
 from parsers import result_parsers
 
@@ -29,32 +31,14 @@ def addFace(name): #function to add a facet to a tree
     face.margin_left = 5
     return face
 
-def prepare_job(job, session):
-    job_template = session.createJobTemplate()
-    job_template.jobName = job['job_name']
-    job_template.nativeSpecification = job['native_specification']
-    job_template.jobEnvironment = os.environ
-    job_template.workingDirectory = os.getcwd()
-    job_template.remoteCommand = job['remote_command']
-    job_template.args = job['args']
-    job_template.joinFiles = True
-    
-    return job_template
 
-def main():
+def main(args):
     
-    #parses some parameters
-    parser = optparse.OptionParser("Usage: %prog [options] arg1 arg2 ...")
-    parser.add_option("-m", "--metadata", dest="metadataPath", type="string", default="./pipelineTest/metadata.tabular", help="absolute file path to metadata file")
-    parser.add_option("-r", "--reference", dest="reference_path", type="string", help="absolute file path to reference genome fasta file")
-    parser.add_option("-o", "--output_file", dest="outputFile", type="string", default="tree.png", help="Output graphics file. Use ending 'png', 'pdf' or 'svg' to specify file format.")
-    
-    (options,args) = parser.parse_args()
     curDir = os.getcwd()
     treePath = str(options.treePath).lstrip().rstrip()
     distancePath = str(options.distancePath).lstrip().rstrip()
-    metadataPath = str(options.metadataPath).lstrip().rstrip()
-    reference_path = options.reference_path
+    metadata_file = args.metadata_file
+    reference = args.reference
     
     sensitivePath = str(options.sensitivePath).lstrip().rstrip()
     sensitiveCols = str(options.sensitiveCols).lstrip().rstrip()
@@ -62,14 +46,14 @@ def main():
     bcidCol = str( str(options.bcidCol).lstrip().rstrip() ) 
     naValue = str( str(options.naValue).lstrip().rstrip() ) 
     
-    metadata = result_parsers.parse_workflow_results(metadataPath)
+    metadata = result_parsers.parse_workflow_results(metadata_file)
     distance = read(distancePath)
     treeFile = "".join(read(treePath))
 
     os.environ['QT_QPA_PLATFORM']='offscreen'
 
-    file_paths = {
-        'snippy_path': "/".join([outputDir, "snippy"]),
+    paths = {
+        'snippy_path': os.path.join(outputDir, "snippy"),
     }
 
     job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
@@ -80,37 +64,29 @@ def main():
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'snippy.sh'),
             'args': [
-                "--reference", reference_path,
+                "--reference", reference,
                 "--contigs", " ".join(contigs),
-                "--output_dir", "/".join([file_paths['snippy_path'], ID])
+                "--output_dir", os.path.join(paths['snippy_path'], ID)
             ]
         }
         for ID in IDs
     ]
     
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in snippy_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(snippy_jobs)
         
-    snippy_core_job = {
-        'job_name': 'snippy-core',
-        'native_specification': '-pe smp 8',
-        'remote_command': os.path.join(job_script_path, 'snippy-core.sh'),
-        'args': [
-            "--reference", reference_path,
-            snippy_dirs
-        ]
-    }
+    snippy_core_jobs = [
+        {
+            'job_name': 'snippy-core',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'snippy-core.sh'),
+            'args': [
+                "--reference", reference,
+                snippy_dirs
+            ]
+        }
+    ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = prepare_job(snippy_core_job, session)
-        running_jobs = [session.runJob(prepared_job)]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(snippy_core_jobs)
 
     snp_dists_jobs = [
         {
@@ -124,28 +100,20 @@ def main():
         }
     ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = [prepare_job(job, session) for job in snp_dists_jobs]
-        running_jobs = [session.runJob(job) for job in prepared_jobs]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+    run_jobs(snp_dists_jobs)
 
-    clustalw_tree_job = {
-        'job_name': 'clustalw_tree',
-        'native_specification': '-pe smp 8',
-        'remote_command': os.path.join(job_script_path, 'clustalw_tree.sh'),
-        'args': [
-            "--alignment", alignment
-        ]
-    }
+    clustalw_tree_jobs = [
+        {
+            'job_name': 'clustalw_tree',
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'clustalw_tree.sh'),
+            'args': [
+                "--alignment", alignment
+            ]
+        }
+    ]
 
-    with drmaa.Session() as session:
-        prepared_jobs = prepare_job(clustalw_tree_job, session)
-        running_jobs = [session.runJob(prepared_job)]
-        for job_id in running_jobs:
-            print('Your job has been submitted with ID %s' % job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)    
+    run_jobs(clustalw_tree_jobs)
     
     distanceDict = {} #store the distance matrix as rowname:list<string>
     
@@ -266,7 +234,18 @@ def main():
 
 
 if __name__ == '__main__':
-    start = time.time()
-    main()
-    end = time.time()
-    print("Finished!\nThe analysis used: " + str(end - start) + " seconds")
+    script_name = os.path.basename(os.path.realpath(sys.argv[0]))
+    parser = argparse.ArgumentParser(prog=script_name, description='')
+    parser.add_argument("-i", "--input", dest="input_file",
+                        help="identifier of the isolate", required=True)
+    parser.add_argument("-r", "--reference", dest="reference",
+                        help="Reference file (fasta or gbk)", required=True)
+    parser.add_argument("-m", "--metadata", dest="metadata",
+                        help="Metadata file", required=False)
+    parser.add_argument("-o", "--outdir", dest="output", default='./',
+                        help="absolute path to output folder")
+    parser.add_argument('-c', '--config', dest='config_file',
+                        default=resource_filename('data', 'config.ini'),
+                        help='Config File', required=False)
+    args = parser.parse_args()
+    main(args)
