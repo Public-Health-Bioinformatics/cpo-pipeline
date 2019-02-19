@@ -234,12 +234,6 @@ def main(args):
         "quast_path": "/".join([output_dir, sample_id, "post-assembly_qc", "quast"]),
     }
 
-    print(str(datetime.datetime.now()))
-    print("sample_id: " + sample_id)
-    print("reads1_fastq: " + reads1_fastq)
-    print("reads2_fastq: " + reads2_fastq)
-
-    print("step 1: preassembly QC")
 
     job_script_path = resource_filename('data', 'job_scripts')
     estimated_genome_sizes_path = resource_filename('data', 'estimated_genome_sizes.tsv')
@@ -372,7 +366,6 @@ def main(args):
         qc_verdicts["acceptable_coverage"] = True
 
 
-    print("step 2: genome assembly and QC")
 
     assembly_jobs = [
         {
