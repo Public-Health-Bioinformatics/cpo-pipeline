@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input INPUT_CONTIGS_FASTA -d|--datadir ABRICATE_DATA_DIR -D|--database ABRICATE_DATABASE_NAME -o|--output_file OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] [-d|--datadir ABRICATE_DATA_DIR] -i|--input INPUT_CONTIGS_FASTA -D|--database ABRICATE_DATABASE_NAME -o|--output_file OUTPUT_FILE\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -61,7 +61,7 @@ mkdir -p $(dirname "${output_file}")
 source activate abricate-0.8.7
 
 abricate \
-    --datadir "${datadir}" \
+    $( if [ "${datadir}" != "" ]; then echo "--datadir" "${datadir}"; fi ) \
     --db "${db}" \
     "${assembly}" > \
     "${output_file}"

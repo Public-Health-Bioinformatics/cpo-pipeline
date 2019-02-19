@@ -25,6 +25,7 @@ setup(
     python_requires = '>=3.4',
     install_requires = [
         "drmaa >=0.7.9, ==0.7.*",
+        "ete3 >=3.1.0, ==3.1.*",
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",

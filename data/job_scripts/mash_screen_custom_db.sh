@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 #$ -V             # Pass environment variables to the job
 #$ -N mash_screen
@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -1|--R1 INPUT_R1_FASTQ -2|--R2 INPUT_R2_FASTQ -q|--queries QUERIES_MSH -i|--min-identity MIN_IDENTITY -o|--output_file OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] [-i|--min-identity IDENTITY] -1|--R1 INPUT_R1_FASTQ -2|--R2 INPUT_R2_FASTQ -d|--plasmid-db-dir -o|--output_file OUTPUT_FILE\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -21,8 +21,9 @@ fi
 
 input_r1_fastq=""
 input_r2_fastq=""
-queries=""
 output_file=""
+plasmid_db_dir=""
+
 min_identity=0.996
 
 while [[ $# -gt 0 ]]
@@ -42,15 +43,15 @@ do
     shift # past argument
     shift # past value
     ;;
-    -q|--queries)
-    # mash sketch file <queries>.msh
-    queries="$2"
+    -i|--min-identity)
+    # minimum identity for mash to report
+    min_identity="$2"
     shift # past argument
     shift # past value
     ;;
-    -i|--min-identity)
-    # Minimum identity to report
-    min_identity="$2"
+    -d|--plasmid-db-dir)
+    # directory containing one or more .msh mash sketches of know plasmids
+    plasmid_db_dir="$2"
     shift # past argument
     shift # past value
     ;;
@@ -63,17 +64,18 @@ do
   esac
 done
 
-mkdir -p $(dirname "${output_file}")
+outdir=$(dirname "${output_file}")
+mkdir -p "${outdir}"
 
 source activate mash-2.0
 
-mash screen \
-     -p 8 \
-     -w \
+ls $(echo "${plasmid_db_dir}"/*.msh) > "${outdir}"/mash_sketch_list.txt
+mash paste "${outdir}"/plasmid_db -l "${outdir}"/mash_sketch_list.txt
+mash screen -p 8 \
      -i "${min_identity}" \
-     "${queries}" \
-     "${input_r1_fastq}" \
-     "${input_r2_fastq}" \
+     "${outdir}"/plasmid_db.msh \
+     "${input_r1_fastq}" "${input_r2_fastq}" \
      > "${output_file}"
+rm "${outdir}/"plasmid_db.msh
 
 source deactivate
