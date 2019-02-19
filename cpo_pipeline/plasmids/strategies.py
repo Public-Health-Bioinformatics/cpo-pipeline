@@ -5,6 +5,7 @@ import operator
 import re
 import shutil
 import time
+import urllib.request
 from pprint import pprint
 
 from cpo_pipeline.assembly.parsers import result_parsers
@@ -320,33 +321,18 @@ def refseq_plasmids(sample_id, paths, queue):
 
 
     # NCBI Rate-limits downloads to 3 per second.
-    # Group list of candidates into chunks of 3, then submit jobs in batches of 3 with
-    # at least a 2-second delay between job submissions.
-    candidates_groupby_three = [candidates[pos:pos + 3] for pos in range(0, len(candidates), 3)]
-    for three_candidates in candidates_groupby_three:
-        ncbi_acc_download_jobs = []
-        for candidate in three_candidates:
-            candidate_fasta = os.path.join(
-                candidate['fasta_path']
-            )
-
-            ncbi_acc_download_job = {
-                'job_name': "_".join(['ncbi_acc_download', sample_id]),
-                'output_path': os.path.join(
-                    paths['plasmid_output'],
-                    'logs',
-                    "_".join(['ncbi_acc_download', sample_id]),
-                ),
-                'native_specification': '-pe smp 1',
-                'remote_command': os.path.join(paths['job_scripts'], 'ncbi-acc-download.sh'),
-                'args': [
-                    '--accession', candidate['accession'],
-                    '--output_file', candidate['fasta_path']
-                ]
-            }
-            ncbi_acc_download_jobs.append(ncbi_acc_download_job)
+    for candidate in candidates:
+        candidate_fasta = os.path.join(
+            candidate['fasta_path']
+        )
+        url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + \
+            "&".join([
+                "db=nucleotide",
+                "id=" + candidate['accession'],
+                "rettype=fasta",
+            ])
+        urllib.request.urlretrieve(url, candidate['fasta_path'])    
         time.sleep(2)
-        run_jobs(ncbi_acc_download_jobs)
 
     for candidate in candidates:
         candidate['database'] = 'refseq'
