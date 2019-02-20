@@ -7,6 +7,8 @@ import csv
 import datetime
 import drmaa
 import json
+import logging
+import structlog
 import subprocess
 import sys
 import multiprocessing
@@ -14,6 +16,20 @@ import uuid
 from pkg_resources import resource_filename
 from pprint import pprint
 import cpo_pipeline
+
+logger = structlog.get_logger()
+
+logging.basicConfig(
+    format="%(message)s",
+    stream=sys.stdout,
+    level=logging.DEBUG
+)
+
+structlog.configure(
+    processors=[structlog.processors.JSONRenderer()],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    context_class=structlog.threadlocal.wrap_dict(dict),
+)
 
 def prepare_job(job, session):
     job_template = session.createJobTemplate()
@@ -32,18 +48,18 @@ def prepare_job(job, session):
     return job_template
 
 def run_jobs(jobs):
+    log = logger.new()
     with drmaa.Session() as session:
         running_jobs = []
         for job in jobs:
             prepared_job = prepare_job(job, session)
             job_id = session.runJob(prepared_job)
-            log_entry = {
-                "event": "job_submitted",
-                "timestamp": str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-                "job_name": prepared_job.jobName,
-                "job_id": job_id,
-            }
-            print(json.dumps(log_entry))
+            log.info(
+                "job_submitted",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                job_name=prepared_job.jobName,
+                job_id=job_id,
+            )
             running_jobs.append(job_id)
         session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
 
@@ -109,15 +125,16 @@ def main(args):
     config.read(args.config_file)
 
     analysis_id = uuid.uuid4()
+    now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 
-    log_entry = {
-        "event": "analysis_started",
-        "timestamp": str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-        "analysis_id": str(analysis_id),
-        "sample_id": args.sample_id,
-        "pipeline_version": cpo_pipeline.__version__,
-    }
-    print(json.dumps(log_entry))
+    log = logger.new()
+    log.info(
+        "analysis_started",
+        timestamp=str(now),
+        analysis_id=str(analysis_id),
+        sample_id=args.sample_id,
+        pipeline_version=cpo_pipeline.__version__,
+    )
 
     plasmids_command_line = [
         'cpo-pipeline',
@@ -129,7 +146,7 @@ def main(args):
     ]
 
     subprocess.run(plasmids_command_line)
-
+    return(0)
     assembly_command_line = [
         'cpo-pipeline',
         'assembly',
@@ -196,7 +213,7 @@ def main(args):
         "sample_id": args.sample_id,
         "pipeline_version": cpo_pipeline.__version__,
     }
-    print(json.dumps(log_entry))
+    log.info(json.dumps(log_entry))
 
 def multi(args):
     """
