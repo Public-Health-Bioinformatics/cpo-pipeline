@@ -252,8 +252,8 @@ def main(args):
     with open(final_output_csv_path, 'w+') as f:
         writer = csv.DictWriter(f, fieldnames=final_outputs_headers, delimiter='\t')
         writer.writeheader()
-        for row in final_outputs:
-            writer.writerow(row)
+        writer.writerow(final_outputs)
+
 
     logger.info(
         "analysis_completed",
