@@ -1,5 +1,6 @@
 import os
 import csv
+import datetime
 import glob
 import operator
 import re
@@ -15,17 +16,14 @@ from cpo_pipeline.plasmids import parsers
 def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
     samtools_view_jobs = []
     for candidate in candidates:
-        alignment = "/".join([
+        alignment = os.path.join(
             paths['plasmid_output_path'],
             candidate['accession'] + ".sam",
-        ])
+        )
         samtools_view_job = {
-            'job_name': "_".join(['samtools_view', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_view', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_view', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_view.sh'),
             # '--f 1540' excludes the following reads:
@@ -49,12 +47,9 @@ def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
             candidate['accession'] + ".mapped.dedup.bam",
         ])
         samtools_sort_job = {
-            'job_name': "_".join(['samtools_sort', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_view', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_sort', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
             'args': [
@@ -74,12 +69,9 @@ def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
             candidate['accession'] + ".mapped.dedup.namesort.bam",
         ])
         samtools_fixmate_job = {
-            'job_name': "_".join(['samtools_fixmate', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_fixmate', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_fixmate', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_fixmate.sh'),
             'args': [
@@ -98,12 +90,9 @@ def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
             candidate['accession'] + ".mapped.dedup.namesort.fixmate.bam",
         ])
         samtools_sort_job = {
-            'job_name': "_".join(['samtools_sort', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_sort', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_sort', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_sort.sh'),
             'args': [
@@ -122,12 +111,9 @@ def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
             candidate['accession'] + ".mapped.dedup.namesort.fixmate.coordsort.bam",
         ])
         samtools_markdup_job = {
-            'job_name': "_".join(['samtools_markdup', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_markdup', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_markdup', sample_id], candidate['accession']),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_markdup.sh'),
             'args': [
@@ -148,12 +134,9 @@ def samtools_filter_fixmate_sort_single_job(sample_id, candidates, paths):
             candidate['accession'] + ".sam",
         ])
         samtools_filter_fixmate_sort_job = {
-            'job_name': "_".join(['samtools_filter_fixmate_sort', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_filter_fixmate_sort', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_filter_fixmate_sort', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(job_script_path, 'samtools_filter_fixmate_sort.sh'),
             'args': [
@@ -167,15 +150,12 @@ def samtools_filter_fixmate_sort_single_job(sample_id, candidates, paths):
     run_jobs(samtools_filter_fixmate_sort_jobs)
     
 
-def custom_plasmids(sample_id, paths, queue):
+def custom_plasmids(sample_id, paths, logger):
     mash_jobs = [
         {
             'job_name': "_".join(['mash_screen_custom_plasmid', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['mash_screen_custom_plasmid', sample_id]),
-            ),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8 -shell y',
             'remote_command': os.path.join(paths['job_scripts'], 'mash_screen_custom_db.sh'),
             'args': [
@@ -249,29 +229,31 @@ def custom_plasmids(sample_id, paths, queue):
             candidates.append(row)
 
     for candidate in candidates:
+        candidate['database'] = 'custom'
+
+    for candidate in candidates:
         candidate_fasta_db_path = os.path.join(
             paths['mash_custom_plasmid_db'],
             candidate['accession'] + ".fna"
         )
         shutil.copyfile(candidate_fasta_db_path, candidate['fasta_path'])
+        logger.info(
+            "file_copied",
+            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+            accession=candidate['accession'],
+            sample_id=sample_id
+        )
+    return candidates
 
-    for candidate in candidates:
-        candidate['database'] = 'custom'
-        queue.put(candidate)
-    queue.put(None)
 
 
-
-def refseq_plasmids(sample_id, paths, queue):
+def refseq_plasmids(sample_id, paths, logger):
 
     mash_jobs = [
         {
             'job_name': "_".join(['mash_screen_refseq_plasmid', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['mash_screen_refseq_plasmid', sample_id]),
-            ),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(paths['job_scripts'], 'mash_screen.sh'),
             'args': [
@@ -287,12 +269,18 @@ def refseq_plasmids(sample_id, paths, queue):
         },
     ]
     run_jobs(mash_jobs)
-    
+
+    mash_screen_result_path = os.path.join(
+        paths['refseq_plasmid_output'],
+        'mash_screen.tsv',
+    )
     mash_screen_results = result_parsers.parse_mash_result(
-        os.path.join(
-            paths['refseq_plasmid_output'],
-            'mash_screen.tsv',
-        )
+        mash_screen_result_path
+    )
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=os.path.abspath(mash_screen_result_path)
     )
     
     for result in mash_screen_results:
@@ -319,7 +307,9 @@ def refseq_plasmids(sample_id, paths, queue):
             )
             candidates.append(row)
 
-
+    for candidate in candidates:
+        candidate['database'] = 'refseq'
+    
     # NCBI Rate-limits downloads to 3 per second.
     for candidate in candidates:
         candidate_fasta = os.path.join(
@@ -331,10 +321,13 @@ def refseq_plasmids(sample_id, paths, queue):
                 "id=" + candidate['accession'],
                 "rettype=fasta",
             ])
-        urllib.request.urlretrieve(url, candidate['fasta_path'])    
+        urllib.request.urlretrieve(url, candidate['fasta_path'])
+        logger.info(
+            "file_downloaded",
+            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+            accession=candidate['accession'],
+            sample_id=sample_id
+        )
         time.sleep(2)
 
-    for candidate in candidates:
-        candidate['database'] = 'refseq'
-        queue.put(candidate)
-    queue.put(None)
+    return candidates

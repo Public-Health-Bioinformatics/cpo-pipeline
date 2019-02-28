@@ -13,6 +13,8 @@ Example usage:
 import argparse
 import os
 import datetime
+import logging
+import structlog
 import sys
 import time
 import configparser
@@ -25,7 +27,7 @@ from pkg_resources import resource_filename
 from cpo_pipeline.pipeline import prepare_job, run_jobs
 from cpo_pipeline.resistance.parsers import result_parsers
 
-def main(args):
+def main(args, logger=None):
     """
     main entrypoint
     Args:
@@ -37,30 +39,83 @@ def main(args):
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
-    assembly = args.assembly
-
-    if args.card_json and not config['databases']['card_json']:
-        card_path = args.card_json
-    else:
-        card_path = config['databases']['card_json']
-
-    if args.abricate_datadir and not config['databases']['abricate_datadir']:
-        abricate_datadir = args.abricate_datadir
-    else:
-        abricate_datadir = config['databases']['abricate_datadir']
-
-    if args.abricate_cpo_plasmid_db and not config['databases']['abricate_cpo_plasmid_db']:
-        abricate_cpo_plasmid_db = args.abricate_cpo_plasmid_db
-    else:
-        abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
-
     sample_id = args.sample_id
     output_dir = args.outdir
 
+    try:
+        assembly = args.assembly
+    except AttributeError:
+        assembly = os.path.join(
+            output_dir,
+            sample_id,
+            'assembly',
+            'contigs.fa'
+        )
 
-    file_paths = {
-        'abricate_path': '/'.join([output_dir, sample_id, 'resistance', 'abricate', 'abricate.tsv']),
-        'rgi_path': "/".join([output_dir, sample_id, 'resistance', 'rgi'])
+    try:
+        card_path = args.card_json
+    except AttributeError:
+        card_path = config['databases']['card_json']
+    if not card_path:
+        card_path = config['databases']['card_json']
+
+    try:
+        abricate_datadir = args.abricate_datadir
+    except AttributeError:
+        abricate_datadir = config['databases']['abricate_datadir']
+    if not abricate_datadir:
+        abricate_datadir = config['databases']['abricate_datadir']
+
+    try:
+        abricate_cpo_plasmid_db = args.abricate_cpo_plasmid_db
+    except AttributeError:
+        abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
+    if not abricate_cpo_plasmid_db:
+        abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
+
+
+
+
+
+    if not logger:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=logging.DEBUG,
+        )
+
+        structlog.configure_once(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.processors.JSONRenderer()
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=structlog.threadlocal.wrap_dict(dict),
+        )
+        logger = structlog.get_logger()
+
+
+    paths = {
+        "output_dir": output_dir,
+        'logs': os.path.join(
+            output_dir,
+            sample_id,
+            'logs',
+        ),
+        'abricate_path': os.path.join(
+            output_dir,
+            sample_id,
+            'resistance',
+            'abricate',
+            'abricate.tsv'
+        ),
+        'rgi_path': os.path.join(
+            output_dir,
+            sample_id,
+            'resistance',
+            'rgi'
+        ),
     }
 
     job_script_path = resource_filename('data', 'job_scripts')
@@ -68,35 +123,82 @@ def main(args):
     resistance_jobs = [
         {
             'job_name': "_".join(['abricate', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'abricate.sh'),
             'args': [
                 "--input", assembly,
                 "--datadir", abricate_datadir,
                 "--database", abricate_cpo_plasmid_db,
-                "--output_file", file_paths['abricate_path']
+                "--output_file", paths['abricate_path']
             ]
         },
         {
             'job_name': "_".join(['rgi', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'rgi.sh'),
             'args': [
                 "--input", assembly,
                 "--card_json", card_path,
-                "--output_dir", file_paths['rgi_path']
+                "--output_dir", paths['rgi_path']
             ]
         }
     ]
 
     run_jobs(resistance_jobs)
 
-    abricate_report_path = "/".join([output_dir, sample_id, "resistance", "abricate", "abricate.tsv"])
+    abricate_report_path = os.path.join(
+        output_dir,
+        sample_id,
+        "resistance",
+        "abricate",
+        "abricate.tsv"
+    )
     abricate_report = result_parsers.parse_abricate_result(abricate_report_path)
-
-    rgi_report_path = "/".join([output_dir, sample_id, "resistance", "rgi", "rgi.txt"])
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=os.path.abspath(abricate_report_path),
+        resistance_genes=[
+            {
+                key: record[key] for key in [
+                    "gene",
+                    "accession",
+                    "database",
+                    "percent_coverage",
+                    "percent_identity",
+                ]
+            }
+            for record in abricate_report
+        ]
+    )
+    
+    rgi_report_path = os.path.join(
+        output_dir,
+        sample_id,
+        "resistance",
+        "rgi",
+        "rgi.txt"
+    )
     rgi_report = result_parsers.parse_rgi_result_txt(rgi_report_path)
-
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=os.path.abspath(rgi_report_path),
+        resistance_genes=[
+            {
+                key: record[key] for key in [
+                    "best_hit_aro",
+                    "aro",
+                ]
+            }
+            for record in rgi_report
+        ]
+    )
+    
     def get_abricate_carbapenemases(abricate_report):
         """
         Given a list of dicts generated by parsing an abricate report file,

@@ -26,6 +26,7 @@ setup(
     install_requires = [
         "drmaa >=0.7.9, ==0.7.*",
         "ete3 >=3.1.0, ==3.1.*",
+        "structlog >=19.1.0, ==19.1.*",
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",

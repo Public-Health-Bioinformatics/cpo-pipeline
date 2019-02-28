@@ -14,7 +14,9 @@ pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --outdir outdir
 import argparse
 import configparser
 import datetime
+import logging
 import os
+import structlog
 import sys
 import time
 
@@ -27,7 +29,7 @@ from cpo_pipeline.typing.parsers import result_parsers
 from cpo_pipeline.typing.parsers import input_parsers
 
 
-def main(args):
+def main(args, logger=None):
     """
     main entrypoint
     Args:
@@ -40,18 +42,71 @@ def main(args):
     config.read(args.config_file)
 
     sample_id = args.sample_id
-    assembly = args.assembly
-    if not args.mlst_scheme_map_file:
-        mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
-    else:
-        mlst_scheme_map_file = args.mlst_scheme_map_file
     output_dir = args.outdir
+    
+    try:
+        assembly = args.assembly
+    except AttributeError:
+        assembly = os.path.join(
+            output_dir,
+            sample_id,
+            'assembly',
+            'contigs.fa'
+        )
 
+    try:
+        mlst_scheme_map_file = args.mlst_scheme_map_file
+    except AttributeError:
+        mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
+    if not mlst_scheme_map_file:
+        mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
 
-    file_paths = {
-        'mlst_path': '/'.join([output_dir, sample_id, 'typing', 'mlst', 'mlst.tsv']),
-        'mob_recon_path': '/'.join([output_dir, sample_id, 'typing', 'mob_recon']),
-        'abricate_plasmidfinder_path': '/'.join([output_dir, sample_id, 'typing', 'abricate', 'abricate_plasmidfinder.tsv']),
+    if not logger:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=logging.DEBUG,
+        )
+
+        structlog.configure_once(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.processors.JSONRenderer()
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=structlog.threadlocal.wrap_dict(dict),
+        )
+        logger = structlog.get_logger()
+
+    
+    paths = {
+        "output_dir": output_dir,
+        'logs': os.path.join(
+            output_dir,
+            sample_id,
+            'logs',
+        ),
+        'mlst_path': os.path.join(
+            output_dir,
+            sample_id,
+            'typing',
+            'mlst',
+            'mlst.tsv'
+        ),
+        'mob_recon_path': os.path.join(
+            output_dir,
+            sample_id,
+            'typing',
+            'mob_recon'
+        ),
+        'abricate_plasmidfinder_path': os.path.join(
+            output_dir,
+            sample_id,
+            'typing',
+            'abricate',
+            'abricate_plasmidfinder.tsv'
+        ),
     }
 
     job_script_path = resource_filename('data', 'job_scripts')
@@ -59,72 +114,102 @@ def main(args):
     typing_jobs = [
         {
             'job_name': "_".join(['mlst', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'mlst.sh'),
             'args': [
                 "--input", assembly,
                 "--label", sample_id,
-                "--output_file", file_paths['mlst_path']
+                "--output_file", paths['mlst_path']
             ]
         },
         {
             'job_name': "_".join(['abricate', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'abricate.sh'),
             'args': [
                 "--input", assembly,
                 "--database", "plasmidfinder",
-                "--output_file", file_paths['abricate_plasmidfinder_path']
+                "--output_file", paths['abricate_plasmidfinder_path']
             ]
         },
         {
             'job_name': "_".join(['mob_recon', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'mob_recon.sh'),
             'args': [
                 "--input", assembly,
-                "--output_dir", file_paths['mob_recon_path']
+                "--output_dir", paths['mob_recon_path']
             ]
         }
     ]
 
     run_jobs(typing_jobs)
 
-    mlst_report = "/".join([output_dir, sample_id, "typing", "mlst", "mlst.tsv"])
+    mlst_report = os.path.join(
+        output_dir,
+        sample_id,
+        "typing",
+        "mlst",
+        "mlst.tsv"
+    )
     mlst_hits = result_parsers.parse_mlst_result(mlst_report)
     # TODO: Check that there is only one MLST result in the report, and handle
     #       cases where the report is malformed.
     [mlst_hit] = mlst_hits
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=os.path.abspath(mlst_report),
+        scheme_id=mlst_hit["scheme_id"],
+        sequence_type=mlst_hit["sequence_type"],
+    )
     mlst_scheme_map = input_parsers.parse_scheme_species_map(mlst_scheme_map_file)
     mlst_species = "Undefined"
     for scheme in mlst_scheme_map:
         if 'species' in scheme and scheme['scheme_id'] == mlst_hit['scheme_id']:
             mlst_species = scheme['species']
 
-    mob_recon_contig_report_path = "/".join([
+    mob_recon_contig_report_path = os.path.join(
         output_dir,
         sample_id,
         "typing",
         "mob_recon",
         "contig_report.txt"
-    ])
+    )
 
     mob_recon_contig_report = result_parsers.parse_mob_recon_contig_report(
         mob_recon_contig_report_path
     )
-
-    mob_recon_aggregate_report_path = "/".join([
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=os.path.abspath(mob_recon_contig_report_path),
+        num_records=len(mob_recon_contig_report),
+    )
+    
+    mob_recon_aggregate_report_path = os.path.join(
         output_dir,
         sample_id,
         "typing",
         "mob_recon",
         "mobtyper_aggregate_report.txt"
-    ])
+    )
 
     mob_recon_aggregate_report = result_parsers.parse_mob_recon_mobtyper_aggregate_report(
         mob_recon_aggregate_report_path
     )
-
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=os.path.abspath(mob_recon_aggregate_report_path),
+        num_records=len(mob_recon_aggregate_report),
+    )
 
     def extract_contig_num(contig_id):
         """

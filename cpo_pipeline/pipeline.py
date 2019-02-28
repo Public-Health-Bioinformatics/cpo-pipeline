@@ -7,6 +7,9 @@ import csv
 import datetime
 import drmaa
 import json
+import logging
+import random
+import structlog
 import subprocess
 import sys
 import multiprocessing
@@ -14,6 +17,7 @@ import uuid
 from pkg_resources import resource_filename
 from pprint import pprint
 import cpo_pipeline
+
 
 def prepare_job(job, session):
     job_template = session.createJobTemplate()
@@ -23,29 +27,51 @@ def prepare_job(job, session):
     job_template.workingDirectory = os.getcwd()
     job_template.remoteCommand = job['remote_command']
     job_template.args = job['args']
-    job_template.joinFiles = True
+    # job_template.joinFiles = True
     try:
         job_template.outputPath = ':' + job['output_path']
+    except KeyError:
+        pass
+    try:
+        job_template.errorPath = ':' + job['error_path']
     except KeyError:
         pass
     
     return job_template
 
-def run_jobs(jobs):
+def run_jobs(jobs, logger=structlog.get_logger()):
     with drmaa.Session() as session:
         running_jobs = []
         for job in jobs:
             prepared_job = prepare_job(job, session)
             job_id = session.runJob(prepared_job)
-            log_entry = {
-                "event": "job_submitted",
-                "timestamp": str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-                "job_name": prepared_job.jobName,
-                "job_id": job_id,
-            }
-            print(json.dumps(log_entry))
-            running_jobs.append(job_id)
-        session.synchronize(running_jobs, drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
+            job_name = prepared_job.jobName
+            logger.info(
+                "job_submitted",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                job_name=job_name,
+                job_id=job_id,
+            )
+            running_jobs.append({"id": job_id, "name": job_name})
+        session.synchronize([x['id'] for x in running_jobs], drmaa.Session.TIMEOUT_WAIT_FOREVER, False)
+        for job in running_jobs:
+            job_info = session.wait(job["id"], drmaa.Session.TIMEOUT_WAIT_FOREVER)
+            resource_usage = job_info.resourceUsage
+            # Convert unix epoch timestamps to ISO8601 (YYYY-MM-DDTHH:mm:ss+tz)
+            for time_field in ["submission_time", "start_time", "end_time"]:
+                unix_timestamp = resource_usage[time_field]
+                iso8601_timestamp = str(datetime.datetime.fromtimestamp(
+                    int(float(unix_timestamp)), datetime.timezone.utc
+                ).isoformat())
+                resource_usage[time_field] = iso8601_timestamp
+            logger.info(
+                "job_completed",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                job_id=job["id"],
+                job_name=job["name"],
+                resource_usage=job_info.resourceUsage,
+                exit_status=job_info.exitStatus,
+            )
 
 def collect_final_outputs(outdir, sample_id):
     final_outputs = {}
@@ -58,7 +84,14 @@ def collect_final_outputs(outdir, sample_id):
             'totalbp'
         )
     )
-    final_outputs['bp'] = total_bp
+    if total_bp:
+        final_outputs['bp'] = total_bp
+    else:
+        logger.error(
+            "output_parsing_failed",
+            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        )
+        final_outputs['bp'] = None
 
 
     try:
@@ -72,6 +105,10 @@ def collect_final_outputs(outdir, sample_id):
             )
         )
     except ValueError:
+        logger.error(
+            "output_parsig_failed",
+            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        )
         mlst_result = {
             'contig_file': os.path.join(
                 outdir,
@@ -99,25 +136,46 @@ def collect_final_outputs(outdir, sample_id):
         final_outputs['MLST_ALLELE_' + str(allele_number)] = key + "(" + value + ")"
         allele_number += 1
 
-    return [final_outputs]
+    return final_outputs
+
 
 def main(args):
     """
     """
 
+
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
     analysis_id = uuid.uuid4()
+    now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 
-    log_entry = {
-        "event": "analysis_started",
-        "timestamp": str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-        "analysis_id": str(analysis_id),
-        "sample_id": args.sample_id,
-        "pipeline_version": cpo_pipeline.__version__,
-    }
-    print(json.dumps(log_entry))
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.DEBUG,
+    )
+
+    structlog.configure_once(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=structlog.threadlocal.wrap_dict(dict),
+    )
+    
+    logger = structlog.get_logger(
+        analysis_id=str(uuid.uuid4()),
+        sample_id=args.sample_id,
+        pipeline_version=cpo_pipeline.__version__,
+    )
+
+    logger.info(
+        "analysis_started",
+        timestamp=str(now),
+    )
 
     plasmids_command_line = [
         'cpo-pipeline',
@@ -128,7 +186,8 @@ def main(args):
         '--outdir', args.outdir,
     ]
 
-    subprocess.run(plasmids_command_line)
+    # subprocess.run(plasmids_command_line)
+    cpo_pipeline.plasmids.pipeline.main(args, logger)
 
     assembly_command_line = [
         'cpo-pipeline',
@@ -139,17 +198,19 @@ def main(args):
         '--outdir', args.outdir,
     ]
 
-    subprocess.run(assembly_command_line)
+    # subprocess.run(assembly_command_line)
+    cpo_pipeline.assembly.pipeline.main(args, logger)
 
     typing_command_line = [
         'cpo-pipeline',
         'typing',
         '--ID', args.sample_id,
-        '--assembly', "/".join([args.outdir, args.sample_id, 'assembly', 'contigs.fa']),
+        '--assembly', os.path.join(args.outdir, args.sample_id, 'assembly', 'contigs.fa'),
         '--outdir', args.outdir,
     ]
 
-    subprocess.run(typing_command_line)
+    # subprocess.run(typing_command_line)
+    cpo_pipeline.typing.pipeline.main(args, logger)
 
     resistance_command_line = [
         'cpo-pipeline',
@@ -159,9 +220,14 @@ def main(args):
         '--outdir', args.outdir,
     ]
 
-    subprocess.run(resistance_command_line)
+    # subprocess.run(resistance_command_line)
+    cpo_pipeline.resistance.pipeline.main(args, logger)
 
     final_outputs = collect_final_outputs(args.outdir, args.sample_id)
+    logger.info(
+        "collected_final_outputs",
+        final_outputs=final_outputs,
+    )
 
     final_output_csv_path = "/".join([
         args.outdir,
@@ -186,17 +252,13 @@ def main(args):
     with open(final_output_csv_path, 'w+') as f:
         writer = csv.DictWriter(f, fieldnames=final_outputs_headers, delimiter='\t')
         writer.writeheader()
-        for row in final_outputs:
-            writer.writerow(row)
+        writer.writerow(final_outputs)
 
-    log_entry = {
-        "event": "analysis_completed",
-        "timestamp": str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-        "analysis_id": str(analysis_id),
-        "sample_id": args.sample_id,
-        "pipeline_version": cpo_pipeline.__version__,
-    }
-    print(json.dumps(log_entry))
+
+    logger.info(
+        "analysis_completed",
+        timestamp=str(now),
+    )
 
 def multi(args):
     """
@@ -221,6 +283,8 @@ def multi(args):
             parser = argparse.ArgumentParser(prog=script_name, description='')
             parser.add_argument("-i", "--ID", dest="sample_id",
                                 help="identifier of the isolate")
+            parser.add_argument("-e", "--expected-organism-taxid", dest="expected_organism_ncbi_taxid",
+                                help="Expected organism NCBI Taxonomy ID")
             parser.add_argument("-1", "--R1", dest="reads1_fastq",
                                 help="absolute file path forward read (R1)")
             parser.add_argument("-2", "--R2", dest="reads2_fastq",
@@ -245,6 +309,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog=script_name, description='')
     parser.add_argument("-i", "--ID", dest="sample_id",
                         help="identifier of the isolate", required=True)
+    parser.add_argument("-e", "--expected-organism-taxid", dest="expected_organism_ncbi_taxid",
+                        help="Expected organism NCBI Taxonomy ID")
     parser.add_argument("-1", "--R1", dest="reads1_fastq",
                         help="absolute file path forward read (R1)", required=True)
     parser.add_argument("-2", "--R2", dest="reads2_fastq",
