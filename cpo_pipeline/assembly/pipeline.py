@@ -17,8 +17,10 @@ import configparser
 import datetime
 import errno
 import glob
+import logging
 import os
 import re
+import structlog
 import sys
 import urllib.request
 
@@ -142,7 +144,7 @@ def prepare_output_directories(output_dir, sample_id):
         (void)
     """
     output_subdirs = [
-        "/".join([output_dir, sample_id, subdir])
+        os.path.join(output_dir, sample_id, subdir)
         for subdir in [
             'pre-assembly_qc',
             'assembly',
@@ -156,6 +158,7 @@ def prepare_output_directories(output_dir, sample_id):
         except OSError as exc:
             if exc.errno != errno.EEXIST:
                 raise
+
 
 def get_estimated_genome_size(estimated_genome_sizes, ncbi_taxonomy_id):
     """
@@ -174,7 +177,7 @@ def get_estimated_genome_size(estimated_genome_sizes, ncbi_taxonomy_id):
     return estimated_genome_size
 
 
-def main(args):
+def main(args, logger=None):
     """
     main entrypoint
     Args:
@@ -186,15 +189,35 @@ def main(args):
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
-    if args.mash_genome_db and not config['databases']['mash_genome_db']:
+    try:
         mash_genome_db = args.mash_genome_db
-    else:
+    except AttributeError:
+        mash_genome_db = config['databases']['mash_genome_db']
+    if not mash_genome_db:
         mash_genome_db = config['databases']['mash_genome_db']
 
     sample_id = args.sample_id
     reads1_fastq = args.reads1_fastq
     reads2_fastq = args.reads2_fastq
     output_dir = args.outdir
+
+    if not logger:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=logging.DEBUG,
+        )
+
+        structlog.configure_once(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.processors.JSONRenderer()
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=structlog.threadlocal.wrap_dict(dict),
+        )
+        logger = structlog.get_logger()
 
     prepare_output_directories(output_dir, sample_id)
 
@@ -225,13 +248,47 @@ def main(args):
         "busco_complete_duplicate_cutoff":0.10
     }
 
-    file_paths = {
-        "mash_genome_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "mashscreen.genome.tsv"]),
-        "fastqc_output_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "fastqc"]),
-        "totalbp_path": "/".join([output_dir, sample_id, "pre-assembly_qc", "totalbp"]),
-        "reference_genome_path": "/".join([output_dir, sample_id, "reference"]),
-        "assembly_path": "/".join([output_dir, sample_id, "assembly"]),
-        "quast_path": "/".join([output_dir, sample_id, "post-assembly_qc", "quast"]),
+    paths = {
+        "output_dir": output_dir,
+        'logs': os.path.join(
+            output_dir,
+            sample_id,
+            'logs',
+        ),
+        "mash_genome_path": os.path.join(
+            output_dir,
+            sample_id,
+            "pre-assembly_qc",
+            "mashscreen.genome.tsv"
+        ),
+        "fastqc_output_path": os.path.join(
+            output_dir,
+            sample_id,
+            "pre-assembly_qc",
+            "fastqc"
+        ),
+        "totalbp_path": os.path.join(
+            output_dir,
+            sample_id,
+            "pre-assembly_qc",
+            "totalbp"
+        ),
+        "reference_genome_path": os.path.join(
+            output_dir,
+            sample_id,
+            "reference"
+        ),
+        "assembly_output": os.path.join(
+            output_dir,
+            sample_id,
+            "assembly"
+        ),
+        "quast_path": os.path.join(
+            output_dir,
+            sample_id,
+            "post-assembly_qc",
+            "quast"
+        ),
     }
 
 
@@ -243,33 +300,39 @@ def main(args):
     pre_assembly_qc_jobs = [
         {
             'job_name': "_".join(['mash_screen', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'mash_screen.sh'),
             'args': [
                 "--R1", reads1_fastq,
                 "--R2", reads2_fastq,
                 "--queries", mash_genome_db,
-                "--output_file", file_paths['mash_genome_path']
+                "--output_file", paths['mash_genome_path']
             ],
         },
         {
             'job_name': "_".join(['fastqc', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'fastqc.sh'),
             'args': [
                 "--R1", reads1_fastq,
                 "--R2", reads2_fastq,
-                "--output_dir", file_paths['fastqc_output_path']
+                "--output_dir", paths['fastqc_output_path']
             ],
         },
         {
             'job_name': "_".join(['seqtk_totalbp', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'seqtk_totalbp.sh'),
             'args': [
                 "--R1", reads1_fastq,
                 "--R2", reads2_fastq,
-                "--output_file", file_paths['totalbp_path']
+                "--output_file", paths['totalbp_path']
             ],
         }
     ]
@@ -277,71 +340,89 @@ def main(args):
     run_jobs(pre_assembly_qc_jobs)
 
     #parse genome mash results
-    mash_hits = result_parsers.parse_mash_result(file_paths["mash_genome_path"])
-    mash_hits = sorted(mash_hits, key=lambda k: k['identity'], reverse=True)
-    # 'shared_hashes' field is string in format '935/1000'
-    # Threshold is 300 below highest numerator (ie. '935/100' -> 635)
-    mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - \
-        int(qc_thresholds["mash_hits_genome_score_cutoff"])
+    mash_hits = result_parsers.parse_mash_result(paths["mash_genome_path"])
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=os.path.abspath(paths["mash_genome_path"]),
+        num_mash_hits=len(mash_hits),
+    )
+    filtered_mash_hits = []
+    if len(mash_hits) > 0:
+        mash_hits = sorted(mash_hits, key=lambda k: k['identity'], reverse=True)
+        # 'shared_hashes' field is string in format '935/1000'
+        # Threshold is 300 below highest numerator (ie. '935/100' -> 635)
+        mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - \
+            int(qc_thresholds["mash_hits_genome_score_cutoff"])
 
-    def score_above_threshold(mash_result, score_threshold):
-        score = int(mash_result['shared_hashes'].split("/")[0])
-        return bool(score >= score_threshold and \
-                    mash_result['query_comment'].find("phiX") == -1)
+        def score_above_threshold(mash_result, score_threshold):
+            score = int(mash_result['shared_hashes'].split("/")[0])
+            return bool(score >= score_threshold and \
+                        mash_result['query_comment'].find("phiX") == -1)
 
-    filtered_mash_hits = list(filter(
-        lambda x: score_above_threshold(x, mash_hits_score_threshold),
-        mash_hits))
+        for mash_hit in mash_hits:
+            if score_above_threshold(mash_hit, mash_hits_score_threshold):
+                filtered_mash_hits.append(mash_hit)
+
+        if len(filtered_mash_hits) > 1:
+            qc_verdicts["multiple_species_contamination"] = True
+        else:
+            qc_verdicts["multiple_species_contamination"] = False
+    
 
     # parse fastqc
-    fastqc_r1_result = result_parsers.parse_fastqc_result(
-        glob.glob(
-            "/".join([
-                file_paths['fastqc_output_path'],
-                sample_id + "*_R1_*" + "fastqc",
-                "summary.txt"
-            ])
-        )[0]
-    )
-    fastqc_r2_result = result_parsers.parse_fastqc_result(
-        glob.glob(
-            "/".join([
-                file_paths['fastqc_output_path'],
-                sample_id + "*_R2_*" + "fastqc",
-                "summary.txt"
-            ])
-        )[0]
-    )
-
-    #all the qC result are parsed now, lets do some QC logic
-    #look at mash results first
-    if len(filtered_mash_hits) > 1:
-        qc_verdicts["multiple_species_contamination"] = True
-    else:
-        qc_verdicts["multiple_species_contamination"] = False
+    fastqc_results = {}
+    for read in ["R1", "R2"]:
+        try:
+            [fastqc_result_summary_path] = glob.glob(
+                os.path.join(
+                    paths['fastqc_output_path'],
+                    sample_id + "*_" + read + "_*" + "fastqc",
+                    'summary.txt'
+                )
+            )
+            fastqc_results[read] = result_parsers.parse_fastqc_result(
+                fastqc_result_summary_path
+            )
+            logger.info(
+                "parsed_result_file",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                filename=os.path.abspath(fastqc_result_summary_path),
+                summary=fastqc_results[read],
+            )
+        except ValueError:
+            logger.error(
+                "result_parsing_failed",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                filename=fastqc_result_summary_path
+        )
 
 
     #look at fastqc results
-    qc_verdicts["acceptable_fastqc_forward"] = fastqc_qc_check(fastqc_r1_result)
-    qc_verdicts["acceptable_fastqc_reverse"] = fastqc_qc_check(fastqc_r2_result)
+    qc_verdicts["acceptable_fastqc_forward"] = fastqc_qc_check(fastqc_results["R1"])
+    qc_verdicts["acceptable_fastqc_reverse"] = fastqc_qc_check(fastqc_results["R2"])
 
 
     reference_genomes = []
     # build the save paths
     try:
-        os.makedirs(file_paths['reference_genome_path'])
+        os.makedirs(paths['reference_genome_path'])
     except OSError as exc:
         if exc.errno != errno.EEXIST:
             raise
     if not qc_verdicts["multiple_species_contamination"]:
-        for mash_hit in filtered_mash_hits:
-            if not re.match("phiX", mash_hit['query_comment']):
-                download_mash_hit(mash_hit, file_paths['reference_genome_path'])
-                reference_genomes.append(mash_hit['query_id'])
+        if len(filtered_mash_hits) > 0:
+            for mash_hit in filtered_mash_hits:
+                if not re.match("phiX", mash_hit['query_comment']):
+                    download_mash_hit(mash_hit, paths['reference_genome_path'])
+                    reference_genomes.append(mash_hit['query_id'])
 
-    else: #throw an error if it contains contaminations
-        print("Contaminated Genome assembly...resequencing required")
-        raise Exception("contamination and mislabeling...crashing")
+    else:
+        logger.error(
+            "failed_quality_control",
+            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+            qc_check_failed="multiple_species_contamination"
+        )
 
     #check to make sure we ONLY have ONE reference.
     if len(reference_genomes) > 1:
@@ -351,14 +432,45 @@ def main(args):
 
     # If the user passes an expected organism NCBI taxonomy ID, then
     # use that to estimate the genome size. Otherwise, use the downloaded reference.
+    estimated_genome_size = DEFAULT_ESTIMATED_GENOME_SIZE
     if args.expected_organism_ncbi_taxid:
         estimated_genome_size = get_estimated_genome_size(estimated_genome_sizes, args.expected_organism_ncbi_taxid)
     else:
-        estimated_genome_size = result_parsers.parse_reference_genome_stats(
-            glob.glob(file_paths["reference_genome_path"] + "/*_assembly_stats.txt")[0]
-        )
+        try:
+            [reference_genome_assembly_stats_path] = glob.glob(
+                paths["reference_genome_path"] + "/*_assembly_stats.txt"
+            )
+        except ValueError:
+            logger.error(
+                "result_parsing_failed",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                filename=str(os.path.abspath(paths["reference_genome_path"])) + "/*_assembly_stats.txt",
+            )
 
-    total_bp = result_parsers.parse_total_bp(file_paths["totalbp_path"])
+        try:
+            estimated_genome_size = result_parsers.parse_reference_genome_stats(
+                reference_genome_assembly_stats_path
+            )
+            logger.info(
+                "parsed_result_file",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                filename=reference_genome_assembly_stats_path,
+                estimated_genome_size=estimated_genome_size
+            )
+        except ValueError:
+            logger.error(
+                "result_parsing_failed",
+                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                filename=reference_genome_assembly_stats_path,
+            )
+
+    total_bp = result_parsers.parse_total_bp(paths["totalbp_path"])
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=paths["totalbp_path"],
+        total_bp=total_bp,
+    )
 
     coverage = total_bp / estimated_genome_size
 
@@ -370,6 +482,8 @@ def main(args):
     assembly_jobs = [
         {
             'job_name': "_".join(['shovill', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 16 -l h_vmem=4G',
             'remote_command': os.path.join(job_script_path, 'shovill.sh'),
             'args': [
@@ -377,7 +491,7 @@ def main(args):
                 "--R2", reads2_fastq,
                 "--mincov", "3",
                 "--minlen", "500",
-                "--output_dir", file_paths['assembly_path']
+                "--output_dir", paths['assembly_output']
             ],
         }
     ]
@@ -387,28 +501,47 @@ def main(args):
     post_assembly_qc_jobs = [
         {
             'job_name': "_".join(['quast', sample_id]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'quast.sh'),
             'args': [
-                "--input", "/".join([file_paths['assembly_path'], "contigs.fa"]),
-                "--outdir", file_paths['quast_path']
+                "--input", os.path.join(paths['assembly_output'], "contigs.fa"),
+                "--outdir", paths['quast_path']
             ]
         },
     ]
 
     run_jobs(post_assembly_qc_jobs)
 
-    busco_results = result_parsers.parse_busco_result(
-        file_paths["quast_path"] + "/busco_stats/short_summary_contigs.txt"
+    busco_short_summary_contigs_path = os.path.abspath(
+        paths["quast_path"] + "/busco_stats/short_summary_contigs.txt"
     )
+    busco_results = result_parsers.parse_busco_result(
+        busco_short_summary_contigs_path
+    )
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=busco_short_summary_contigs_path,
+        busco_results=busco_results
+    )
+    quast_report_path = os.path.abspath(paths["quast_path"] + "/report.txt")
     quast_results = result_parsers.parse_quast_result(
-        file_paths["quast_path"] + "/report.txt"
+        quast_report_path
+    )
+    logger.info(
+        "parsed_result_file",
+        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        filename=quast_report_path,
+        num_contigs=quast_results["num_contigs"],
+        N50=quast_results["N50"],
     )
 
     qc_verdicts["acceptable_busco_assembly_metrics"] = busco_qc_check(busco_results, qc_thresholds)
     qc_verdicts["acceptable_quast_assembly_metrics"] = quast_qc_check(quast_results, estimated_genome_size)
 
-    return "/".join([file_paths['assembly_path'], "contigs.fa"])
+    # return os.path.join(paths['assembly_output'], "contigs.fa")
 
 if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))

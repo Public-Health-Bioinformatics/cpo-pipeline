@@ -15,11 +15,13 @@ import datetime
 import errno
 import glob
 import itertools
+import logging
 import multiprocessing
 import os
 import operator
 import re
 import shutil
+import structlog
 import sys
 import urllib.request
 from pprint import pprint
@@ -32,7 +34,7 @@ from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.plasmids import parsers
 from cpo_pipeline.plasmids import strategies
 
-def main(args):
+def main(args, logger=None):
     """
     main entrypoint
     Args:
@@ -44,18 +46,41 @@ def main(args):
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
-    if args.mash_refseq_plasmid_db and not config['databases']['mash_refseq_plasmid_db']:
+    try:
         mash_refseq_plasmid_db = args.mash_refseq_plasmid_db
-    else:
+    except AttributeError:
         mash_refseq_plasmid_db = config['databases']['mash_refseq_plasmid_db']
-    if args.mash_custom_plasmid_db and not config['databases']['mash_custom_plasmid_db']:
+    if not mash_refseq_plasmid_db:
+        mash_refseq_plasmid_db = config['databases']['mash_refseq_plasmid_db']
+
+    try:
         mash_custom_plasmid_db = args.mash_custom_plasmid_db
-    else:
+    except AttributeError:
         mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
+    if not mash_custom_plasmid_db:
+        mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
+
 
     sample_id = args.sample_id
     output_dir = args.outdir
 
+    if not logger:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=logging.DEBUG,
+        )
+
+        structlog.configure_once(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.processors.JSONRenderer()
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=structlog.threadlocal.wrap_dict(dict),
+        )
+        logger = structlog.get_logger()
 
     paths = {
         'job_scripts': resource_filename('data', 'job_scripts'),
@@ -63,6 +88,12 @@ def main(args):
         'reads2_fastq': args.reads2_fastq,
         'mash_custom_plasmid_db': mash_custom_plasmid_db,
         'mash_refseq_plasmid_db': mash_refseq_plasmid_db,
+        'output_dir': output_dir,
+        'logs': os.path.join(
+            output_dir,
+            sample_id,
+            'logs',
+        ),
         'plasmid_output': os.path.join(
             output_dir,
             sample_id,
@@ -83,10 +114,7 @@ def main(args):
     }
 
     os.makedirs(
-        os.path.join(
-            paths['plasmid_output'],
-            'logs',
-        ),
+        paths['logs'],
         exist_ok=True
     )
 
@@ -106,47 +134,50 @@ def main(args):
         exist_ok=True
     )
 
+    refseq_candidates = strategies.refseq_plasmids(sample_id, paths, logger)
+    custom_candidates = strategies.custom_plasmids(sample_id, paths, logger)
     # Generate a list of candidate plasmids using two strategies
     # in parallel, then merge the results.
-    process_details = [
-        {
-            'target': strategies.refseq_plasmids,
-            'name': 'refseq_plasmids',
-        },
-        {
-            'target': strategies.custom_plasmids,
-            'name': 'custom_plasmids',
-        },
-    ]
-    
-    processes = []
-    completed_processes = 0
-    queue = multiprocessing.SimpleQueue()
-    for process_detail in process_details:
-        p = multiprocessing.Process(
-            name=process_detail['name'],
-            target=process_detail['target'],
-            args=(
-                sample_id,
-                paths,
-                queue,
-            )
-        )
-        processes.append(p)
-        p.start()
+    #process_details = [
+    #    {
+    #        'target': strategies.refseq_plasmids,
+    #        'name': 'refseq_plasmids',
+    #    },
+    #    {
+    #        'target': strategies.custom_plasmids,
+    #        'name': 'custom_plasmids',
+    #    },
+    #]
+    #
+    #processes = []
+    #completed_processes = 0
+    #queue = multiprocessing.SimpleQueue()
+    #for process_detail in process_details:
+    #    p = multiprocessing.Process(
+    #        name=process_detail['name'],
+    #        target=process_detail['target'],
+    #        args=(
+    #            sample_id,
+    #            paths,
+    #            queue,
+    #        )
+    #    )
+    #    processes.append(p)
+    #    p.start()
 
-    candidates = []
-    while True:
-        candidate = queue.get()
-        if candidate:
-            candidates.append(candidate)
-        else:
-            completed_processes += 1
-        if completed_processes >= len(processes):
-            break
-            
-    for process in processes:
-        process.join()
+    candidates = refseq_candidates + custom_candidates
+
+    #while True:
+    #    candidate = queue.get()
+    #    if candidate:
+    #        candidates.append(candidate)
+    #    else:
+    #        completed_processes += 1
+    #    if completed_processes >= len(processes):
+    #        break
+    #        
+    #for process in processes:
+    #    process.join()
 
     # TODO:
     # DONE determine which mash hits are 'candidates'
@@ -162,12 +193,9 @@ def main(args):
     bwa_index_jobs = []
     for candidate in candidates:
         samtools_faidx_job = {
-            'job_name': "_".join(['samtools_faidx', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_faidx', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_faidx', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 2',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_faidx.sh'),
             'args': [
@@ -175,12 +203,9 @@ def main(args):
             ]
         }
         bwa_index_job = {
-            'job_name': "_".join(['bwa_index', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['bwa_index', sample_id]),
-            ),
+            'job_name': "_".join(['bwa_index', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 2',
             'remote_command': os.path.join(paths['job_scripts'], 'bwa_index.sh'),
             'args': [
@@ -195,12 +220,9 @@ def main(args):
     bwa_mem_jobs = []
     for candidate in candidates:
         bwa_mem_job = {
-            'job_name': "_".join(['bwa_mem', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['bwa_mem', sample_id]),
-            ),
+            'job_name': "_".join(['bwa_mem', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8 -shell y',
             'remote_command': os.path.join(paths['job_scripts'], 'bwa_mem.sh'),
             'args': [
@@ -221,12 +243,9 @@ def main(args):
             re.sub("\.fna$", ".sam", candidate['fasta_path'])
         )
         samtools_filter_fixmate_sort_job = {
-            'job_name': "_".join(['samtools_filter_fixmate_sort', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_filter_fixmate_sort', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_filter_fixmate_sort', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_filter_fixmate_sort.sh'),
             'args': [
@@ -251,12 +270,9 @@ def main(args):
             re.sub('\.fna', '.bam', candidate['fasta_path'])
         )
         samtools_index_job = {
-            'job_name': "_".join(['samtools_index', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_index', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_index', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 4',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_index.sh'),
             'args': [
@@ -273,12 +289,9 @@ def main(args):
             re.sub('\.fna', '.bam', candidate['fasta_path'])
         )
         samtools_depth_job = {
-            'job_name': "_".join(['samtools_depth', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['samtools_depth', sample_id]),
-            ),
+            'job_name': "_".join(['samtools_depth', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 1',
             'remote_command': os.path.join(paths['job_scripts'], 'samtools_depth.sh'),
             'args': [
@@ -320,13 +333,9 @@ def main(args):
             '\.fna$', '.vcf', candidate['fasta_path']
         )
         freebayes_job = {
-            'job_name': "_".join(['freebayes', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['freebayes', sample_id]),
-            ),
-            'native_specification': '-pe smp 8',
+            'job_name': "_".join(['freebayes', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],            'native_specification': '-pe smp 8',
             'remote_command': os.path.join(paths['job_scripts'], 'freebayes.sh'),
             'args': [
                 "--input", alignment,
@@ -345,12 +354,9 @@ def main(args):
             '\.fna$', '.vcf', candidate['fasta_path']
         )
         bcftools_view_job = {
-            'job_name': "_".join(['bcftools_view', sample_id]),
-            'output_path': os.path.join(
-                paths['plasmid_output'],
-                'logs',
-                "_".join(['bcftools_view', sample_id]),
-            ),
+            'job_name': "_".join(['bcftools_view', sample_id, candidate['accession']]),
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 2 -shell y',
             'remote_command': os.path.join(paths['job_scripts'], 'bcftools_view.sh'),
             'args': [
