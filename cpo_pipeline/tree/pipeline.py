@@ -5,18 +5,26 @@
 
 import subprocess
 import argparse
+import csv
 import os
 import datetime
+import errno
+import logging
+import structlog
 import sys
 import time
 import urllib.request
+import uuid
 import gzip
 import ete3 as e
 import drmaa
+from pprint import pprint
 
+from pkg_resources import resource_filename
+
+import cpo_pipeline
 from cpo_pipeline.pipeline import prepare_job, run_jobs
-
-from parsers import result_parsers
+from cpo_pipeline.tree.parsers import result_parsers
 
 
 def read(path): #read in a text file to a list
@@ -32,89 +40,277 @@ def addFace(name): #function to add a facet to a tree
     return face
 
 
-def main(args):
+def main(args, logger=None):
+    """
+    main entrypoint
+    Args:
+        args():
+    Returns:
+        (void)
+    """
+    
+    analysis_id = uuid.uuid4()
     
     curDir = os.getcwd()
-    treePath = str(options.treePath).lstrip().rstrip()
-    distancePath = str(options.distancePath).lstrip().rstrip()
-    metadata_file = args.metadata_file
-    reference = args.reference
+    output_dir = args.outdir
+    # metadata_file = args.metadata_file
+    reference = os.path.abspath(args.reference)
     
-    sensitivePath = str(options.sensitivePath).lstrip().rstrip()
-    sensitiveCols = str(options.sensitiveCols).lstrip().rstrip()
-    outputFile = str(options.outputFile).lstrip().rstrip()
-    bcidCol = str( str(options.bcidCol).lstrip().rstrip() ) 
-    naValue = str( str(options.naValue).lstrip().rstrip() ) 
+    # sensitivePath = str(options.sensitivePath).lstrip().rstrip()
+    # sensitiveCols = str(options.sensitiveCols).lstrip().rstrip()
+    # outputFile = str(options.outputFile).lstrip().rstrip()
+    # bcidCol = str( str(options.bcidCol).lstrip().rstrip() ) 
+    # naValue = str( str(options.naValue).lstrip().rstrip() ) 
     
-    metadata = result_parsers.parse_workflow_results(metadata_file)
-    distance = read(distancePath)
-    treeFile = "".join(read(treePath))
+    # metadata = result_parsers.parse_workflow_results(metadata_file)
+    # distance = read(distancePath)
+    # treeFile = "".join(read(treePath))
+
+    if not logger:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=logging.DEBUG,
+        )
+
+        structlog.configure_once(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.processors.JSONRenderer()
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            context_class=structlog.threadlocal.wrap_dict(dict),
+        )
+        logger = structlog.get_logger(
+            analysis_id=str(uuid.uuid4()),
+            pipeline_version=cpo_pipeline.__version__,
+        )
+
+    inputs = []
+    with open(args.input_file) as input_file:
+        fieldnames = ['sample_id']
+        reader = csv.DictReader(
+            (row for row in input_file if not row.startswith('#')),
+            delimiter='\t',
+            fieldnames=fieldnames
+        )
+        for row in reader:
+            inputs.append(row)
+
 
     os.environ['QT_QPA_PLATFORM']='offscreen'
 
     paths = {
-        'snippy_path': os.path.join(outputDir, "snippy"),
+        'logs': os.path.abspath(
+            os.path.join(
+                output_dir,
+                'logs',
+            )
+        ),
+        'snippy_output': os.path.abspath(
+            os.path.join(
+                output_dir,
+                "snippy"
+            )
+        ),
     }
 
-    job_script_path = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),  'job_scripts')
+    for output_subdir in paths.values():
+        try:
+            os.makedirs(output_subdir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
+    job_script_path = resource_filename('data', 'job_scripts')
+
+    contigs_paths = []
+    for sample_id in [input["sample_id"] for input in inputs]:
+        contigs = os.path.abspath(
+            os.path.join(
+                args.result_dir,
+                sample_id,
+                "assembly",
+                "contigs.fa"
+            )
+        )
+        contigs_paths.append(contigs)
+
+    snippy_dirs = [
+        os.path.join(
+            paths['snippy_output'],
+            os.path.basename(
+                os.path.dirname(os.path.dirname(contigs)) + "_" + \
+                os.path.splitext(os.path.basename(reference))[0]
+            )
+        )
+        for contigs in contigs_paths
+    ]
     
     snippy_jobs = [
         {
-            'job_name': 'snippy',
-            'native_specification': '-pe smp 8',
-            'remote_command': os.path.join(job_script_path, 'snippy.sh'),
+            'job_name': 'snippy_ctgs',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8 -shell y',
+            'remote_command': os.path.join(job_script_path, 'snippy_ctgs.sh'),
             'args': [
-                "--reference", reference,
-                "--contigs", " ".join(contigs),
-                "--output_dir", os.path.join(paths['snippy_path'], ID)
+                "--ref", reference,
+                "--ctgs", contigs,
+                "--outdir", snippy_dir
             ]
         }
-        for ID in IDs
+        for snippy_dir in snippy_dirs
     ]
     
     run_jobs(snippy_jobs)
-        
+
+    
     snippy_core_jobs = [
         {
             'job_name': 'snippy-core',
-            'native_specification': '-pe smp 8',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8 -shell y',
             'remote_command': os.path.join(job_script_path, 'snippy-core.sh'),
             'args': [
-                "--reference", reference,
-                snippy_dirs
-            ]
+                "--ref", reference,
+                "--outdir", paths["snippy_output"],
+            ] + snippy_dirs
         }
     ]
 
     run_jobs(snippy_core_jobs)
-
+    
+    
     snp_dists_jobs = [
         {
             'job_name': 'snp-dists',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
             'remote_command': os.path.join(job_script_path, 'snp-dists.sh'),
             'args': [
-                "--alignment", alignment,
-                "--output_file", file_paths['snp_dists_path']
+                "--alignment", os.path.join(paths["snippy_output"], "core.aln"),
             ]
         }
     ]
 
     run_jobs(snp_dists_jobs)
 
-    clustalw_tree_jobs = [
+    iqtree_jobs = [
         {
-            'job_name': 'clustalw_tree',
+            'job_name': 'iqtree',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
-            'remote_command': os.path.join(job_script_path, 'clustalw_tree.sh'),
+            'remote_command': os.path.join(job_script_path, 'iqtree.sh'),
             'args': [
-                "--alignment", alignment
+                "--alignment", os.path.join(paths["snippy_output"], "core.full.aln"),
+                "--model", "GTR+G4",
             ]
         }
     ]
 
-    run_jobs(clustalw_tree_jobs)
+    run_jobs(iqtree_jobs)
+
+
+    clonalframeml_jobs = [
+        {
+            'job_name': 'clonalframeml',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'clonalframeml.sh'),
+            'args': [
+                "--alignment", os.path.join(paths["snippy_output"], "core.full.aln"),
+                "--treefile", os.path.join(paths["snippy_output"], "core.full.aln.treefile"),
+                "--output_file", os.path.join(paths["snippy_output"], "core.full.aln.clonalframeml"),
+            ]
+        }
+    ]
+
+    run_jobs(clonalframeml_jobs)
+
+    maskrc_svg_jobs = [
+        {
+            'job_name': 'maskrc-svg',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'maskrc-svg.sh'),
+            'args': [
+                "--alignment", os.path.join(paths["snippy_output"], "core.full.aln"),
+                "--svg", os.path.join(paths["snippy_output"], "core.full.maskrc.svg"),
+                "--clonalframeml", os.path.join(paths["snippy_output"], "core.full.aln.clonalframeml"),
+                "--output_file", os.path.join(paths["snippy_output"], "core.full.maskrc.aln"),
+            ]
+        }
+    ]
     
+    run_jobs(maskrc_svg_jobs)
+
+    snp_sites_jobs = [
+        {
+            'job_name': 'snp-sites',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'snp-sites.sh'),
+            'args': [
+                "--alignment", os.path.join(paths["snippy_output"], "core.full.maskrc.aln"),
+                "--output_file", os.path.join(paths["snippy_output"], "core.full.maskrc.snp.aln"),
+            ]
+        }
+    ]
+
+    run_jobs(snp_sites_jobs)
+
+    iqtree_jobs = [
+        {
+            'job_name': 'iqtree',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'iqtree.sh'),
+            'args': [
+                "--alignment", os.path.join(paths["snippy_output"], "core.full.maskrc.aln"),
+                "--model", "GTR+G+ASC",
+            ]
+        }
+    ]
+
+    run_jobs(iqtree_jobs)
+    
+    snp_dists_jobs = [
+        {
+            'job_name': 'snp-sites',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'snp-dists.sh'),
+            'args': [
+                "--alignment", os.path.join(paths["snippy_output"], "core.aln"),
+                "--output_file", os.path.join(paths["snippy_output"], "core.matrix.tab"),
+            ]
+        },
+        {
+            'job_name': 'snp-sites',
+            'output_path': paths['logs'],
+            'error_path': paths['logs'],
+            'native_specification': '-pe smp 8',
+            'remote_command': os.path.join(job_script_path, 'snp-dists.sh'),
+            'args': [
+                "--alignment", os.path.join(paths["snippy_output"], "core.full.maskrc.snp.aln"),
+                "--output_file", os.path.join(paths["snippy_output"], "core.full.maskrc.snp.matrix.tab"),
+            ]
+        }
+    ]
+
+    run_jobs(snp_dists_jobs)
+    
+    exit(0)
     distanceDict = {} #store the distance matrix as rowname:list<string>
     
     for i in range(len(distance)):
@@ -244,6 +440,8 @@ if __name__ == '__main__':
                         help="Metadata file", required=False)
     parser.add_argument("-o", "--outdir", dest="output", default='./',
                         help="absolute path to output folder")
+    parser.add_argument("-d", "--resultdir", dest="result_dir",
+                        help="Path to cpo-pipeline output folder")
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)
