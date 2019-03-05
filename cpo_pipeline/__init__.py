@@ -3,3 +3,4 @@ from . import assembly
 from . import typing
 from . import resistance
 from . import plasmids
+from . import tree

@@ -139,9 +139,12 @@ def main():
                             help="Metadata file", required=False)
     tree_group.add_argument("-o", "--outdir", dest="outdir",
                               help="absolute path to output folder", required=True)
+    tree_group.add_argument("-d", "--resultdir", dest="result_dir",
+                        help="Path to cpo-pipeline output folder")
     tree_group.add_argument('-c', '--config', dest='config_file',
                             default=resource_filename('data', 'config.ini'),
                             help='Config File', required=False)
+    tree_group.set_defaults(func=cpo_pipeline.tree.pipeline.main)
     
     args = parser.parse_args()
 
