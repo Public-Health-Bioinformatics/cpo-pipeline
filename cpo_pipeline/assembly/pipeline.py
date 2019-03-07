@@ -155,8 +155,8 @@ def prepare_output_directories(output_dir, sample_id):
     for output_subdir in output_subdirs:
         try:
             os.makedirs(output_subdir)
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
+        except OSError as e:
+            if e.errno != errno.EEXIST:
                 raise
 
 
