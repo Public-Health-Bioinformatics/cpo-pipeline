@@ -383,6 +383,37 @@ def main(args, logger=None):
         paths['plasmid_output'],
         'custom_plasmid.txt'
     )
+
+    
+    plasmid_output_final = os.path.join(
+        output_dir,
+        sample_id,
+        'final_plasmid.txt'
+    )
+    
+    custom_candidates = [c for c in candidates if c['database'] == 'custom']
+    custom_candidates.sort(key=operator.itemgetter('snps'))
+    custom_candidates.sort(key=operator.itemgetter('plasmid_length'), reverse=True)
+    custom_candidates.sort(key=operator.itemgetter('percent_above_minimum_depth'), reverse=True)
+    custom_best_candidate = next(iter(custom_candidates), None)
+
+    with open(plasmid_output_final, 'w+') as f:
+        fieldnames = [
+            'accession',
+            'circularity',
+            'plasmid_length',
+            'bases_above_minimum_depth',
+            'percent_above_minimum_depth',
+            'snps',
+            'allele',
+            'incompatibility_group'
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
+        if custom_best_candidate:
+            f.write(args.sample_id + '\t')
+            # Truncate floats to 4 digits
+            writer.writerow({k:round(v,4) if isinstance(v,float) else v for k,v in custom_best_candidate.items()})
+
     with open(plasmid_output_summary, 'w+') as f:
         fieldnames = [
             'accession',
@@ -395,11 +426,10 @@ def main(args, logger=None):
             'incompatibility_group'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
-        for candidate in candidates:
-            if candidate['database'] == 'custom':
-                f.write(args.sample_id + '\t')
-                # Truncate floats to 4 digits
-                writer.writerow({k:round(v,4) if isinstance(v,float) else v for k,v in candidate.items()})
+        for candidate in custom_candidates:
+            f.write(args.sample_id + '\t')
+            # Truncate floats to 4 digits
+            writer.writerow({k:round(v,4) if isinstance(v,float) else v for k,v in candidate.items()})
     
     
 if __name__ == "__main__":

@@ -1,0 +1,13 @@
+[
+    {
+	"accession": "NZ_CP003997",
+	"date": "RefSeq89",
+	"circularity": "circular",
+	"organism": "Klebsiella_pneumoniae",
+	"plasmid_name": "pKP13d",
+	"plasmid_length": 45574,
+	"allele": "blaKPC-2",
+	"incompatibility_group": "IncU/IncX3",
+	"geographic_region": "Brazil"
+    }
+]

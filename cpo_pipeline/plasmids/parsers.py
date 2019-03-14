@@ -12,7 +12,7 @@ def custom_plasmid_db_dat_parser(path_to_dat_file):
         'accession': lambda x: x,
         'date': lambda x: x,
         'circularity': lambda x: x,
-        'organism': lambda x: x.replace("_", " "),
+        'organism': lambda x: x,
         'plasmid_name': lambda x: x,
         'plasmid_length': lambda x: int(x),
         'allele': lambda x: x,
@@ -30,3 +30,4 @@ def custom_plasmid_db_dat_parser(path_to_dat_file):
             parsed_dat_file.append(dat_record)
 
     return parsed_dat_file
+
