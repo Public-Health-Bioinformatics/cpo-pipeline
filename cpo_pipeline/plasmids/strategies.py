@@ -10,7 +10,7 @@ import urllib.request
 from pprint import pprint
 
 from cpo_pipeline.assembly.parsers import result_parsers
-from cpo_pipeline.pipeline import run_jobs
+from cpo_pipeline.pipeline import run_jobs, now
 from cpo_pipeline.plasmids import parsers
 
 def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
@@ -177,7 +177,7 @@ def custom_plasmids(sample_id, paths, logger):
     run_jobs(mash_jobs)
 
     
-    mash_screen_results = result_parsers.parse_mash_result(
+    mash_screen_results = result_parsers.parse_mash_screen_result(
         os.path.join(
             paths['custom_plasmid_output'],
             'mash_screen.tsv',
@@ -239,7 +239,7 @@ def custom_plasmids(sample_id, paths, logger):
         shutil.copyfile(candidate_fasta_db_path, candidate['fasta_path'])
         logger.info(
             "file_copied",
-            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+            timestamp=str(now()),
             accession=candidate['accession'],
             sample_id=sample_id
         )
@@ -274,12 +274,12 @@ def refseq_plasmids(sample_id, paths, logger):
         paths['refseq_plasmid_output'],
         'mash_screen.tsv',
     )
-    mash_screen_results = result_parsers.parse_mash_result(
+    mash_screen_results = result_parsers.parse_mash_screen_result(
         mash_screen_result_path
     )
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        timestamp=str(now()),
         filename=os.path.abspath(mash_screen_result_path)
     )
     
@@ -324,7 +324,7 @@ def refseq_plasmids(sample_id, paths, logger):
         urllib.request.urlretrieve(url, candidate['fasta_path'])
         logger.info(
             "file_downloaded",
-            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+            timestamp=str(now()),
             accession=candidate['accession'],
             sample_id=sample_id
         )

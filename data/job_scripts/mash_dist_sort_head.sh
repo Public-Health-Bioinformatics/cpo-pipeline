@@ -49,7 +49,7 @@ do
     shift # past value
     ;;
     -m|--minimum-kmers)
-    # mash sketch file <queries>.msh
+    # ominimum kmers
     minimum_kmers="$2"
     shift # past argument
     shift # past value
@@ -69,7 +69,7 @@ mkdir -p "${output_dir}"
 source activate mash-2.0
 
 cat "${input_r1_fastq}" "${input_r2_fastq}" | mash sketch -m "${minimum_kmers}" -r -o "${output_dir}"/reads -
-mash dist -p 8 "${queries}" "${output_dir}"/reads.msh | sort -gk3 > "${output_file}"
+mash dist -p 8 "${queries}" "${output_dir}"/reads.msh | sort -gk2,2 | head > "${output_file}"
 rm "${output_dir}"/reads.msh
 
 source deactivate

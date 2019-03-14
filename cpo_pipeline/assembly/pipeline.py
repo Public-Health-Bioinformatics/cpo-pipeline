@@ -14,6 +14,7 @@ pipeline.py -i BC11-Kpn005_S2 --R1 BC11-Kpn005_S2_L001_R1_001.fastq.gz \
 
 import argparse
 import configparser
+import csv
 import datetime
 import errno
 import glob
@@ -28,7 +29,7 @@ import drmaa
 
 from pkg_resources import resource_filename
 
-from cpo_pipeline.pipeline import prepare_job, run_jobs
+from cpo_pipeline.pipeline import prepare_job, run_jobs, now
 from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.assembly.parsers import input_parsers
 
@@ -84,7 +85,9 @@ def fastqc_qc_check(fastqc_results):
                 fastqc_results["sequence_length_distribution"] == "PASS")
 
 
-def download_mash_hit(mash_hit, download_path):
+
+
+def download_refseq_reference(reference_id, download_path):
     """
     Given a mash_hit, download the query sequence from NCBI FTP servers
     Will fail if the download_path doesn't exist.
@@ -95,32 +98,31 @@ def download_mash_hit(mash_hit, download_path):
         (void)
     """
 
-    def mash_query_id_to_ncbi_ftp_path(query_id):
+    def mash_reference_id_to_ncbi_ftp_path(reference_id):
         """
         Args:
-            query_id (str): Mash query ID (column 5 of mash screen report)
+            query_id (str): Mash reference ID (column 1 of mash dist report)
         Returns:
             list: Directory names used to locate reference genome
                   on ftp://ftp.ncbi.nlm.nih.gov/genomes/all/
         For example:
             "GCF/001/022/155"
         """
-        prefix = query_id.split('_')[0]
-        digits = query_id.split('_')[1].split('.')[0]
+        prefix = reference_id.split('_')[0]
+        digits = reference_id.split('_')[1].split('.')[0]
         path_list = [prefix] + [digits[i:i+3] for i in range(0, len(digits), 3)]
 
         return "/".join(path_list)
 
-    query_id = mash_hit['query_id']
-    ncbi_ftp_path = mash_query_id_to_ncbi_ftp_path(query_id)
-    assembly = query_id[:query_id.find("_genomic.fna.gz")]
+    ncbi_ftp_path = mash_reference_id_to_ncbi_ftp_path(reference_id)
+    assembly = reference_id[:reference_id.find("_genomic.fna.gz")]
 
     ncbi_ftp_server_base = "ftp://ftp.ncbi.nlm.nih.gov"
     fasta_url = "/".join([
         ncbi_ftp_server_base, "genomes", "all",
         ncbi_ftp_path,
         assembly,
-        query_id
+        reference_id
     ])
     assembly_stat_url = "/".join([
         ncbi_ftp_server_base, "genomes", "all",
@@ -130,7 +132,7 @@ def download_mash_hit(mash_hit, download_path):
     ])
 
     #fetch the files
-    urllib.request.urlretrieve(fasta_url, "/".join([download_path, query_id]))
+    urllib.request.urlretrieve(fasta_url, "/".join([download_path, reference_id]))
     urllib.request.urlretrieve(assembly_stat_url,
                                "/".join([download_path, assembly + "_assembly_stats.txt"]))
 
@@ -146,6 +148,7 @@ def prepare_output_directories(output_dir, sample_id):
     output_subdirs = [
         os.path.join(output_dir, sample_id, subdir)
         for subdir in [
+            'logs',
             'pre-assembly_qc',
             'assembly',
             'post-assembly_qc',
@@ -259,7 +262,7 @@ def main(args, logger=None):
             output_dir,
             sample_id,
             "pre-assembly_qc",
-            "mashscreen.genome.tsv"
+            "mash_dist.genome.tsv"
         ),
         "fastqc_output_path": os.path.join(
             output_dir,
@@ -272,6 +275,12 @@ def main(args, logger=None):
             sample_id,
             "pre-assembly_qc",
             "totalbp"
+        ),
+        "estimated_coverage_stats_path": os.path.join(
+            output_dir,
+            sample_id,
+            "pre-assembly_qc",
+            "estimated_coverage_stats.tsv"
         ),
         "reference_genome_path": os.path.join(
             output_dir,
@@ -299,11 +308,11 @@ def main(args, logger=None):
 
     pre_assembly_qc_jobs = [
         {
-            'job_name': "_".join(['mash_screen', sample_id]),
+            'job_name': "_".join(['mash_dist_sort_head', sample_id]),
             'output_path': paths['logs'],
             'error_path': paths['logs'],
             'native_specification': '-pe smp 8',
-            'remote_command': os.path.join(job_script_path, 'mash_screen.sh'),
+            'remote_command': os.path.join(job_script_path, 'mash_dist_sort_head.sh'),
             'args': [
                 "--R1", reads1_fastq,
                 "--R2", reads2_fastq,
@@ -340,34 +349,13 @@ def main(args, logger=None):
     run_jobs(pre_assembly_qc_jobs)
 
     #parse genome mash results
-    mash_hits = result_parsers.parse_mash_result(paths["mash_genome_path"])
+    mash_dist_results = result_parsers.parse_mash_dist_result(paths["mash_genome_path"])
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        timestamp=str(now()),
         filename=os.path.abspath(paths["mash_genome_path"]),
-        num_mash_hits=len(mash_hits),
+        closest_match_reference_id=mash_dist_results[0]['reference_id'],
     )
-    filtered_mash_hits = []
-    if len(mash_hits) > 0:
-        mash_hits = sorted(mash_hits, key=lambda k: k['identity'], reverse=True)
-        # 'shared_hashes' field is string in format '935/1000'
-        # Threshold is 300 below highest numerator (ie. '935/100' -> 635)
-        mash_hits_score_threshold = int(mash_hits[0]['shared_hashes'].split("/")[0]) - \
-            int(qc_thresholds["mash_hits_genome_score_cutoff"])
-
-        def score_above_threshold(mash_result, score_threshold):
-            score = int(mash_result['shared_hashes'].split("/")[0])
-            return bool(score >= score_threshold and \
-                        mash_result['query_comment'].find("phiX") == -1)
-
-        for mash_hit in mash_hits:
-            if score_above_threshold(mash_hit, mash_hits_score_threshold):
-                filtered_mash_hits.append(mash_hit)
-
-        if len(filtered_mash_hits) > 1:
-            qc_verdicts["multiple_species_contamination"] = True
-        else:
-            qc_verdicts["multiple_species_contamination"] = False
     
 
     # parse fastqc
@@ -377,7 +365,7 @@ def main(args, logger=None):
             [fastqc_result_summary_path] = glob.glob(
                 os.path.join(
                     paths['fastqc_output_path'],
-                    sample_id + "*_" + read + "_*" + "fastqc",
+                    "*_" + read + "_*" + "fastqc",
                     'summary.txt'
                 )
             )
@@ -395,40 +383,58 @@ def main(args, logger=None):
                 "result_parsing_failed",
                 timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
                 filename=fastqc_result_summary_path
-        )
+            )
+            fastqc_results["R1"] = {
+                "basic_statistics": "FAILED_TO_PARSE",
+                "per_base_sequence_quality": "FAILED_TO_PARSE",
+                "per_tile_sequence_quality": "FAILED_TO_PARSE",
+                "per_sequence_quality_scores": "FAILED_TO_PARSE",
+                "per_base_sequence_content": "FAILED_TO_PARSE",
+                "per_sequence_gc_content": "FAILED_TO_PARSE",
+                "per_base_n_content": "FAILED_TO_PARSE",
+                "sequence_length_distribution": "FAILED_TO_PARSE",
+                "sequence_duplication_levels": "FAILED_TO_PARSE",
+                "overrepresented_sequences": "FAILED_TO_PARSE",
+                "adapter_content": "FAILED_TO_PARSE",
+            }
+
+            fastqc_results["R2"] = {
+                "basic_statistics": "FAILED_TO_PARSE",
+                "per_base_sequence_quality": "FAILED_TO_PARSE",
+                "per_tile_sequence_quality": "FAILED_TO_PARSE",
+                "per_sequence_quality_scores": "FAILED_TO_PARSE",
+                "per_base_sequence_content": "FAILED_TO_PARSE",
+                "per_sequence_gc_content": "FAILED_TO_PARSE",
+                "per_base_n_content": "FAILED_TO_PARSE",
+                "sequence_length_distribution": "FAILED_TO_PARSE",
+                "sequence_duplication_levels": "FAILED_TO_PARSE",
+                "overrepresented_sequences": "FAILED_TO_PARSE",
+                "adapter_content": "FAILED_TO_PARSE",
+            }
 
 
     #look at fastqc results
     qc_verdicts["acceptable_fastqc_forward"] = fastqc_qc_check(fastqc_results["R1"])
     qc_verdicts["acceptable_fastqc_reverse"] = fastqc_qc_check(fastqc_results["R2"])
 
-
-    reference_genomes = []
+    try:
+        reference_genome = mash_dist_results[0]['reference_id']
+    except ValueError as e:
+        logger.error(
+            "failed_quality_control",
+            timestamp=str(now()),
+            qc_check_failed="determine_reference_sequence",
+        )
+        
     # build the save paths
     try:
         os.makedirs(paths['reference_genome_path'])
     except OSError as exc:
         if exc.errno != errno.EEXIST:
             raise
-    if not qc_verdicts["multiple_species_contamination"]:
-        if len(filtered_mash_hits) > 0:
-            for mash_hit in filtered_mash_hits:
-                if not re.match("phiX", mash_hit['query_comment']):
-                    download_mash_hit(mash_hit, paths['reference_genome_path'])
-                    reference_genomes.append(mash_hit['query_id'])
+    
+    download_refseq_reference(reference_genome, paths['reference_genome_path'])
 
-    else:
-        logger.error(
-            "failed_quality_control",
-            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-            qc_check_failed="multiple_species_contamination"
-        )
-
-    #check to make sure we ONLY have ONE reference.
-    if len(reference_genomes) > 1:
-        raise Exception("there are multiple reference genomes")
-    elif not reference_genomes:
-        raise Exception("no reference genome identified")
 
     # If the user passes an expected organism NCBI taxonomy ID, then
     # use that to estimate the genome size. Otherwise, use the downloaded reference.
@@ -443,41 +449,64 @@ def main(args, logger=None):
         except ValueError:
             logger.error(
                 "result_parsing_failed",
-                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                timestamp=str(now()),
                 filename=str(os.path.abspath(paths["reference_genome_path"])) + "/*_assembly_stats.txt",
             )
 
         try:
-            estimated_genome_size = result_parsers.parse_reference_genome_stats(
+            reference_genome_assembly_stats = result_parsers.parse_reference_genome_assembly_stats(
                 reference_genome_assembly_stats_path
             )
             logger.info(
                 "parsed_result_file",
-                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-                filename=reference_genome_assembly_stats_path,
-                estimated_genome_size=estimated_genome_size
+                timestamp=str(now()),
+                filename=os.path.abspath(reference_genome_assembly_stats_path),
+                total_length=reference_genome_assembly_stats['total_length'],
+                contig_count=reference_genome_assembly_stats['contig_count'],
+                contig_N50=reference_genome_assembly_stats['contig_N50'],
+                organism_name=reference_genome_assembly_stats['organism_name'],
+                infraspecific_name=reference_genome_assembly_stats['infraspecific_name'],
+                ncbi_taxonomy_id=reference_genome_assembly_stats['taxid'],
+                refseq_assembly_accession=reference_genome_assembly_stats['refseq_assembly_accession'],
             )
+            estimated_genome_size = reference_genome_assembly_stats['total_length']
         except ValueError:
             logger.error(
                 "result_parsing_failed",
-                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-                filename=reference_genome_assembly_stats_path,
+                timestamp=str(now()),
+                filename=os.path.abspath(reference_genome_assembly_stats_path),
             )
 
     total_bp = result_parsers.parse_total_bp(paths["totalbp_path"])
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-        filename=paths["totalbp_path"],
+        timestamp=str(now()),
+        filename=os.path.abspath(paths["totalbp_path"]),
         total_bp=total_bp,
     )
 
-    coverage = total_bp / estimated_genome_size
+    estimated_depth_of_coverage = total_bp / estimated_genome_size
 
-    if coverage >= int(qc_thresholds["coverage_cutoff"]):
+
+    if estimated_depth_of_coverage >= int(qc_thresholds["coverage_cutoff"]):
         qc_verdicts["acceptable_coverage"] = True
 
+    estimated_coverage_stats_headers = [
+        'sample_id',
+        'total_bp',
+        'estimated_genome_size',
+        'estimated_depth_of_coverage',
+    ]
 
+    with open(paths['estimated_coverage_stats_path'], 'w+') as f:
+        writer = csv.DictWriter(f, fieldnames=estimated_coverage_stats_headers, delimiter='\t')
+        writer.writeheader()
+        writer.writerow({
+            'sample_id': sample_id,
+            'total_bp': int(total_bp),
+            'estimated_genome_size': int(estimated_genome_size),
+            'estimated_depth_of_coverage': round(estimated_depth_of_coverage, 4),
+        })
 
     assembly_jobs = [
         {
@@ -522,8 +551,8 @@ def main(args, logger=None):
     )
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-        filename=busco_short_summary_contigs_path,
+        timestamp=str(now()),
+        filename=os.path.abspath(busco_short_summary_contigs_path),
         busco_results=busco_results
     )
     quast_report_path = os.path.abspath(paths["quast_path"] + "/report.txt")
@@ -532,8 +561,8 @@ def main(args, logger=None):
     )
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-        filename=quast_report_path,
+        timestamp=str(now()),
+        filename=os.path.abspath(quast_report_path),
         num_contigs=quast_results["num_contigs"],
         N50=quast_results["N50"],
     )

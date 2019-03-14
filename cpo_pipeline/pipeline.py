@@ -6,6 +6,7 @@ import configparser
 import csv
 import datetime
 import drmaa
+import glob
 import json
 import logging
 import random
@@ -18,6 +19,8 @@ from pkg_resources import resource_filename
 from pprint import pprint
 import cpo_pipeline
 
+def now():
+    return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 
 def prepare_job(job, session):
     job_template = session.createJobTemplate()
@@ -48,7 +51,7 @@ def run_jobs(jobs, logger=structlog.get_logger()):
             job_name = prepared_job.jobName
             logger.info(
                 "job_submitted",
-                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                timestamp=str(now()),
                 job_name=job_name,
                 job_id=job_id,
             )
@@ -66,48 +69,119 @@ def run_jobs(jobs, logger=structlog.get_logger()):
                 resource_usage[time_field] = iso8601_timestamp
             logger.info(
                 "job_completed",
-                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                timestamp=str(now()),
                 job_id=job["id"],
                 job_name=job["name"],
                 resource_usage=job_info.resourceUsage,
                 exit_status=job_info.exitStatus,
             )
 
-def collect_final_outputs(outdir, sample_id):
+def collect_final_outputs(outdir, sample_id, logger=structlog.get_logger()):
     final_outputs = {}
     final_outputs['sample_id'] = sample_id
-    total_bp = cpo_pipeline.assembly.parsers.result_parsers.parse_total_bp(
-        os.path.join(
-            outdir,
-            sample_id,
-            'pre-assembly_qc',
-            'totalbp'
-        )
+    total_bp_path = os.path.join(
+        outdir,
+        sample_id,
+        'pre-assembly_qc',
+        'totalbp'
     )
-    if total_bp:
-        final_outputs['bp'] = total_bp
-    else:
-        logger.error(
-            "output_parsing_failed",
-            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
-        )
-        final_outputs['bp'] = None
-
 
     try:
-        [mlst_result] = cpo_pipeline.typing.parsers.result_parsers.parse_mlst_result(
-            os.path.join(
-                outdir,
-                sample_id,
-                'typing',
-                'mlst',
-                'mlst.tsv'
-            )
+        total_bp = cpo_pipeline.assembly.parsers.result_parsers.parse_total_bp(
+            total_bp_path
+        )
+        logger.info(
+            "parsed_result_file",
+            timestamp=str(now()),
+            filename=os.path.abspath(total_bp_path),
+        )
+    except FileNotFoundError:
+        logger.error(
+            "output_parsing_failed",
+            timestamp=str(now()),
+        )
+        total_bp = None
+
+    estimated_genome_coverage_stats_path = os.path.join(
+        outdir,
+        sample_id,
+        'pre-assembly_qc',
+        'estimated_coverage_stats.tsv'
+    )
+
+    try:
+        estimated_coverage_stats = cpo_pipeline.assembly.parsers.result_parsers.parse_estimated_coverage_stats(
+            estimated_genome_coverage_stats_path
+        )
+        logger.info(
+            "parsed_result_file",
+            timestamp=str(now()),
+            filename=os.path.abspath(estimated_genome_coverage_stats_path),
+        )
+    except FileNotFoundError:
+        logger.error(
+            "output_parsing_failed",
+            timestamp=str(now()),
+            filename=os.path.abspath(estimated_genome_coverage_stats_path),
+        )
+        estimated_coverage_stats = {
+            'sample_id': sample_id,
+            'total_bp': '-',
+            'estimated_genome_size': '-',
+            'estimated_depth_of_coverage': '-',
+        }
+
+    reference_genome_assembly_stats_glob = os.path.join(
+        outdir,
+        sample_id,
+        'reference',
+        "*_assembly_stats.txt"
+    )
+    try:
+        [reference_genome_assembly_stats_path] = glob.glob(
+            reference_genome_assembly_stats_glob
         )
     except ValueError:
         logger.error(
-            "output_parsig_failed",
-            timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+            "result_parsing_failed",
+            timestamp=str(now()),
+            filename=str(reference_genome_assembly_stats_glob),
+        )
+    try:
+        reference_genome_assembly_stats = cpo_pipeline.assembly.parsers.result_parsers.parse_reference_genome_assembly_stats(
+            reference_genome_assembly_stats_path
+        )
+    except FileNotFoundError:
+        logger.error(
+            "output_parsing_failed",
+            timestamp=str(now()),
+            filename=os.path.abspath(reference_genome_assembly_stats_path),
+        )
+        reference_genome_assembly_stats = {
+            'organism_name': 'Unknown (parsing failed)',
+            'infraspecific_name': 'Unknown (parsing failed)',
+            'refseq_assembly_accession': 'Unknown (parsing failed)',
+            'taxid': 'Unknown (parsing failed)',
+            'total_length': 0,
+            'contig_count': 0,
+            'contig_N50': 0,
+        }
+
+    mlst_result_path = os.path.join(
+        outdir,
+        sample_id,
+        'typing',
+        'mlst',
+        'mlst.tsv'
+    )
+    try:
+        [mlst_result] = cpo_pipeline.typing.parsers.result_parsers.parse_mlst_result(
+            mlst_result_path
+        )
+    except ValueError:
+        logger.error(
+            "output_parsing_failed",
+            timestamp=str(now()),
         )
         mlst_result = {
             'contig_file': os.path.join(
@@ -129,6 +203,13 @@ def collect_final_outputs(outdir, sample_id):
             }
         }
 
+    final_outputs['bp'] = total_bp
+    final_outputs['est_genome_size'] = estimated_coverage_stats['estimated_genome_size']
+    final_outputs['Coverage'] = round(estimated_coverage_stats['estimated_depth_of_coverage'], 2)
+    final_outputs['MASH_BEST_HIT'] = " ".join([
+        reference_genome_assembly_stats['organism_name'],
+        reference_genome_assembly_stats['infraspecific_name'],   
+    ])
     final_outputs['MLST_SCHEME'] = mlst_result['scheme_id']
     final_outputs['MLST'] = mlst_result['sequence_type']
     allele_number = 1
@@ -148,7 +229,6 @@ def main(args):
     config.read(args.config_file)
 
     analysis_id = uuid.uuid4()
-    now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 
     logging.basicConfig(
         format="%(message)s",
@@ -174,7 +254,7 @@ def main(args):
 
     logger.info(
         "analysis_started",
-        timestamp=str(now),
+        timestamp=str(now()),
     )
 
     plasmids_command_line = [
@@ -238,6 +318,9 @@ def main(args):
     final_outputs_headers = [
         'sample_id',
         'bp',
+        'est_genome_size',
+        'Coverage',
+        'MASH_BEST_HIT',
         'MLST_SCHEME',
         'MLST',
         'MLST_ALLELE_1',
@@ -257,7 +340,7 @@ def main(args):
 
     logger.info(
         "analysis_completed",
-        timestamp=str(now),
+        timestamp=str(now()),
     )
 
 def multi(args):

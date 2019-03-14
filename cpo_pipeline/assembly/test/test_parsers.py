@@ -21,18 +21,18 @@ class FastqcResultParserTest(unittest.TestCase):
         parsed_result = result_parsers.parse_fastqc_result(self.test_data_path)
         self.assertDictEqual(parsed_result, self.parsed_fastqc_summary_json)
 
-class MashResultParserTest(unittest.TestCase):
+class MashScreenResultParserTest(unittest.TestCase):
     def setUp(self):
         self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/pre-assembly_qc/mashscreen.genome.tsv')
         with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_mash_screen_genome_report.json')) as mash_screen_genome_json:
             self.parsed_mash_screen_genome_json = json.load(mash_screen_genome_json)
             mash_screen_genome_json.close()
 
-    def test_parse_mash_result(self):    
-        parsed_result = result_parsers.parse_mash_result(self.test_data_path)
+    def test_parse_mash_screen_result(self):    
+        parsed_result = result_parsers.parse_mash_screen_result(self.test_data_path)
         paired_results = zip(parsed_result, self.parsed_mash_screen_genome_json)
-        for parsed_mash_report_record, parsed_mash_json_record in paired_results:
-            self.assertDictEqual(parsed_mash_report_record, parsed_mash_json_record)
+        for parsed_mash_screen_report_record, parsed_mash_screen_json_record in paired_results:
+            self.assertDictEqual(parsed_mash_screen_report_record, parsed_mash_screen_json_record)
 
 class MashLogParserTest(unittest.TestCase):
     def setUp(self):
@@ -57,16 +57,16 @@ class TotalBpParserTest(unittest.TestCase):
         parsed_result = result_parsers.parse_total_bp(self.test_data_path)
         self.assertEqual(parsed_result, self.parsed_totalbp_json['total_bp'])
 
-class ReferenceGenomeStatsParserTest(unittest.TestCase):
+class ReferenceGenomeAssemblyStatsParserTest(unittest.TestCase):
     def setUp(self):
         self.test_data_path = os.path.join(TEST_DIR_PATH, 'data/pipeline_output/SAMPLE-ID/reference/GCF_001022155.1_ASM102215v1_assembly_stats.txt')
-        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_reference_genome_stats.json')) as reference_genome_stats_json:
-            self.parsed_reference_genome_stats_json = json.load(reference_genome_stats_json)
-            reference_genome_stats_json.close()
+        with open(os.path.join(TEST_DIR_PATH, 'data/parsed_results/parsed_reference_genome_assembly_stats.json')) as reference_genome_assembly_stats_json:
+            self.parsed_reference_genome_assembly_stats_json = json.load(reference_genome_assembly_stats_json)
+            reference_genome_assembly_stats_json.close()
     
-    def test_parse_reference_genome_stats(self):
-        parsed_result = result_parsers.parse_reference_genome_stats(self.test_data_path)
-        self.assertEqual(parsed_result, self.parsed_reference_genome_stats_json['reference_genome_total_length'])
+    def test_parse_reference_genome_assembly_stats(self):
+        parsed_result = result_parsers.parse_reference_genome_assembly_stats(self.test_data_path)
+        self.assertDictEqual(parsed_result, self.parsed_reference_genome_assembly_stats_json)
 
 class BuscoResultParserTest(unittest.TestCase):
     def setUp(self):

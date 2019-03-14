@@ -82,7 +82,53 @@ def parse_fastqc_result(path_to_qc_summary):
             fastqc_summary[field_name] = row[0]
     return fastqc_summary
 
-def parse_mash_result(path_to_mash_screen):
+def parse_mash_dist_result(path_to_mash_dist_result):
+    """
+    Args:
+        path_to_mash_screen (str): Path to the mash screen report file.
+
+    Returns:
+        list(dict): Parsed mash screen report
+        For example:
+        [
+          {
+            "reference_id": "GCF_001519515.1_ASM151951v1_genomic.fna.gz",
+            "query_id": "",
+            "mash_distance": 0.00584167,
+            "p_value": 0.00,
+            "matching_hashes": "793/1000"
+          },
+          {
+            ...
+          }
+        ]
+        See mash docs for more info on mash screen report file:
+        https://mash.readthedocs.io/en/latest/tutorials.html#screening-a-read-set-for-containment-of-refseq-genomes
+    """
+
+    mash_dist_report_fields = {
+        'reference_id': lambda x: x,
+        'query_id': lambda x: x,
+        'mash_distance': lambda x: float(x),
+        'p_value': lambda x: float(x),
+        'matching_hashes': lambda x: x,
+    }
+
+    # Example mash dist report record (actual report has no header and is tab-delimited):
+    # reference_id                                query_id   mash_distance    p_value    matching_hashes
+    # GCF_001519515.1_ASM151951v1_genomic.fna.gz             0.00584167       0          793/1000
+
+    parsed_mash_dist_result = []
+    with open(path_to_mash_dist_result) as f:
+        reader = csv.DictReader(f, delimiter='\t', fieldnames=list(mash_dist_report_fields))
+        mash_record = {}
+        for row in reader:
+            for field_name, parse in mash_dist_report_fields.items():
+                mash_record[field_name] = parse(row[field_name])
+            parsed_mash_dist_result.append(mash_record.copy())
+    return parsed_mash_dist_result
+
+def parse_mash_screen_result(path_to_mash_screen_result):
     """
     Args:
         path_to_mash_screen (str): Path to the mash screen report file.
@@ -119,15 +165,15 @@ def parse_mash_result(path_to_mash_screen):
     # identity    shared_hashes    median_multiplicity    p_value    query_id                                    query_comment
     # 0.998697    973/1000         71                     0          GCF_000958965.1_matepair4_genomic.fna.gz    [59 seqs] NZ_LAFU01000001.1 Klebsiella pneumoniae strain CDPH5262 contig000001, whole genome shotgun sequence [...]
 
-    parsed_mash_result = []
-    with open(path_to_mash_screen) as mashfile:
-        reader = csv.DictReader(mashfile, delimiter='\t', fieldnames=list(mash_screen_report_fields))
+    parsed_mash_screen_result = []
+    with open(path_to_mash_screen_result) as f:
+        reader = csv.DictReader(f, delimiter='\t', fieldnames=list(mash_screen_report_fields))
         mash_record = {}
         for row in reader:
             for field_name, parse in mash_screen_report_fields.items():
                 mash_record[field_name] = parse(row[field_name])
-            parsed_mash_result.append(mash_record.copy())
-    return parsed_mash_result
+            parsed_mash_screen_result.append(mash_record.copy())
+    return parsed_mash_screen_result
 
 def parse_read_stats(path_to_mash_log, path_to_total_bp):
     """
@@ -170,23 +216,89 @@ def parse_total_bp(path_to_total_bp):
         total_bp = int(totalbp_file.readline())
 
     return total_bp
+
+def parse_estimated_coverage_stats(path_to_estimated_coverage_stats):
+    """
+    Args:
+        path_to_total_bp (str):
+
+    Returns:
+        dict:
+        For example:
+          {
+            'sample_id': "Sample-01"
+            'total_bp': 300017980
+            'estimated_genome_size': 5200000
+            'estimated_depth_of_coverage': 57.7
+          }
+    """
+    estimated_coverage_stats_fields = {
+        'sample_id': lambda x: x,
+        'total_bp': lambda x: int(x),
+        'estimated_genome_size': lambda x: int(x),
+        'estimated_depth_of_coverage': lambda x: float(x),
+    }
+    with open(path_to_estimated_coverage_stats, 'r') as f:
+        reader = csv.DictReader(f, fieldnames=list(estimated_coverage_stats_fields), delimiter='\t')
+        header = next(reader)
+        data = next(reader)
+        estimated_coverage_stats = {}
+        for field_name, parse in estimated_coverage_stats_fields.items():
+            estimated_coverage_stats[field_name] = parse(data[field_name])
+
+    return estimated_coverage_stats
     
-def parse_reference_genome_stats(path_to_reference_genome_stats):
+def parse_reference_genome_assembly_stats(path_to_reference_genome_assembly_stats):
     """
     Args:
         path_to_reference_genome_stats (str): Path to
 
     Returns:
-        float: genome size
+        dict: genome stats
         For example:
-          5185840
+        {
+          'organism_name': 'Escherichia coli (E. coli)',
+          'infraspecific_name': 'strain=GN02215',
+          'refseq_assembly_accession': 'GCF_001519515.1',
+          'taxid': '562',
+          'total_length': 5185840,
+          'contig_count': 219,
+          'contig_N50': 52782
+        }
     """
-    with open(path_to_reference_genome_stats, 'r') as reference_stats:
-        genome_stats = reference_stats.read().splitlines()
-    for line in genome_stats:
-        if (line.find("all	all	all	all	total-length") > -1): #find the total length stat
-            expected_genome_size = float(line.split("\t")[5].strip()) 
-    return expected_genome_size
+    reference_genome_assembly_stats = {
+        'organism_name': '',
+        'infraspecific_name': '',
+        'refseq_assembly_accession': '',
+        'taxid': '',
+        'total_length': None,
+        'contig_count': None,
+        'contig_N50': None,
+    }
+    header_fields = [
+        "Organism name",
+        "Infraspecific name",
+        "RefSeq assembly accession",
+        "Taxid",
+    ]
+    body_fields = [
+        'total-length',
+        'contig-count',
+        'contig-N50',
+    ]
+    with open(path_to_reference_genome_assembly_stats, 'r') as f:
+        for line in f:
+            for field in header_fields:
+                if re.match("^# " + field + ":", line):
+                    reference_genome_assembly_stats[field.lower().replace(" ", "_")] = re.split(
+                        "# " + field + ":\s+", line.strip()
+                    )[-1]
+            for field in body_fields:
+                if re.match("^all\tall\tall\tall\t" + field, line):
+                    reference_genome_assembly_stats[field.replace('-', '_')] = int(
+                        line.strip().split('\t')[-1].strip()
+                    )
+    return reference_genome_assembly_stats
 
 def parse_busco_result(path_to_busco_result):
     """
