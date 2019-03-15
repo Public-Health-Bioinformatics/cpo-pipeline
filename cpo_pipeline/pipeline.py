@@ -385,7 +385,7 @@ def multi(args):
             ])
             arguments.append(job_args)
 
-    pool.map(cpo_pipeline.pipeline.main, arguments)
+    pool.map(main, arguments)
     
 if __name__ == '__main__':
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
