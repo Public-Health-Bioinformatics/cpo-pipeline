@@ -141,8 +141,7 @@ def main(args, logger=None):
         os.path.join(
             paths['snippy_output'],
             os.path.basename(
-                os.path.dirname(os.path.dirname(contigs)) + "_" + \
-                os.path.splitext(os.path.basename(reference))[0]
+                os.path.dirname(os.path.dirname(contigs))
             )
         )
         for contigs in contigs_paths
@@ -193,6 +192,7 @@ def main(args, logger=None):
             'remote_command': os.path.join(job_script_path, 'snp-dists.sh'),
             'args': [
                 "--alignment", os.path.join(paths["snippy_output"], "core.aln"),
+                "--output_file", os.path.join(paths["snippy_output"], "core.aln.matrix.tsv"),
             ]
         }
     ]
