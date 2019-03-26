@@ -89,7 +89,11 @@ def main(args, logger=None):
 
     inputs = []
     with open(args.input_file) as input_file:
-        fieldnames = ['sample_id']
+        fieldnames = [
+            'sample_id',
+            'reads1',
+            'reads2',
+        ]
         reader = csv.DictReader(
             (row for row in input_file if not row.startswith('#')),
             delimiter='\t',
@@ -149,18 +153,23 @@ def main(args, logger=None):
     
     snippy_jobs = [
         {
-            'job_name': 'snippy_ctgs',
+            'job_name': 'snippy',
             'output_path': paths['logs'],
             'error_path': paths['logs'],
             'native_specification': '-pe smp 8 -shell y',
-            'remote_command': os.path.join(job_script_path, 'snippy_ctgs.sh'),
+            'remote_command': os.path.join(job_script_path, 'snippy.sh'),
             'args': [
                 "--ref", reference,
-                "--ctgs", contigs,
-                "--outdir", snippy_dir
+                "--R1", input['reads1'],
+                "--R2", input['reads2'],
+                "--outdir",
+                os.path.join(
+                    paths['snippy_output'],
+                    input['sample_id'],
+                ),
             ]
         }
-        for snippy_dir in snippy_dirs
+        for input in inputs
     ]
     
     run_jobs(snippy_jobs)
