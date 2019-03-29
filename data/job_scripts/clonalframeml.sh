@@ -51,6 +51,7 @@ ClonalFrameML \
     "${treefile}" \
     "${alignment}" \
     "${output_file}" \
+    -show_progress true
 
 source deactivate
 
