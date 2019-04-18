@@ -1,15 +1,5 @@
 #!/usr/bin/env python
 
-'''
-This script is a wrapper for resistance gene idenfification from assemblies.
-
-It uses abricate and rgi for AMR profile prediction and plasmid predictions.
-
-Example usage:
-
-  pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --outdir outdir
-'''
-
 import argparse
 import os
 import datetime
@@ -20,18 +10,20 @@ import time
 import configparser
 import re
 
-import drmaa
-
 from pkg_resources import resource_filename
 
-from cpo_pipeline.pipeline import prepare_job, run_jobs
+from cpo_pipeline.drmaa import prepare_job, run_jobs
+from cpo_pipeline.logging import now
 from cpo_pipeline.resistance.parsers import result_parsers
 
-def main(args, logger=None):
+
+logger = structlog.get_logger()
+
+def main(args):
     """
     main entrypoint
     Args:
-        args():
+        args(argparse.Namespace): Parsed command-line arguments.
     Returns:
         (void)
     """
@@ -55,46 +47,70 @@ def main(args, logger=None):
     try:
         card_path = args.card_json
     except AttributeError:
-        card_path = config['databases']['card_json']
-    if not card_path:
-        card_path = config['databases']['card_json']
+        try:
+            card_path = config['databases']['card_json']
+            if not os.path.exists(card_path):
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), card_path
+                )
+            logger.info(
+                "configuration_loaded",
+                timestamp=str(now()),
+                configuration_attribute="databases/card_json",
+                configuration_value=card_path,
+            )
+        except Exception as e:
+            logger.error(
+                "configuration_failed",
+                timestamp=str(now()),
+                configuration_attribute="databases/card_json",
+                error_message=str(e),
+            )
 
     try:
         abricate_datadir = args.abricate_datadir
     except AttributeError:
-        abricate_datadir = config['databases']['abricate_datadir']
-    if not abricate_datadir:
-        abricate_datadir = config['databases']['abricate_datadir']
+        try:
+            abricate_datadir = config['databases']['abricate_datadir']
+            if not os.path.exists(abricate_datadir):
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), abricate_datadir
+                )
+            logger.info(
+                "configuration_loaded",
+                timestamp=str(now()),
+                configuration_attribute="databases/abricate_datadir",
+                configuration_value=abricate_datadir,
+            )
+        except Exception as e:
+            logger.error(
+                "configuration_failed",
+                timestamp=str(now()),
+                configuration_attribute="databases/abricate_datadir",
+                error_message=str(e),
+            )
 
     try:
         abricate_cpo_plasmid_db = args.abricate_cpo_plasmid_db
     except AttributeError:
-        abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
-    if not abricate_cpo_plasmid_db:
-        abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
-
-
-
-
-
-    if not logger:
-        logging.basicConfig(
-            format="%(message)s",
-            stream=sys.stdout,
-            level=logging.DEBUG,
-        )
-
-        structlog.configure_once(
-            processors=[
-                structlog.stdlib.add_log_level,
-                structlog.processors.JSONRenderer()
-            ],
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            wrapper_class=structlog.stdlib.BoundLogger,
-            context_class=structlog.threadlocal.wrap_dict(dict),
-        )
-        logger = structlog.get_logger()
-
+        try:
+            abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
+            if not os.path.exists(abricate_cpo_plasmid_db):
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), abricate_cpo_plasmid_db
+                )
+            logger.info(
+                "configuration_loaded",
+                timestamp=str(now()),
+                configuration_attribute="databases/abricate_cpo_plasmid_db",
+                configuration_value=abricate_cpo_plasmid_db,
+            )
+        except Exception as e:
+            logger.error(
+                "configuration_failed",
+                timestamp=str(now()),
+                configuration_attribute="databases/abricate_cpo_plasmid_db",
+            )
 
     paths = {
         "output_dir": output_dir,
@@ -248,5 +264,34 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)
+
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.DEBUG,
+    )
+
+    structlog.configure_once(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=structlog.threadlocal.wrap_dict(dict),
+    )
+
+    logger = structlog.get_logger(
+        analysis_id=str(uuid.uuid4()),
+        sample_id=args.sample_id,
+        pipeline_version=cpo_pipeline.__version__,
+    )
+
+    logger.info(
+        "analysis_started",
+        timestamp=str(now()),
+    )
+
     main(args)

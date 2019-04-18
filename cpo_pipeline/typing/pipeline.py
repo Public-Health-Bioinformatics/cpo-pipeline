@@ -1,16 +1,5 @@
 #!/usr/bin/env python
 
-'''
-This script is a wrapper for module two, part 1: typing from assemblies.
-
-It uses mlst, mobsuite for sequence typing.
-
-Example usage:
-
-pipeline.py --id BC11-Kpn005 --assembly BC11-Kpn005_S2.fa --outdir outdir
-
-'''
-
 import argparse
 import configparser
 import datetime
@@ -22,14 +11,16 @@ import time
 
 from pkg_resources import resource_filename
 
-import drmaa
 
-from cpo_pipeline.pipeline import prepare_job, run_jobs
+from cpo_pipeline.drmaa import prepare_job, run_jobs
+from cpo_pipeline.logging import now
 from cpo_pipeline.typing.parsers import result_parsers
 from cpo_pipeline.typing.parsers import input_parsers
 
 
-def main(args, logger=None):
+logger = structlog.get_logger()
+
+def main(args):
     """
     main entrypoint
     Args:
@@ -60,24 +51,6 @@ def main(args, logger=None):
         mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
     if not mlst_scheme_map_file:
         mlst_scheme_map_file = resource_filename('data', 'scheme_species_map.tab')
-
-    if not logger:
-        logging.basicConfig(
-            format="%(message)s",
-            stream=sys.stdout,
-            level=logging.DEBUG,
-        )
-
-        structlog.configure_once(
-            processors=[
-                structlog.stdlib.add_log_level,
-                structlog.processors.JSONRenderer()
-            ],
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            wrapper_class=structlog.stdlib.BoundLogger,
-            context_class=structlog.threadlocal.wrap_dict(dict),
-        )
-        logger = structlog.get_logger()
 
     
     paths = {
@@ -164,7 +137,7 @@ def main(args, logger=None):
     [mlst_hit] = mlst_hits
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        timestamp=str(now()),
         filename=os.path.abspath(mlst_report),
         scheme_id=mlst_hit["scheme_id"],
         sequence_type=mlst_hit["sequence_type"],
@@ -188,7 +161,7 @@ def main(args, logger=None):
     )
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        timestamp=str(now()),
         filename=os.path.abspath(mob_recon_contig_report_path),
         num_records=len(mob_recon_contig_report),
     )
@@ -206,7 +179,7 @@ def main(args, logger=None):
     )
     logger.info(
         "parsed_result_file",
-        timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+        timestamp=str(now()),
         filename=os.path.abspath(mob_recon_aggregate_report_path),
         num_records=len(mob_recon_aggregate_report),
     )
@@ -298,5 +271,34 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)
+
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.DEBUG,
+    )
+
+    structlog.configure_once(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=structlog.threadlocal.wrap_dict(dict),
+    )
+
+    logger = structlog.get_logger(
+        analysis_id=str(uuid.uuid4()),
+        sample_id=args.sample_id,
+        pipeline_version=cpo_pipeline.__version__,
+    )
+
+    logger.info(
+        "analysis_started",
+        timestamp=str(now()),
+    )
+
     main(args)

@@ -2,8 +2,10 @@
 
 import argparse
 import configparser
+import logging
 import os
 import sys
+import structlog
 
 from pkg_resources import resource_filename
 
@@ -151,4 +153,20 @@ def main():
     args.func(args)
 
 if __name__ == '__main__':
-   main()
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.DEBUG,
+    )
+
+    structlog.configure_once(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=structlog.threadlocal.wrap_dict(dict),
+    )
+
+    main()

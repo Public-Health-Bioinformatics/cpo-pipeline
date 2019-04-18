@@ -5,13 +5,18 @@ import glob
 import operator
 import re
 import shutil
+import structlog
 import time
 import urllib.request
 from pprint import pprint
 
 from cpo_pipeline.assembly.parsers import result_parsers
-from cpo_pipeline.pipeline import run_jobs, now
+from cpo_pipeline.drmaa import run_jobs
+from cpo_pipeline.logging import now
 from cpo_pipeline.plasmids import parsers
+
+
+logger = structlog.get_logger()
 
 def samtools_filter_fixmate_sort_discrete_jobs(sample_id, candidates, paths):
     samtools_view_jobs = []
@@ -150,7 +155,7 @@ def samtools_filter_fixmate_sort_single_job(sample_id, candidates, paths):
     run_jobs(samtools_filter_fixmate_sort_jobs)
     
 
-def custom_plasmids(sample_id, paths, logger):
+def custom_plasmids(sample_id, paths):
     mash_jobs = [
         {
             'job_name': "_".join(['mash_screen_custom_plasmid', sample_id]),
@@ -247,7 +252,7 @@ def custom_plasmids(sample_id, paths, logger):
 
 
 
-def refseq_plasmids(sample_id, paths, logger):
+def refseq_plasmids(sample_id, paths):
 
     mash_jobs = [
         {
@@ -321,13 +326,20 @@ def refseq_plasmids(sample_id, paths, logger):
                 "id=" + candidate['accession'],
                 "rettype=fasta",
             ])
-        urllib.request.urlretrieve(url, candidate['fasta_path'])
-        logger.info(
-            "file_downloaded",
-            timestamp=str(now()),
-            accession=candidate['accession'],
-            sample_id=sample_id
-        )
+        try:
+            urllib.request.urlretrieve(url, candidate['fasta_path'])
+            logger.info(
+                "file_downloaded",
+                timestamp=str(now()),
+                accession=candidate['accession'],
+                sample_id=sample_id
+            )
+        except Exception as e:
+            logging.error(
+                "download_failed",
+                timestamp=str(now()),
+                url=url,
+            )
         time.sleep(2)
 
     return candidates

@@ -1,13 +1,5 @@
 #!/usr/bin/env python
 
-'''
-
-Example usage:
-
-pipeline.py -i BC11-Kpn005_S2 --R1 BC11-Kpn005_S2_L001_R1_001.fastq.gz \
-  --R2 BC11-Kpn005_S2_L001_R2_001.fastq.gz -o output_dir
-'''
-
 import argparse
 import configparser
 import csv
@@ -29,12 +21,16 @@ import drmaa
 
 from pkg_resources import resource_filename
 
-from cpo_pipeline.pipeline import prepare_job, run_jobs
+from cpo_pipeline.drmaa import prepare_job, run_jobs
+from cpo_pipeline.logging import now
 from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.plasmids import parsers
 from cpo_pipeline.plasmids import strategies
 
-def main(args, logger=None):
+
+logger = structlog.get_logger()
+
+def main(args):
     """
     main entrypoint
     Args:
@@ -49,38 +45,53 @@ def main(args, logger=None):
     try:
         mash_refseq_plasmid_db = args.mash_refseq_plasmid_db
     except AttributeError:
-        mash_refseq_plasmid_db = config['databases']['mash_refseq_plasmid_db']
-    if not mash_refseq_plasmid_db:
-        mash_refseq_plasmid_db = config['databases']['mash_refseq_plasmid_db']
+        try:
+            mash_refseq_plasmid_db = config['databases']['mash_refseq_plasmid_db']
+            if not os.path.exists(mash_refseq_plasmid_db):
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), mash_refseq_plasmid_db
+                )
+            logger.info(
+                "configuration_loaded",
+                timestamp=str(now()),
+                configuration_attribute="databases/mash_refseq_plasmid_db",
+                configuration_value=mash_refseq_plasmid_db,
+            )
+        except Exception as e:
+            logger.error(
+                "configuration_failed",
+                timestamp=str(now()),
+                configuration_attribute="databases/mash_refseq_plasmid_db",
+                error_message=str(e),
+            )
 
     try:
         mash_custom_plasmid_db = args.mash_custom_plasmid_db
     except AttributeError:
-        mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
-    if not mash_custom_plasmid_db:
-        mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
+        try:
+            mash_custom_plasmid_db = config['databases']['mash_custom_plasmid_db']
+            if not os.path.exists(mash_custom_plasmid_db):
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), mash_custom_plasmid_db
+                )
+            logger.info(
+                "configuration_loaded",
+                timestamp=str(now()),
+                configuration_attribute="databases/mash_custom_plasmid_db",
+                configuration_value=mash_custom_plasmid_db,
+            )
+        except Exception as e:
+            logger.error(
+                "configuration_failed",
+                timestamp=str(now()),
+                configuration_attribute="databases/mash_custom_plasmid_db",
+                error_message=str(e),
+            )
 
 
     sample_id = args.sample_id
     output_dir = args.outdir
-
-    if not logger:
-        logging.basicConfig(
-            format="%(message)s",
-            stream=sys.stdout,
-            level=logging.DEBUG,
-        )
-
-        structlog.configure_once(
-            processors=[
-                structlog.stdlib.add_log_level,
-                structlog.processors.JSONRenderer()
-            ],
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            wrapper_class=structlog.stdlib.BoundLogger,
-            context_class=structlog.threadlocal.wrap_dict(dict),
-        )
-        logger = structlog.get_logger()
+        
 
     paths = {
         'job_scripts': resource_filename('data', 'job_scripts'),
@@ -134,60 +145,10 @@ def main(args, logger=None):
         exist_ok=True
     )
 
-    refseq_candidates = strategies.refseq_plasmids(sample_id, paths, logger)
-    custom_candidates = strategies.custom_plasmids(sample_id, paths, logger)
-    # Generate a list of candidate plasmids using two strategies
-    # in parallel, then merge the results.
-    #process_details = [
-    #    {
-    #        'target': strategies.refseq_plasmids,
-    #        'name': 'refseq_plasmids',
-    #    },
-    #    {
-    #        'target': strategies.custom_plasmids,
-    #        'name': 'custom_plasmids',
-    #    },
-    #]
-    #
-    #processes = []
-    #completed_processes = 0
-    #queue = multiprocessing.SimpleQueue()
-    #for process_detail in process_details:
-    #    p = multiprocessing.Process(
-    #        name=process_detail['name'],
-    #        target=process_detail['target'],
-    #        args=(
-    #            sample_id,
-    #            paths,
-    #            queue,
-    #        )
-    #    )
-    #    processes.append(p)
-    #    p.start()
+    refseq_candidates = strategies.refseq_plasmids(sample_id, paths)
+    custom_candidates = strategies.custom_plasmids(sample_id, paths)
 
     candidates = refseq_candidates + custom_candidates
-
-    #while True:
-    #    candidate = queue.get()
-    #    if candidate:
-    #        candidates.append(candidate)
-    #    else:
-    #        completed_processes += 1
-    #    if completed_processes >= len(processes):
-    #        break
-    #        
-    #for process in processes:
-    #    process.join()
-
-    # TODO:
-    # DONE determine which mash hits are 'candidates'
-    # DONE copy the candidate plasmid match fasta files over to working directory
-    # DONE index plasmid reference with samtools & bwa
-    # DONE align reads to referece with bwa
-    # DONE determine depth of alignment with samtools
-    # DONE call snps with freebayes
-
-
     
     samtools_faidx_jobs = []
     bwa_index_jobs = []
@@ -388,7 +349,7 @@ def main(args, logger=None):
     plasmid_output_final = os.path.join(
         output_dir,
         sample_id,
-        'final_plasmid.txt'
+        'final_plasmid.tsv'
     )
     
     custom_candidates = [c for c in candidates if c['database'] == 'custom']
@@ -450,5 +411,34 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)
+
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.DEBUG,
+    )
+
+    structlog.configure_once(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=structlog.threadlocal.wrap_dict(dict),
+    )
+
+    logger = structlog.get_logger(
+        analysis_id=str(uuid.uuid4()),
+        sample_id=args.sample_id,
+        pipeline_version=cpo_pipeline.__version__,
+    )
+
+    logger.info(
+        "analysis_started",
+        timestamp=str(now()),
+    )
+
     main(args)

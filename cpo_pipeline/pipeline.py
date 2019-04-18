@@ -17,66 +17,14 @@ import multiprocessing
 import uuid
 from pkg_resources import resource_filename
 from pprint import pprint
+
 import cpo_pipeline
+from cpo_pipeline.logging import now
 
-def now():
-    return datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 
-def prepare_job(job, session):
-    job_template = session.createJobTemplate()
-    job_template.jobName = job['job_name']
-    job_template.nativeSpecification = job['native_specification']
-    job_template.jobEnvironment = os.environ
-    job_template.workingDirectory = os.getcwd()
-    job_template.remoteCommand = job['remote_command']
-    job_template.args = job['args']
-    # job_template.joinFiles = True
-    try:
-        job_template.outputPath = ':' + job['output_path']
-    except KeyError:
-        pass
-    try:
-        job_template.errorPath = ':' + job['error_path']
-    except KeyError:
-        pass
-    
-    return job_template
+logger = structlog.get_logger()
 
-def run_jobs(jobs, logger=structlog.get_logger()):
-    with drmaa.Session() as session:
-        running_jobs = []
-        for job in jobs:
-            prepared_job = prepare_job(job, session)
-            job_id = session.runJob(prepared_job)
-            job_name = prepared_job.jobName
-            logger.info(
-                "job_submitted",
-                timestamp=str(now()),
-                job_name=job_name,
-                job_id=job_id,
-            )
-            running_jobs.append({"id": job_id, "name": job_name})
-        session.synchronize([x['id'] for x in running_jobs], drmaa.Session.TIMEOUT_WAIT_FOREVER, False)
-        for job in running_jobs:
-            job_info = session.wait(job["id"], drmaa.Session.TIMEOUT_WAIT_FOREVER)
-            resource_usage = job_info.resourceUsage
-            # Convert unix epoch timestamps to ISO8601 (YYYY-MM-DDTHH:mm:ss+tz)
-            for time_field in ["submission_time", "start_time", "end_time"]:
-                unix_timestamp = resource_usage[time_field]
-                iso8601_timestamp = str(datetime.datetime.fromtimestamp(
-                    int(float(unix_timestamp)), datetime.timezone.utc
-                ).isoformat())
-                resource_usage[time_field] = iso8601_timestamp
-            logger.info(
-                "job_completed",
-                timestamp=str(now()),
-                job_id=job["id"],
-                job_name=job["name"],
-                resource_usage=job_info.resourceUsage,
-                exit_status=job_info.exitStatus,
-            )
-
-def collect_final_outputs(outdir, sample_id, logger=structlog.get_logger()):
+def collect_final_outputs(outdir, sample_id):
     final_outputs = {}
     final_outputs['sample_id'] = sample_id
     total_bp_path = os.path.join(
@@ -230,23 +178,8 @@ def main(args):
 
     analysis_id = uuid.uuid4()
 
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=logging.DEBUG,
-    )
-
-    structlog.configure_once(
-        processors=[
-            structlog.stdlib.add_log_level,
-            structlog.processors.JSONRenderer()
-        ],
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        context_class=structlog.threadlocal.wrap_dict(dict),
-    )
     
-    logger = structlog.get_logger(
+    logger.new(
         analysis_id=str(uuid.uuid4()),
         sample_id=args.sample_id,
         pipeline_version=cpo_pipeline.__version__,
@@ -257,51 +190,13 @@ def main(args):
         timestamp=str(now()),
     )
 
-    plasmids_command_line = [
-        'cpo-pipeline',
-        'plasmids',
-        '--ID', args.sample_id,
-        '--R1', args.reads1_fastq,
-        '--R2', args.reads2_fastq,
-        '--outdir', args.outdir,
-    ]
+    cpo_pipeline.plasmids.pipeline.main(args)
 
-    # subprocess.run(plasmids_command_line)
-    cpo_pipeline.plasmids.pipeline.main(args, logger)
+    cpo_pipeline.assembly.pipeline.main(args)
 
-    assembly_command_line = [
-        'cpo-pipeline',
-        'assembly',
-        '--ID', args.sample_id,
-        '--R1', args.reads1_fastq,
-        '--R2', args.reads2_fastq,
-        '--outdir', args.outdir,
-    ]
+    cpo_pipeline.typing.pipeline.main(args)
 
-    # subprocess.run(assembly_command_line)
-    cpo_pipeline.assembly.pipeline.main(args, logger)
-
-    typing_command_line = [
-        'cpo-pipeline',
-        'typing',
-        '--ID', args.sample_id,
-        '--assembly', os.path.join(args.outdir, args.sample_id, 'assembly', 'contigs.fa'),
-        '--outdir', args.outdir,
-    ]
-
-    # subprocess.run(typing_command_line)
-    cpo_pipeline.typing.pipeline.main(args, logger)
-
-    resistance_command_line = [
-        'cpo-pipeline',
-        'resistance',
-        '--ID', args.sample_id,
-        '--assembly', "/".join([args.outdir, args.sample_id, 'assembly', 'contigs.fa']),
-        '--outdir', args.outdir,
-    ]
-
-    # subprocess.run(resistance_command_line)
-    cpo_pipeline.resistance.pipeline.main(args, logger)
+    cpo_pipeline.resistance.pipeline.main(args)
 
     final_outputs = collect_final_outputs(args.outdir, args.sample_id)
     logger.info(
@@ -309,10 +204,10 @@ def main(args):
         final_outputs=final_outputs,
     )
 
-    final_output_csv_path = "/".join([
+    final_output_path = "/".join([
         args.outdir,
         args.sample_id,
-        'final_output.csv'
+        'final_output.tsv'
     ])
 
     final_outputs_headers = [
@@ -332,7 +227,7 @@ def main(args):
         'MLST_ALLELE_7',
     ]
 
-    with open(final_output_csv_path, 'w+') as f:
+    with open(final_output_path, 'w+') as f:
         writer = csv.DictWriter(f, fieldnames=final_outputs_headers, delimiter='\t')
         writer.writeheader()
         writer.writerow(final_outputs)
@@ -404,4 +299,21 @@ if __name__ == '__main__':
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.DEBUG,
+    )
+
+    structlog.configure_once(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=structlog.threadlocal.wrap_dict(dict),
+    )
+
     main(args)

@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-# This script is a wrapper for CPO Pipeline Phase 3: tree rendering.
-# It uses snippy for core genome SNV calling and alignment, clustalw to generate a NJ tree and ete3 to render the dendrogram
-
 import subprocess
 import argparse
 import csv
@@ -17,13 +14,12 @@ import urllib.request
 import uuid
 import gzip
 import ete3 as e
-import drmaa
 from pprint import pprint
 
 from pkg_resources import resource_filename
 
 import cpo_pipeline
-from cpo_pipeline.pipeline import prepare_job, run_jobs
+from cpo_pipeline.drmaa import prepare_job, run_jobs
 from cpo_pipeline.tree.parsers import result_parsers
 
 

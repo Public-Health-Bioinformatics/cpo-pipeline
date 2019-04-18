@@ -1,21 +1,10 @@
 #!/usr/bin/env python
 
-'''
-This script is a wrapper for module one of the cpo-pipeline including QC and Assembly.
-It uses Mash2.0 and fastqc to check for sequence contamination, quality information and
-identify a reference genome. Then assembles the reads using shovill, and assesses the
-quality of the assembly with quast.
-
-Example usage:
-
-pipeline.py -i BC11-Kpn005_S2 --R1 BC11-Kpn005_S2_L001_R1_001.fastq.gz \
-  --R2 BC11-Kpn005_S2_L001_R2_001.fastq.gz -o output_dir
-'''
-
 import argparse
 import configparser
 import csv
 import datetime
+import drmaa
 import errno
 import glob
 import logging
@@ -24,68 +13,23 @@ import re
 import structlog
 import sys
 import urllib.request
-
-import drmaa
+import uuid
 
 from pkg_resources import resource_filename
 
-from cpo_pipeline.pipeline import prepare_job, run_jobs, now
+import cpo_pipeline
+from cpo_pipeline.drmaa import prepare_job, run_jobs
+from cpo_pipeline.logging import now
 from cpo_pipeline.assembly.parsers import result_parsers
 from cpo_pipeline.assembly.parsers import input_parsers
+from cpo_pipeline.assembly import quality_control as qc
+
 
 # If the user provides an unrecognized NCBI taxid
 # then use this as the estimated genome size
 DEFAULT_ESTIMATED_GENOME_SIZE = 5000000
 
-def busco_qc_check(busco_results, qc_thresholds):
-    """
-    BUSCO PASS CRITERIA:
-    1. complete singles > 90% of total genes
-    2. complte duplicates < 90% of total genes
-    Args:
-        busco_results (dict): Busco results
-        qc_thresholds (dict): Threshold values for determining QC pass/fail
-    Returns:
-        boolean: Assembly passes our BUSCO quality criteria
-    """
-    complete_single = busco_results['complete_single']
-    complete_duplicate = busco_results['complete_duplicate']
-    total = busco_results['total']
-    busco_complete_single_cutoff = qc_thresholds['busco_complete_single_cutoff']
-    busco_complete_duplicate_cutoff = qc_thresholds['busco_complete_duplicate_cutoff']
-
-    return bool((complete_single / total) >= busco_complete_single_cutoff and \
-                (complete_duplicate / total) <= busco_complete_duplicate_cutoff)
-
-
-def quast_qc_check(quast_results, estimated_genome_size):
-    """
-    QUAST PASS CRITERIA:
-    1. total length within +/- 10% of expected genome size
-    Args:
-        quast_results (dict): Quast results
-        qc_thresholds (dict): Threshold values for determining QC pass/fail
-    Returns:
-        boolean: Assembly passes our QUAST quality criteria
-    """
-    total_length = quast_results['total_length']
-    return bool(total_length <= (estimated_genome_size * 1.1) and \
-                total_length >= (estimated_genome_size * 0.9))
-
-
-def fastqc_qc_check(fastqc_results):
-    """
-    Args:
-        fastqc_results (dict): FastQC results
-    Returns:
-        boolean: Sequence data passes our FastQC quality criteria
-    """
-    return bool(fastqc_results["basic_statistics"] == "PASS" and \
-                fastqc_results["per_base_sequence_quality"] == "PASS" and \
-                fastqc_results["sequence_length_distribution"] == "PASS")
-
-
-
+logger = structlog.get_logger()
 
 def download_refseq_reference(reference_id, download_path):
     """
@@ -132,9 +76,33 @@ def download_refseq_reference(reference_id, download_path):
     ])
 
     #fetch the files
-    urllib.request.urlretrieve(fasta_url, "/".join([download_path, reference_id]))
-    urllib.request.urlretrieve(assembly_stat_url,
+    try:
+        urllib.request.urlretrieve(fasta_url, "/".join([download_path, reference_id]))
+        logger.info(
+            "file_downloaded",
+            timestamp=str(now()),
+            url=fasta_url,
+        )
+    except Exception as e:
+        logging.error(
+            "download_failed",
+            timestamp=str(now()),
+            url=fasta_url,
+        )
+    try:
+        urllib.request.urlretrieve(assembly_stat_url,
                                "/".join([download_path, assembly + "_assembly_stats.txt"]))
+        logger.info(
+            "file_downloaded",
+            timestamp=str(now()),
+            url=assembly_stat_url,
+        )
+    except Exception as e:
+        logging.error(
+            "download_failed",
+            timestamp=str(now()),
+            url=assembly_stat_url,
+        )
 
 def prepare_output_directories(output_dir, sample_id):
     """
@@ -180,7 +148,7 @@ def get_estimated_genome_size(estimated_genome_sizes, ncbi_taxonomy_id):
     return estimated_genome_size
 
 
-def main(args, logger=None):
+def main(args):
     """
     main entrypoint
     Args:
@@ -195,32 +163,30 @@ def main(args, logger=None):
     try:
         mash_genome_db = args.mash_genome_db
     except AttributeError:
-        mash_genome_db = config['databases']['mash_genome_db']
-    if not mash_genome_db:
-        mash_genome_db = config['databases']['mash_genome_db']
+        try:
+            mash_genome_db = config['databases']['mash_genome_db']
+            if not os.path.exists(mash_genome_db):
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), mash_genome_db
+                )
+            logger.info(
+                "configuration_loaded",
+                timestamp=str(now()),
+                configuration_attribute="databases/mash_genome_db",
+                configuration_value=mash_genome_db,
+            )
+        except Exception as e:
+            logger.error(
+                "configuration_failed",
+                timestamp=str(now()),
+                configuration_attribute="databases/mash_genome_db",
+                error_message=str(e),
+            )
 
     sample_id = args.sample_id
     reads1_fastq = args.reads1_fastq
     reads2_fastq = args.reads2_fastq
     output_dir = args.outdir
-
-    if not logger:
-        logging.basicConfig(
-            format="%(message)s",
-            stream=sys.stdout,
-            level=logging.DEBUG,
-        )
-
-        structlog.configure_once(
-            processors=[
-                structlog.stdlib.add_log_level,
-                structlog.processors.JSONRenderer()
-            ],
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            wrapper_class=structlog.stdlib.BoundLogger,
-            context_class=structlog.threadlocal.wrap_dict(dict),
-        )
-        logger = structlog.get_logger()
 
     prepare_output_directories(output_dir, sample_id)
 
@@ -349,14 +315,23 @@ def main(args, logger=None):
     run_jobs(pre_assembly_qc_jobs)
 
     #parse genome mash results
-    mash_dist_results = result_parsers.parse_mash_dist_result(paths["mash_genome_path"])
-    logger.info(
-        "parsed_result_file",
-        timestamp=str(now()),
-        filename=os.path.abspath(paths["mash_genome_path"]),
-        closest_match_reference_id=mash_dist_results[0]['reference_id'],
-    )
-    
+    mash_dist_results = []
+    try:
+        mash_dist_results = result_parsers.parse_mash_dist_result(paths["mash_genome_path"])
+        logger.info(
+            "parsed_result_file",
+            timestamp=str(now()),
+            filename=os.path.abspath(paths["mash_genome_path"]),
+            closest_match_reference_id=mash_dist_results[0]['reference_id'],
+        )
+    except Exception as e:
+        logger.info(
+            "result_parsing_failed",
+            timestamp=str(now()),
+            filename=os.path.abspath(paths["mash_genome_path"]),
+            error_message=e.message,
+        )
+
 
     # parse fastqc
     fastqc_results = {}
@@ -374,14 +349,14 @@ def main(args, logger=None):
             )
             logger.info(
                 "parsed_result_file",
-                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                timestamp=str(now()),
                 filename=os.path.abspath(fastqc_result_summary_path),
                 summary=fastqc_results[read],
             )
-        except ValueError:
+        except Exception as e:
             logger.error(
                 "result_parsing_failed",
-                timestamp=str(datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()),
+                timestamp=str(now()),
                 filename=fastqc_result_summary_path
             )
             fastqc_results["R1"] = {
@@ -414,16 +389,17 @@ def main(args, logger=None):
 
 
     #look at fastqc results
-    qc_verdicts["acceptable_fastqc_forward"] = fastqc_qc_check(fastqc_results["R1"])
-    qc_verdicts["acceptable_fastqc_reverse"] = fastqc_qc_check(fastqc_results["R2"])
+    qc_verdicts["acceptable_fastqc_forward"] = qc.fastqc_qc_check(fastqc_results["R1"])
+    qc_verdicts["acceptable_fastqc_reverse"] = qc.fastqc_qc_check(fastqc_results["R2"])
 
     try:
         reference_genome = mash_dist_results[0]['reference_id']
-    except ValueError as e:
+    except Exception as e:
         logger.error(
-            "failed_quality_control",
+            "failed_quality_control_check",
             timestamp=str(now()),
             qc_check_failed="determine_reference_sequence",
+            error_message=e.message,
         )
         
     # build the save paths
@@ -432,7 +408,7 @@ def main(args, logger=None):
     except OSError as exc:
         if exc.errno != errno.EEXIST:
             raise
-    
+
     download_refseq_reference(reference_genome, paths['reference_genome_path'])
 
 
@@ -470,11 +446,12 @@ def main(args, logger=None):
                 refseq_assembly_accession=reference_genome_assembly_stats['refseq_assembly_accession'],
             )
             estimated_genome_size = reference_genome_assembly_stats['total_length']
-        except ValueError:
+        except Exception as e:
             logger.error(
                 "result_parsing_failed",
                 timestamp=str(now()),
                 filename=os.path.abspath(reference_genome_assembly_stats_path),
+                error_message=e.message,
             )
 
     total_bp = result_parsers.parse_total_bp(paths["totalbp_path"])
@@ -567,10 +544,9 @@ def main(args, logger=None):
         N50=quast_results["N50"],
     )
 
-    qc_verdicts["acceptable_busco_assembly_metrics"] = busco_qc_check(busco_results, qc_thresholds)
-    qc_verdicts["acceptable_quast_assembly_metrics"] = quast_qc_check(quast_results, estimated_genome_size)
+    qc_verdicts["acceptable_busco_assembly_metrics"] = qc.busco_qc_check(busco_results, qc_thresholds)
+    qc_verdicts["acceptable_quast_assembly_metrics"] = qc.quast_qc_check(quast_results, estimated_genome_size)
 
-    # return os.path.join(paths['assembly_output'], "contigs.fa")
 
 if __name__ == "__main__":
     script_name = os.path.basename(os.path.realpath(sys.argv[0]))
@@ -583,10 +559,39 @@ if __name__ == "__main__":
                         help="absolute file path forward read (R1)", required=True)
     parser.add_argument("-2", "--R2", dest="reads2_fastq",
                         help="absolute file path to reverse read (R2)", required=True)
-    parser.add_argument("-o", "--outdir", dest="output", default='./',
+    parser.add_argument("-o", "--outdir", dest="outdir", default='./',
                         help="absolute path to output folder")
     parser.add_argument('-c', '--config', dest='config_file',
                         default=resource_filename('data', 'config.ini'),
                         help='Config File', required=False)
+
     args = parser.parse_args()
+    
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.DEBUG,
+    )
+
+    structlog.configure_once(
+        processors=[
+            structlog.stdlib.add_log_level,
+            structlog.processors.JSONRenderer()
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=structlog.threadlocal.wrap_dict(dict),
+    )
+
+    logger = structlog.get_logger(
+        analysis_id=str(uuid.uuid4()),
+        sample_id=args.sample_id,
+        pipeline_version=cpo_pipeline.__version__,
+    )
+    
+    logger.info(
+        "analysis_started",
+        timestamp=str(now()),
+    )
+    
     main(args)
