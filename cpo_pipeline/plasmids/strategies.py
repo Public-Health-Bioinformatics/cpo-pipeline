@@ -8,6 +8,7 @@ import shutil
 import structlog
 import time
 import urllib.request
+from urllib.error import HTTPError
 from pprint import pprint
 
 from cpo_pipeline.assembly.parsers import result_parsers
