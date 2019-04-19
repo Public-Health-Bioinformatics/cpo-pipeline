@@ -154,6 +154,8 @@ The pipeline emits json-formatted structured logs using the `structlog` library.
 | `job_submitted`                |
 | `job_completed`                |
 | `parsed_result_file`           |
+| `file_downloaded`              |
+| `retried_download`             |
 | `download_failed`              |
 | `result_parsing_failed`        |
 | `failed_quality_control_check` |

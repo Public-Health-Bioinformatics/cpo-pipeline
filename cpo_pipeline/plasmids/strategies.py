@@ -326,20 +326,41 @@ def refseq_plasmids(sample_id, paths):
                 "id=" + candidate['accession'],
                 "rettype=fasta",
             ])
-        try:
-            urllib.request.urlretrieve(url, candidate['fasta_path'])
-            logger.info(
-                "file_downloaded",
-                timestamp=str(now()),
-                accession=candidate['accession'],
-                sample_id=sample_id
-            )
-        except Exception as e:
-            logger.error(
-                "download_failed",
-                timestamp=str(now()),
-                url=url,
-            )
+        def download_retry(url, candidate):
+            """
+              NCBI Rate-limits refseq downloads to 3 per second from each IP.
+              When multiple files are being analyzed simultaneously this 
+              limit may be exceeded.
+              Retry
+            """
+            try:
+                urllib.request.urlretrieve(url, candidate['fasta_path'])
+                logger.info(
+                    "file_downloaded",
+                    timestamp=str(now()),
+                    url=url,
+                    accession=candidate['accession'],
+                    sample_id=sample_id,
+                )
+            except HTTPError as e:
+                if int(e.code) == 429:
+                    time.sleep(5)
+                    logger.info(
+                        "retried_download",
+                        timestamp=str(now()),
+                        url=url,
+                        accession=candidate['accession'],
+                        sample_id=sample_id,
+                    )
+                    download_retry(url, candidate)
+                else:
+                    logger.error(
+                        "download_failed",
+                        timestamp=str(now()),
+                        url=url,
+                        sample_id=sample_id,
+                    )
+        download_retry(url, candidate)
         time.sleep(2)
 
     return candidates
