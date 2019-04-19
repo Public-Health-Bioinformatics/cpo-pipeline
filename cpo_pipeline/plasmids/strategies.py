@@ -335,7 +335,7 @@ def refseq_plasmids(sample_id, paths):
                 sample_id=sample_id
             )
         except Exception as e:
-            logging.error(
+            logger.error(
                 "download_failed",
                 timestamp=str(now()),
                 url=url,
