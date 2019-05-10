@@ -95,7 +95,7 @@ def main(args):
     except AttributeError:
         try:
             abricate_cpo_plasmid_db = config['databases']['abricate_cpo_plasmid_db']
-            if not os.path.exists(abricate_cpo_plasmid_db):
+            if not os.path.exists(os.path.join(abricate_datadir, abricate_cpo_plasmid_db)):
                 raise FileNotFoundError(
                     errno.ENOENT, os.strerror(errno.ENOENT), abricate_cpo_plasmid_db
                 )
