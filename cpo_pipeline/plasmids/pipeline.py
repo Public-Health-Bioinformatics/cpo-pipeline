@@ -360,6 +360,7 @@ def main(args):
 
     with open(plasmid_output_final, 'w+') as f:
         fieldnames = [
+            'sample_id',
             'accession',
             'circularity',
             'plasmid_length',
@@ -369,7 +370,9 @@ def main(args):
             'allele',
             'incompatibility_group'
         ]
+
         writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
+        writer.writeheader()
         if custom_best_candidate:
             f.write(args.sample_id + '\t')
             # Truncate floats to 4 digits
@@ -377,6 +380,7 @@ def main(args):
 
     with open(plasmid_output_summary, 'w+') as f:
         fieldnames = [
+        'sample_id',
             'accession',
             'circularity',
             'plasmid_length',
@@ -387,6 +391,7 @@ def main(args):
             'incompatibility_group'
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
+        writer.writeheader()
         for candidate in custom_candidates:
             f.write(args.sample_id + '\t')
             # Truncate floats to 4 digits
