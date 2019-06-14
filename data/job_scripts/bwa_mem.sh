@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -f|--fasta\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -1|--R1 INPUT_R1.fastq.gz -2|--R2 INPUT_R2.fasta.gz -r|--reference REFERENCE_FASTA -o|--output\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 

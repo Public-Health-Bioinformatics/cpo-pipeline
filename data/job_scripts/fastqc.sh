@@ -19,7 +19,8 @@ then
   exit 0
 fi
 
-input_fastq=""
+input_r1_fastq=""
+input_r2_fastq=""
 output_dir=""
 
 while [[ $# -gt 0 ]]

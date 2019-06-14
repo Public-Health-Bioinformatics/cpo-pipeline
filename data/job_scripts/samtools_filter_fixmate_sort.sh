@@ -39,7 +39,7 @@ do
     shift # past value
     ;;
     -o|--output)
-    # only include reads with none of the FLAGS in this integer present
+    # output sam (or bam) file
     output="$2"
     shift # past argument
     shift # past value

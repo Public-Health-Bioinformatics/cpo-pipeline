@@ -18,7 +18,7 @@ then
 fi
 
 alignment=""
-treefile=""
+output_file=""
 clonalframeml=""
 svg=""
 

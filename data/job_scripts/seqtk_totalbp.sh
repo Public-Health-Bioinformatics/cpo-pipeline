@@ -21,7 +21,6 @@ fi
 
 input_r1_fastq=""
 input_r2_fastq=""
-queries=""
 output_file=""
 
 while [[ $# -gt 0 ]]

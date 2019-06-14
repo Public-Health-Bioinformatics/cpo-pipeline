@@ -18,6 +18,7 @@ then
 fi
 
 alignment=""
+model=""
 
 while [[ $# -gt 0 ]]
 do

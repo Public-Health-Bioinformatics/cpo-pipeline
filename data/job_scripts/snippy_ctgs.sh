@@ -6,7 +6,7 @@
 #$ -pe smp 8      # Parallel Environment (how many cores)
 #$ -l h_vmem=1G   # Memory (RAM) allocation *per core*
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -r|--ref REFERENCE_FASTA -c|--ctgs -o|--outdir OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -r|--ref REFERENCE_FASTA -c|--ctgs CONTIGS_FASTA_FILE -o|--outdir OUTPUT_FILE\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -18,8 +18,7 @@ then
 fi
 
 reference=""
-input_r1_fastq=""
-input_r2_fastq=""
+ctgs=""
 outdir=""
 
 while [[ $# -gt 0 ]]

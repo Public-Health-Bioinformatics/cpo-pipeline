@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input SAM_BAM -o|--output SAM_BAM\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -i|--input SAM_BAM -o|--output SAM_BAM -n|--name-order\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -40,7 +40,7 @@ do
     shift # past argument
     ;;
     -o|--output)
-    # only include reads with none of the FLAGS in this integer present
+    # output sam (or bam) file
     output="$2"
     shift # past argument
     shift # past value

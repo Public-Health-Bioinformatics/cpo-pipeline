@@ -8,7 +8,7 @@
 #$ -e ./logs/$JOB_ID.err
 #$ -o ./logs/$JOB_ID.log
 
-USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -1|--R1 INPUT_R1_FASTQ -2|--R2 INPUT_R2_FASTQ -q|--queries QUERIES_MSH -o|--output_file OUTPUT_FILE\n\
+USAGE="qsub $( basename "$BASH_SOURCE" ) [-h] -1|--R1 INPUT_R1_FASTQ -2|--R2 INPUT_R2_FASTQ -c|--mincov MIN_CONTIG_COVERAGE -l|--minlen MIN_CONTIG_LENGTH -o|--output_dir OUTPUT_DIR\n\
 \n\
 optional arguments:\n\
   -h, --help \t\t\t Show this help message and exit" 
@@ -21,6 +21,8 @@ fi
 
 input_r1_fastq=""
 input_r2_fastq=""
+mincov="2"
+minlen="0"
 output_dir=""
 
 while [[ $# -gt 0 ]]

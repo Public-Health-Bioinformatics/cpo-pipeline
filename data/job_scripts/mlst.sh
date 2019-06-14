@@ -19,7 +19,8 @@ then
   exit 0
 fi
 
-input=""
+assembly=""
+label=""
 output_file=""
 
 while [[ $# -gt 0 ]]
@@ -28,7 +29,7 @@ do
   
   case $key in
     -i|--input)
-    # input_R1.fastq.gz file
+    # input_contigs_fasta file
     assembly="$2"
     shift # past argument
     shift # past value

@@ -26,7 +26,7 @@ do
   
   case $key in
     -a|--alignment)
-    # reference fasta file
+    # alignment fasta file
     alignment="$2"
     shift # past argument
     shift # past value

@@ -20,7 +20,7 @@ then
 fi
 
 input=""
-flags=0
+output=""
 
 while [[ $# -gt 0 ]]
 do
@@ -34,7 +34,7 @@ do
     shift # past value
     ;;
     -o|--output)
-    # only include reads with none of the FLAGS in this integer present
+    # output sam (or bam) file
     output="$2"
     shift # past argument
     shift # past value
